@@ -4,31 +4,39 @@
 #include <ctime> 
 #include <stdlib.h>
 #include "diagonalize.h"
+#include "gaunt.h"
 
 
 using namespace std;
 int main(int argc, char** argv){
+	// Process flags
+
 
 	// Generate random array
-  int n,m;
-  double *mat;
+	// int n,m;
+	// double *mat;
 
-  n = 10;
-  m = 10;
+	// n = 10;
+	// m = 10;
 
-  mat = new double[n*m];
+	// mat = new double[n*m];
 
-  srand(time(NULL));
-  for (int i = 0; i < n*m; ++i) {
-    mat[i] = rand() % 10 + 1;
-  }
-	cout << "print matrix" << endl;
-	for (int i = 0; i < n; i++) {
-		for (int j = 0; j < m; j++) {
-			cout << mat[i*n+j] << " ";
-		}
-		cout << endl;
+	// srand(time(NULL));
+	// for (int i = 0; i < n*m; ++i) {
+	//   mat[i] = rand() % 10 + 1;
+	// }
+	// cout << "print matrix" << endl;
+	// for (int i = 0; i < n; i++) {
+	// 	for (int j = 0; j < m; j++) {
+	// 		cout << mat[i*n+j] << " ";
+	// 	}
+	// 	cout << endl;
+	// }
+	// cout << endl;
+	// diagonalize(mat,n,m);
+
+	double* test = gaunt(2,2,2,2);
+	for (int i = 0; i <= 4; ++i) {
+		cout << test[i] << endl;
 	}
-	cout << endl;
-	diagonalize(mat,n,m);
 }
