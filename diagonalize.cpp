@@ -10,10 +10,54 @@ extern "C" {
 extern int dgeev_(char*,char*,int*,double*,int*,double*, double*, double*, int*, double*, int*, double*, int*, int*);
 }
 
-double diagonalize(double *mat, int n, int m) {
-	if (n != m) {
-		cout << "Matrix is not square" << endl;
-		return -1;
+void diagonalize_test() {
+	// Generate random array
+	int n,m;
+	double *mat;
+
+	n = 10;
+	m = 10;
+
+	mat = new double[n*m];
+
+	srand(time(NULL));
+	for (int i = 0; i < n*m; ++i) {
+	  mat[i] = rand() % 10 + 1;
+	}
+	cout << "print matrix" << endl;
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < m; j++) {
+			cout << mat[i*n+j] << " ";
+		}
+		cout << endl;
+	}
+	cout << endl;
+	diagonalize(mat,n,m);
+	delete [] mat;
+}
+
+double trace(double *mat, int n, int m) {
+	try {
+		if (n != m){
+			throw invalid_argument( "Matrix is not square");
+		}
+	} catch(const exception &ex) {
+		std::cout << ex.what() << "\n";
+	}
+	int t = 0;
+	for (int i = 0; i < n; ++i) {
+		t += mat[i+n*i];
+	}
+	return t;
+}
+
+double* diagonalize(double *mat, int n, int m) {
+	try {
+		if (n != m){
+			throw invalid_argument( "Matrix is not square");
+		}
+	} catch(const exception &ex) {
+		std::cout << ex.what() << "\n";
 	}
 	// allocate data
 	char Nchar='N';
@@ -30,22 +74,24 @@ double diagonalize(double *mat, int n, int m) {
 			vl,&one,vr,&one,
 			work,&lwork,&info);
 	// check for errors
-	if (info!=0){
-		cout << "Error: dgeev returned error code " << info << endl;
-		return -1;
+	try {
+		if (info!=0){
+			throw runtime_error( "Error: dgeev returned error code ");
+		}
+	} catch(const exception &ex) {
+		std::cout << ex.what() << "\n";
 	}
 	// output eigenvalues to stdout
-	cout << "--- Eigenvalues ---" << endl;
-	for (int i=0;i<n;i++){
-		cout << "( " << eigReal[i] << " , " << eigImag[i] << " )\n";
-	}
-	cout << endl;
+	// cout << "--- Eigenvalues ---" << endl;
+	// for (int i=0;i<n;i++){
+	// 	cout << "( " << eigReal[i] << " , " << eigImag[i] << " )\n";
+	// }
+	// cout << endl;
 
 	// deallocate
-	delete [] mat;
-	delete [] eigReal;
-	delete [] eigImag;
+	// delete [] eigReal;
+	// delete [] eigImag;
 	delete [] work;
 
-	return 0;
+	return eigReal;
 }
