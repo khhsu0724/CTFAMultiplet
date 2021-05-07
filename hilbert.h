@@ -5,6 +5,7 @@
 #define HILBERT
 
 int choose(int n, int k);
+double norm(std::vector<double>& vin);
 
 struct QN {
 	// Quantum number for each occupations
@@ -16,6 +17,7 @@ struct QN {
 	}
 };
 bool operator<(const QN& qn1, const QN& qn2);
+bool operator!=(const QN& qn1, const QN& qn2);
 
 class Hilbert {
 	// This class contains function to calculate and generate hilbert space (array of states)
@@ -31,12 +33,15 @@ public:
 	int* hmat;
 public:
 	explicit Hilbert(char orb, int occ_num);
-	int bit2state(const char* state);
+	double Psign(QN* lhsop, QN* rhsop, int lhss, int rhss, int opnum);
+	int bit2state(std::string& state);
 	std::string state2bit(int state);
 	int qn2state(QN* qn, int snum, bool is_bit=true);
 	int sindex(int state);
 	int* generate_states(int in_state, QN* in_state_arr);
+	std::vector<std::pair<int,int>> match_states(int snum, QN* rhs, QN* lhs);
 	void pretty_print(double* mat, std::pair<int,int> column, std::pair<int,int> row);
+	void matrix_check(double* mat, double* eig, double* eigvec);
 };
 
 #endif

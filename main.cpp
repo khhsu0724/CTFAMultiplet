@@ -14,14 +14,6 @@
 
 using namespace std;
 
-double Psign(QN qn1, QN qn2, QN qn3, QN qn4) {
-	// Make sure that the fermion operator is normal ordered, uses different rule to compare QN
-	double p = 1;
-	if (qn4 < qn3) p *= -1;
-	if (qn1 < qn2) p *= -1;
-	return p;
-}
-
 double calc_U(double* gaunt1, double* gaunt2, double* SC, int size) {
 	double u = 0;
 	for (int i = 0; i < size; ++i) {
@@ -34,12 +26,13 @@ double calc_U(double* gaunt1, double* gaunt2, double* SC, int size) {
 // Implement Symmetries
 void calc_coulomb(Hilbert& hspace, double* mat, double* SC) {
 	//Calculate Coulomb Matrix Element
-	double n = hspace.hmat_size, m = n;
-	double* ml_arr = new double[hspace.l*2+1];
+	int n = hspace.hmat_size, m = n;
+	int* ml_arr = new int[hspace.l*2+1];
 	for (int ml = -hspace.l; ml <= hspace.l; ++ml) {
 		ml_arr[ml+hspace.l] = ml;
 	}
-
+	int term = 0;
+	double dsum = 0; //Debug
 	// Find all combination when m1+m2=m3+m4
 	for (int msum = -hspace.l*2; msum <= hspace.l*2; ++msum) {
 		vector<pair<int,int>> mpair_p; //parallel ml pairs
@@ -57,30 +50,32 @@ void calc_coulomb(Hilbert& hspace, double* mat, double* SC) {
 			//antiparallel spin, can occupy same ml
 			mpair_a.push_back({m,msum-m});
 		}
+
 		for (auto m12 : mpair_a) {
 			// Populate Hamiltonian that contains the antiparallel spin pair
-			int num_states = choose(hspace.orb_avail-2,hspace.occ_num-2);
-			struct QN qn12[2] = {{m12.first,-1},{m12.second,1}}; // psi,i,j => Creation operators m4,m3
-			int* state12 = hspace.generate_states(2,qn12);
+			struct QN qn12[2] = {{m12.first,-1},{m12.second,1}}; // psi_kl, lhs 
 			for (auto m34 : mpair_a) {
-				struct QN qn34[2] = {{m34.first,-1},{m34.second,1}}; // Annihilation operators m1,m2
-				int* state34 = hspace.generate_states(2,qn34);
-				for (int s1 = 0; s1 < num_states; ++s1) {
-					for (int s2 = 0; s2 < num_states; ++s2) {
-						double matelem = calc_U(gaunt(hspace.l,m34.first,hspace.l,m12.first),
-									gaunt(hspace.l,m12.second,hspace.l,m34.second),SC,2*hspace.l+1);
-						if (hspace.qn2state(qn12,2) != hspace.qn2state(qn34,2)) { // Off Diagonal Term
-							matelem *= Psign(qn34[0],qn34[1],qn12[1],qn12[0]);
-						}
-						mat[hspace.sindex(state12[s1])+hspace.hmat_size*hspace.sindex(state34[s2])] += matelem;
-						// Debug
+				struct QN qn34[2] = {{m34.first,-1},{m34.second,1}}; // psi_ij,rhs
+				vector<pair<int,int>> entries = hspace.match_states(2, qn12, qn34);
+				double matelem = calc_U(gaunt(hspace.l,m12.first,hspace.l,m34.first),
+								gaunt(hspace.l,m34.second,hspace.l,m12.second),SC,2*hspace.l+1);
+				for (auto e : entries) {
+					if (hspace.sindex(e.first) != hspace.sindex(e.second)) { // Off Diagonal Term
+						matelem *= hspace.Psign(qn12,qn34,e.first,e.second,2);
+					}
+					mat[hspace.sindex(e.first)+hspace.hmat_size*hspace.sindex(e.second)] += matelem;
 
-							if (hspace.sindex(state12[s1]) == 1 && hspace.sindex(state34[s2]) == 0) {
-								cout << "m1(sd): " << m34.first << ", m2(su): " << m34.second << ", m3(su): " << m12.second << ", m4(sd): " << m12.first;
-								cout << ", gaunt sum: " << calc_U(gaunt(hspace.l,m34.first,hspace.l,m12.first),
-									gaunt(hspace.l,m12.second,hspace.l,m34.second),SC,2*hspace.l+1) 
-								<< ", index: " << hspace.sindex(state12[s1])+hspace.hmat_size*hspace.sindex(state34[s2]) << endl;
-							}
+					// Debug
+					if (hspace.sindex(e.first) != hspace.sindex(e.second)) {
+						++term;
+						double gs = hspace.Psign(qn34,qn12,e.second,e.first,2)*calc_U(gaunt(hspace.l,m12.first,hspace.l,m34.first),
+								gaunt(hspace.l,m34.second,hspace.l,m12.second),SC,2*hspace.l+1);
+
+						dsum += gs;
+						cout << "m1(sd): " << m34.first << ", m2(su): " << m34.second << ", m3(su): " << m12.second << ", m4(sd): " << m12.first;
+						cout << ", gaunt sum: " << gs
+						<< ", index: " << hspace.sindex(e.first)+hspace.hmat_size*hspace.sindex(e.second)
+						<< ", state 1: " << hspace.state2bit(e.first) << ", state 2: " << hspace.state2bit(e.second) << ", dsum: " << dsum << endl;
 					}
 				}
 			}
@@ -89,39 +84,39 @@ void calc_coulomb(Hilbert& hspace, double* mat, double* SC) {
 		for (auto spin : {-1,1}) {
 			for (auto m12 : mpair_p) {
 				// Populate Hamiltonian that contains the parallel spin pair
-				int num_states = choose(hspace.orb_avail-2,hspace.occ_num-2);
-				struct QN qn12[2] = {{m12.first,spin},{m12.second,spin}};
-				int* state12 = hspace.generate_states(2,qn12);
+				struct QN qn12[2] = {{m12.first,spin},{m12.second,spin}}; // psi_kl, lhs 
 				for (auto m34 : mpair_p) {
-					struct QN qn34[2] = {{m34.first,spin},{m34.second,spin}};
-					int* state34 = hspace.generate_states(2,qn34);
-					for (int s1 = 0; s1 < num_states; ++s1) {
-						for (int s2 = 0; s2 < num_states; ++s2) {
-							double matelem = calc_U(gaunt(hspace.l,m34.first,hspace.l,m12.first),
-										gaunt(hspace.l,m12.second,hspace.l,m34.second),SC,hspace.l+hspace.l+1) -
-								calc_U(gaunt(hspace.l,m34.second,hspace.l,m12.first),
-										gaunt(hspace.l,m12.second,hspace.l,m34.first),SC,hspace.l+hspace.l+1);
-							if (hspace.qn2state(qn12,2) != hspace.qn2state(qn34,2)) { // Off Diagonal Term
-								matelem *= Psign(qn34[0],qn34[1],qn12[1],qn12[0]);
-							}
-							mat[hspace.sindex(state12[s1])+hspace.hmat_size*hspace.sindex(state34[s2])] += matelem;
-
-							//Debug				
-							if (hspace.sindex(state12[s1]) == 1 && hspace.sindex(state34[s2]) == 0) {
-								cout << "spin: " << spin;
-								cout << ", m1: " << m34.first << ", m2: " << m34.second << ", m3: " << m12.second << ", m4: " << m12.first;
-								cout << ", gaunt sum: " << calc_U(gaunt(hspace.l,m34.first,hspace.l,m12.first),
-										gaunt(hspace.l,m12.second,hspace.l,m34.second),SC,hspace.l+hspace.l+1) -
-								calc_U(gaunt(hspace.l,m34.second,hspace.l,m12.first),
-										gaunt(hspace.l,m12.second,hspace.l,m34.first),SC,hspace.l+hspace.l+1) 
-								<< ", index: " << hspace.sindex(state12[s1])+hspace.hmat_size*hspace.sindex(state34[s2]) << endl;
-							}
+					struct QN qn34[2] = {{m34.first,spin},{m34.second,spin}}; // psi_ij,rhs
+					vector<pair<int,int>> entries = hspace.match_states(2, qn12, qn34);
+					double matelem = calc_U(gaunt(hspace.l,m12.first,hspace.l,m34.first),
+									 gaunt(hspace.l,m34.second,hspace.l,m12.second),SC,2*hspace.l+1) -
+									 calc_U(gaunt(hspace.l,m12.second,hspace.l,m34.first),
+									 gaunt(hspace.l,m34.second,hspace.l,m12.first),SC,2*hspace.l+1);
+					for (auto e : entries) {
+						if (hspace.sindex(e.first) != hspace.sindex(e.second)) { // Off Diagonal Term
+							matelem *= hspace.Psign(qn12,qn34,e.first,e.second,2);
+						}
+						mat[hspace.sindex(e.first)+hspace.hmat_size*hspace.sindex(e.second)] += matelem;
+						//Debug				
+						if (hspace.sindex(e.first) != hspace.sindex(e.second)) {							
+							++term;
+							double gs = hspace.Psign(qn12,qn34,e.first,e.second,2) * calc_U(gaunt(hspace.l,m12.first,hspace.l,m34.first),
+									 gaunt(hspace.l,m34.second,hspace.l,m12.second),SC,2*hspace.l+1) -
+									 calc_U(gaunt(hspace.l,m12.second,hspace.l,m34.first),
+									 gaunt(hspace.l,m34.second,hspace.l,m12.first),SC,2*hspace.l+1);
+							dsum += gs;
+							cout << "spin: " << spin;
+							cout << ", m1: " << m34.first << ", m2: " << m34.second << ", m3: " << m12.second << ", m4: " << m12.first;
+							cout << ", gaunt sum: " << gs
+							<< ", index: " << hspace.sindex(e.first)+hspace.hmat_size*hspace.sindex(e.second) 
+							<< ", state 1: " << hspace.state2bit(e.first) << ", state 2: " << hspace.state2bit(e.second) << ", dsum: " << dsum << endl;
 						}
 					}
 				}
 			}
 		}
 	}
+	cout << "term: " <<  term << ", dsum: " << dsum << endl;
 }
 
 double* CFmat(double l, double tenDQ) {
@@ -190,19 +185,18 @@ void tanabe_sugano(double* SC) {
 		}
 		calc_coulomb(d2, mat, SC);
 		calc_CF(d2,mat,cf);
-		double* eig;
-		eig = diagonalize(mat,d2.hmat_size,d2.hmat_size);
-		myfile << cf << " ";
-		for (int i =0; i < d2.hmat_size; ++i) {
-			myfile << eig[i] << " ";
-		}
-		myfile << endl;
+		// double* eig;
+		// eig = diagonalize(mat,d2.hmat_size,d2.hmat_size);
+		// myfile << cf << " ";
+		// for (int i =0; i < d2.hmat_size; ++i) {
+		// 	myfile << eig[i] << " ";
+		// }
+		// myfile << endl;
 	}
     myfile.close();
 }
 
-void printDistinct(double arr[], int n)
-{
+void printDistinct(double arr[], int n) {
     // Pick all elements one by one
     for (int i=0; i<n; i++)
     {
@@ -211,7 +205,6 @@ void printDistinct(double arr[], int n)
         for (j=0; j<i; j++)
            if (abs(arr[i] - arr[j]) < 0.00001)
                break;
-  
         // If not printed earlier, then print it
         if (i == j)
           cout << arr[i] << " ";
@@ -221,30 +214,41 @@ void printDistinct(double arr[], int n)
 int main(int argc, char** argv){
 	// Process flags
 
+	bool CF_on = false;
+	bool SO_on = false;
+
 	Hilbert d2('d',3);
 	double* mat = new double[d2.hmat_size*d2.hmat_size];
+	double* eigvec = new double[d2.hmat_size*d2.hmat_size];
 	for (int i = 0; i < d2.hmat_size*d2.hmat_size; ++i) {
 		mat[i] = 0;
+		eigvec[i] = 0;
 	}
-	// struct QN qn_list[2] = {
-	// 	{2,-1},{-1,1},
-	// };
-	// int* test = d2.generate_states(2,qn_list);
-	// cout << choose(d2.orb_avail-2,d2.occ_num-2) << endl;
-	// for (int i = 0; i < choose(d2.orb_avail-2,d2.occ_num-2); ++i) {
-	// 	cout << d2.state2bit(test[i]) << endl;
-	// }
-	// for (int i = 0; i < d2.hmat_size; ++i) {
-	// 	cout << d2.hmat[i] << endl;
-	// }
-	double SC[5] = {1.0,0,1.0*49,0,1*441};
+	double SC[5] = {1.0,0,1.0*49,0,1.0*441};
 	calc_coulomb(d2, mat, SC);
-	d2.pretty_print(mat,{0,9},{0,9});
+
+	// d2.pretty_print(mat,{0,9},{0,9});
 	double* eig;
-	eig = diagonalize(mat,d2.hmat_size,d2.hmat_size);
-	// calc_CF(d2,mat,0);
+	eig = diagonalize(mat,eigvec,d2.hmat_size,d2.hmat_size);
+	double esum;
+	for (int i = 0; i < d2.hmat_size; ++i) {
+		// cout << eig[i] << " ";
+		esum += eig[i];
+	}
+
+	d2.pretty_print(mat,{0,9},{0,9});
 	printDistinct(eig,d2.hmat_size);
-	cout << endl << "trace: " << trace(mat,45,45) << endl;
-	// d2.pretty_print(mat,{0,8},{0,8});
+	cout << endl;
+	d2.matrix_check(mat,eig,eigvec);
+
+	ofstream matfile;
+    matfile.open ("./mat.txt");
+	for (int i = 0; i < d2.hmat_size; ++i) {
+		for (int j = 0; j < d2.hmat_size; ++j) {
+			matfile << mat[i+d2.hmat_size*j];
+			if (j != d2.hmat_size-1) matfile << ",";
+		}
+		matfile << endl;
+	}
 	delete [] mat;
 }
