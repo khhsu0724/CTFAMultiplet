@@ -41,7 +41,7 @@ public:
 	int* generate_states(int in_state, QN* in_state_arr);
 	std::vector<std::pair<int,int>> match_states(int snum, QN* rhs, QN* lhs);
 	void pretty_print(double* mat, std::pair<int,int> column, std::pair<int,int> row);
-	void matrix_check(double* mat, double* eig, double* eigvec);
+	void momentum_check(double* mat, double* eig, double* eigvec);
 };
 
 #endif

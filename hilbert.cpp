@@ -265,7 +265,7 @@ void Hilbert::pretty_print(double* mat, pair<int,int> column, pair<int,int> row)
 	}
 }
 
-void Hilbert::matrix_check(double* mat, double* eig, double* eigvec) {
+void Hilbert::momentum_check(double* mat, double* eig, double* eigvec) {
 	// Check Lz, L2, Sz, S2 for the matrix
 	double* L2 = new double[hmat_size];
 	double* S2 = new double[hmat_size];
