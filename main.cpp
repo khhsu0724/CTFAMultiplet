@@ -14,6 +14,37 @@
 
 using namespace std;
 
+void write_mat(double* mat, size_t n, string file_dir) {
+	ofstream matfile;
+    matfile.open (file_dir);
+    for (int i = 0; i < n; ++i) {
+    	for (int j = 0; j < n; ++j) {
+    		matfile << mat[i+n*j] << " ";
+    	}
+    	matfile << endl;
+    }
+    matfile.close();
+}
+
+vector<double> printDistinct(double arr[], int n, bool is_print = true) {
+    // Pick all elements one by one
+    vector<double> unique_eig;
+    for (int i=0; i<n; i++)
+    {
+        // Check if the picked element is already printed
+        int j;
+        for (j=0; j<i; j++)
+           if (abs(arr[i] - arr[j]) < 1e-10)
+               break;
+        // If not printed earlier, then print it
+        if (i == j) {
+        	if (is_print) cout << arr[i] << " ";
+        	unique_eig.push_back(arr[i]);
+        }
+    }
+    return unique_eig;
+}
+
 double calc_U(double* gaunt1, double* gaunt2, double* SC, int size) {
 	double u = 0;
 	for (int i = 0; i < size; ++i) {
@@ -22,8 +53,6 @@ double calc_U(double* gaunt1, double* gaunt2, double* SC, int size) {
 	return u;
 }
 
-
-// Implement Symmetries
 void calc_coulomb(Hilbert& hspace, double* mat, double* SC) {
 	//Calculate Coulomb Matrix Element
 	int n = hspace.hmat_size, m = n;
@@ -89,99 +118,118 @@ void calc_coulomb(Hilbert& hspace, double* mat, double* SC) {
 	}
 }
 
-double* CFmat(double l, double tenDQ) {
+double* CFmat(int l, double tenDQ, int coord) {
 	// Crystal field present when the 2 state has same spin
 	try {
-		if (l == 2) {
+		if (l == 2 && coord == 6) {
 			double* cfmat = new double[25];
-			for (int i = 0; i < 5; ++i) cfmat[i] = 0;
-			cfmat[0] = 1 * tenDQ * 0.1;
-			cfmat[1+5*1] = -4 * tenDQ * 0.1;
-			cfmat[2+5*2] = 6 * tenDQ * 0.1;
-			cfmat[3+5*3] = -4 * tenDQ * 0.1;
-			cfmat[4+5*4] = 1 * tenDQ * 0.1;
-			cfmat[4+5*0] = 5 * tenDQ * 0.1;
-			cfmat[0+5*4] = 5 * tenDQ * 0.1;
+			for (int i = 0; i < 25; ++i) cfmat[i] = 0;
+			cfmat[0] = 1 * tenDQ;
+			cfmat[1+5*1] = -4 * tenDQ;
+			cfmat[2+5*2] = 6 * tenDQ;
+			cfmat[3+5*3] = -4 * tenDQ;
+			cfmat[4+5*4] = 1 * tenDQ;
+			cfmat[4+5*0] = 5 * tenDQ;
+			cfmat[0+5*4] = 5 * tenDQ;
 			return cfmat;
 		} else {
-			throw invalid_argument("non-d crystal field not coded yet");
+			throw invalid_argument("non-d and non-octahedral crystal field not coded yet");
 		}
 	} catch(const exception &ex) {
 			std::cout << ex.what() << "\n";
 	}
-	double* ph;
+	double* ph; // Place holder
 	return ph;
 }
 
-void calc_CF(Hilbert& hspace, double* mat, double tenDQ) {
-	//Calculate Crystal Field Matrix Element
-	double* cfmat = CFmat(hspace.l, tenDQ);
+void calc_CF(Hilbert& hspace, double* mat, double tenDQ, int coord) {
+	//Calculate Crystal Field Matrix Element, octahedral symmetry
+	double* cfmat = CFmat(hspace.l, tenDQ, coord);
 	for (int i = 0; i < (hspace.l*2+1)*(hspace.l*2+1); ++i) {
 		if (cfmat[i] != 0) {
-			int num_states = choose(hspace.orb_avail-1,hspace.occ_num-1);
-			int l1 = i%(hspace.l*2+1)-2;
-			int l2 = i/(hspace.l*2+1)-2;
-			if (l1 >= l2) {
-				for (auto spin : {1,-1}) {
-					struct QN qn1[1] = {{l1,spin}};
-					struct QN qn2[1] = {{l2,spin}};
-					int* state1 = hspace.generate_states(1,qn1);
-					int* state2 = hspace.generate_states(1,qn2);
- 					for (int s1 = 0; s1 < num_states; ++s1) {
-						for (int s2 = 0; s2 < num_states; ++s2) {
-							mat[hspace.sindex(state1[s1])+hspace.hmat_size*hspace.sindex(state2[s2])] 
-								+= cfmat[i];
-						}
-					}
+			int ml1 = i%(hspace.l*2+1)-2;
+			int ml2 = i/(hspace.l*2+1)-2;
+			// Same spin creates crystal field
+			for (auto spin : {-1,1}) {
+				struct QN qn1[1] = {{ml1,spin}};
+				struct QN qn2[1] = {{ml2,spin}};
+				vector<pair<int,int>> entries = hspace.match_states(1, qn1, qn2);
+				for (auto& e : entries) {
+					mat[hspace.sindex(e.first)+hspace.hmat_size*hspace.sindex(e.second)] += cfmat[i];
 				}
 			}
 		}
 	}
 }
 
-void calc_SO() {
-	//Calculate Spin Orbit Coupling Matrix Element
+void calc_SO(Hilbert& hspace, double* mat, double lambda) {
+	// Calculate Spin Orbit Coupling Matrix Element
+	for (int ml = -hspace.l; ml <= hspace.l; ++ml) {
+		// parallel
+		for (auto spin: {-1,1}) {
+			struct QN qn[1] = {{ml,spin}};
+			vector<pair<int,int>> entries = hspace.match_states(1, qn, qn);
+			for (auto& e : entries) {
+				double matelem = -lambda/2 * spin * ml; // No sign traversing issue due to symmetry
+				mat[hspace.sindex(e.first)+hspace.hmat_size*hspace.sindex(e.second)] += matelem;
+			}
+		}
+		// Antiparallel
+		if (ml < hspace.l) {
+			struct QN qn1[1] = {{ml+1,-1}};
+			struct QN qn2[1] = {{ml,1}};
+			vector<pair<int,int>> entries = hspace.match_states(1, qn1, qn2);
+			for (auto& e : entries) {
+				double matelem = -lambda/2 * sqrt((hspace.l-ml)*(hspace.l+ml+1));
+				mat[hspace.sindex(e.first)+hspace.hmat_size*hspace.sindex(e.second)] 
+					+= matelem * hspace.Psign(qn1,qn2,e.first,e.second,1);
+				mat[hspace.sindex(e.second)+hspace.hmat_size*hspace.sindex(e.first)] 
+					+= matelem * hspace.Psign(qn2,qn1,e.second,e.first,1);
+			}
+		}
+	}
 }
 
 void tanabe_sugano(double* SC) {
+	// Terrible code now, should implement plotting & block diagonal matrices in the future
 	ofstream myfile;
     myfile.open ("./tb.txt");
 
-	Hilbert d2('d',2);
-	double* mat = new double[d2.hmat_size*d2.hmat_size];
-	for (double cf = 0; cf < 3.0; cf+=0.1) {
+	Hilbert d2('d',5);
+	double racah_B = (SC[2]/49) - (5*SC[4]/441);
+	cout << "racah_B: " << racah_B << endl;
+	for (double cf = 0; cf <= 3.0; cf += 0.06) {
+		double* mat = new double[d2.hmat_size*d2.hmat_size];
+		double* eigvec = new double[d2.hmat_size*d2.hmat_size];
 		for (int i = 0; i < d2.hmat_size*d2.hmat_size; ++i) {
 			mat[i] = 0;
+			eigvec[i] = 0;
 		}
 		calc_coulomb(d2, mat, SC);
-		calc_CF(d2,mat,cf);
-		// double* eig;
-		// eig = diagonalize(mat,d2.hmat_size,d2.hmat_size);
-		// myfile << cf << " ";
-		// for (int i =0; i < d2.hmat_size; ++i) {
-		// 	myfile << eig[i] << " ";
-		// }
-		// myfile << endl;
+		calc_CF(d2,mat,cf*racah_B,6);
+		double* eig;
+		eig = diagonalize(mat,eigvec,d2.hmat_size,d2.hmat_size);
+		vector<double> unique_eig = printDistinct(eig,d2.hmat_size,false);
+		cout << unique_eig.size() << ", ";
+		if (unique_eig.size() != 10) {
+			write_mat(mat,d2.hmat_size,"./mat.txt");
+		}
+		auto min_eig = *min_element(unique_eig.begin(), unique_eig.end());
+		sort(unique_eig.begin(), unique_eig.end());
+		for (auto& e : unique_eig) {
+			cout << e - min_eig << " ";
+			myfile << e - min_eig << " ";
+		}
+		cout << endl;
+		myfile << endl;
+		delete [] mat;
+		delete [] eigvec;
 	}
     myfile.close();
 }
 
-void printDistinct(double arr[], int n) {
-    // Pick all elements one by one
-    for (int i=0; i<n; i++)
-    {
-        // Check if the picked element is already printed
-        int j;
-        for (j=0; j<i; j++)
-           if (abs(arr[i] - arr[j]) < 0.00001)
-               break;
-        // If not printed earlier, then print it
-        if (i == j)
-          cout << arr[i] << " ";
-    }
-}
-
 void block_diag_hack(double* mat, Hilbert& hspace, int L, double S) {
+	// Check block matrices, need to phase out in the future
 	vector<int> bh;
 	int c = 0;
 	for (int i = 0; i < hspace.hmat_size; ++i) {
@@ -223,15 +271,18 @@ int main(int argc, char** argv){
 	bool CF_on = false;
 	bool SO_on = false;
 
-	Hilbert d2('d',7);
+	Hilbert d2('d',3);
 	double* mat = new double[d2.hmat_size*d2.hmat_size];
 	double* eigvec = new double[d2.hmat_size*d2.hmat_size];
 	for (int i = 0; i < d2.hmat_size*d2.hmat_size; ++i) {
 		mat[i] = 0;
 		eigvec[i] = 0;
 	}
-	double SC[5] = {1.0,0,1.0*49,0,1.0*441};
+	double SC[5] = {1.0,0,1.0*49,0,1*441};
+	double racah_B = (SC[2]/49) - (5*SC[4]/441);
 	calc_coulomb(d2, mat, SC);
+	calc_SO(d2, mat, 2); 
+	// calc_CF(d2,mat,0.1*racah_B,6);
 
 	// d2.pretty_print(mat,{0,9},{0,9});
 	double* eig;
@@ -240,7 +291,6 @@ int main(int argc, char** argv){
 	for (int i = 0; i < d2.hmat_size; ++i) {
 		esum += eig[i];
 	}
-
 	printDistinct(eig,d2.hmat_size);
 	cout << endl;
 	// d2.momentum_check(mat,eig,eigvec);
