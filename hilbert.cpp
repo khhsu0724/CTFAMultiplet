@@ -58,8 +58,8 @@ Hilbert::Hilbert(char orb, int occ_num) : orb(orb), occ_num(occ_num) {
 		else {
 			throw invalid_argument("invalid orbital");
 		}
-		if (occ_num < 2 || occ_num > orb_avail-2) {
-			throw invalid_argument("occupied electron number will not form a multiplet");
+		if (occ_num < 0 || occ_num > orb_avail) {
+			throw invalid_argument("too many electrons for the orbital");
 		}
 	} catch(const exception &ex) {
 		std::cout << ex.what() << "\n";
@@ -167,7 +167,7 @@ vector<pair<int,int>> Hilbert::match_states(int snum, QN* lhs, QN* rhs) {
             	l += pow(2,mask[i]);
             }
         }
-        mat.push_back({r,l}); 
+        mat.push_back({l,r}); 
     } while (std::prev_permutation(bitmask.begin(), bitmask.end()));
 	return mat;
 }
