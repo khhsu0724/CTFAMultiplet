@@ -55,6 +55,7 @@ double calc_U(double* gaunt1, double* gaunt2, double* SC, int size) {
 
 void calc_coulomb(Hilbert& hspace, double* mat, double* SC) {
 	//Calculate Coulomb Matrix Element
+	if (hspace.occ_num < 2 || hspace.occ_num > 8) return;
 	int n = hspace.hmat_size, m = n;
 	int* ml_arr = new int[hspace.l*2+1];
 	for (int ml = -hspace.l; ml <= hspace.l; ++ml) {
@@ -271,7 +272,7 @@ int main(int argc, char** argv){
 	bool CF_on = false;
 	bool SO_on = false;
 
-	Hilbert d2('d',3);
+	Hilbert d2('d',8);
 	double* mat = new double[d2.hmat_size*d2.hmat_size];
 	double* eigvec = new double[d2.hmat_size*d2.hmat_size];
 	for (int i = 0; i < d2.hmat_size*d2.hmat_size; ++i) {
