@@ -149,11 +149,15 @@ vector<pair<int,int>> Hilbert::match_states(int snum, QN* lhs, QN* rhs) {
 	vector<pair<int,int>> mat;
 
 	try {
+		if (occ_num > orb_avail - snum) {
+			throw invalid_argument("too many operators for occupied states");
+		}
 		if (snum > occ_num) {
 			throw invalid_argument("input states more than occupied states");
 		}
 	} catch(const exception &ex) {
 		std::cout << ex.what() << "\n";
+		exit(0);
 	}
 
 	string bitmask(occ_num - snum, 1);
@@ -239,6 +243,7 @@ int Hilbert::sindex(int state) {
 		}
 		int index = distance(hmat, find(hmat, hmat + hmat_size, state));
 		if (index < 0 || index >= hmat_size) {
+			cout << "state: " << state << ", bit: " << state2bit(state) << ", index: " << index << endl;
 			throw invalid_argument("state not in hilbert space");
 		}
 		return index;
