@@ -55,7 +55,7 @@ double calc_U(double* gaunt1, double* gaunt2, double* SC, int size) {
 
 void calc_coulomb(Hilbert& hspace, double* mat, double* SC) {
 	//Calculate Coulomb Matrix Element
-	if (hspace.occ_num < 2 || hspace.occ_num > 8) return;
+	if (hspace.occ_num < 2 || hspace.occ_num > hspace.l - 2) return;
 	int n = hspace.hmat_size, m = n;
 	int* ml_arr = new int[hspace.l*2+1];
 	for (int ml = -hspace.l; ml <= hspace.l; ++ml) {
@@ -85,6 +85,7 @@ void calc_coulomb(Hilbert& hspace, double* mat, double* SC) {
 			for (auto m34 : mpair_a) {
 				struct QN qn34[2] = {{m34.first,-1},{m34.second,1}}; // psi_ij,rhs
 				vector<pair<int,int>> entries = hspace.match_states(2, qn12, qn34);
+				cout << "anti, m12: " << m12.first << "," << m12.second << ", m34: " << m34.first << "," << m34.second << endl;
 				for (auto e : entries) {
 					double matelem = calc_U(gaunt(hspace.l,m12.first,hspace.l,m34.first),
 									gaunt(hspace.l,m34.second,hspace.l,m12.second),SC,2*hspace.l+1);
@@ -103,6 +104,7 @@ void calc_coulomb(Hilbert& hspace, double* mat, double* SC) {
 				for (auto m34 : mpair_p) {
 					struct QN qn34[2] = {{m34.first,spin},{m34.second,spin}}; // psi_ij,rhs
 					vector<pair<int,int>> entries = hspace.match_states(2, qn12, qn34);
+					cout << "par, m12: " << m12.first << "," << m12.second << ", m34: " << m34.first << "," << m34.second << endl;
 					for (auto e : entries) {
 						double matelem = calc_U(gaunt(hspace.l,m12.first,hspace.l,m34.first),
 									 	gaunt(hspace.l,m34.second,hspace.l,m12.second),SC,2*hspace.l+1) -
@@ -272,7 +274,7 @@ int main(int argc, char** argv){
 	bool CF_on = false;
 	bool SO_on = false;
 
-	Hilbert d2('d',8);
+	Hilbert d2('p', 5);
 	double* mat = new double[d2.hmat_size*d2.hmat_size];
 	double* eigvec = new double[d2.hmat_size*d2.hmat_size];
 	for (int i = 0; i < d2.hmat_size*d2.hmat_size; ++i) {

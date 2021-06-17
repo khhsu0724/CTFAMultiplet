@@ -38,7 +38,7 @@ size_t hash(Gaunt_coeff gc)
     return h;
 }
 
-map<pair<int,int>,Gaunt_coeff> dd_coeff =  { {{ 2, 2}, {1, 0,     -2.0/7.0, 0,       1.0/21}},
+map<pair<int,int>,Gaunt_coeff> dd_coeff =   {{{ 2, 2}, {1, 0,     -2.0/7.0, 0,       1.0/21}},
 											 {{-2,-2}, {1, 0,     -2.0/7.0, 0,       1.0/21}},
 											 {{ 2, 1}, {0, 0,  sqrt(6)/7.0, 0,  -sqrt(5)/21}},
 											 {{-2,-1}, {0, 0,  sqrt(6)/7.0, 0,  -sqrt(5)/21}},
@@ -65,6 +65,49 @@ map<pair<int,int>,Gaunt_coeff> dd_coeff =  { {{ 2, 2}, {1, 0,     -2.0/7.0, 0,  
 											 {{-1, 1}, {0, 0, -sqrt(6)/7.0, 0, -sqrt(40)/21}},
 											};
 
+map<pair<int,int>,Gaunt_coeff> pp_coeff =   {{{ 1, 1}, {1, 0,     -1.0/5.0}},
+											 {{-1,-1}, {1, 0,     -1.0/5.0}},
+											 {{ 1, 0}, {0, 0,  sqrt(3)/5.0}},
+											 {{-1, 0}, {0, 0,  sqrt(3)/5.0}},
+											 {{ 0, 1}, {0, 0, -sqrt(3)/5.0}}, //
+											 {{ 0,-1}, {0, 0, -sqrt(3)/5.0}}, //
+											 {{ 0, 0}, {1, 0,      2.0/5.0}},
+											 {{ 1,-1}, {1, 0, -sqrt(6)/5.0}},
+											 {{-1, 1}, {1, 0, -sqrt(6)/5.0}},
+											};
+
+map<pair<int,int>,Gaunt_coeff> ss_coeff =  	{{{ 0, 0}, {1}},
+											};
+
+map<pair<int,int>,Gaunt_coeff> sp_coeff =  	{{{ 0, 0}, {0,  1/sqrt(3)}},
+											 {{ 0, 1}, {0, -1/sqrt(3)}},
+											 {{ 0,-1}, {0, -1/sqrt(3)}},
+											};
+
+map<pair<int,int>,Gaunt_coeff> sd_coeff =  	{{{ 0, 0}, {0, 0,  1/sqrt(5)}},
+											 {{ 0, 1}, {0, 0, -1/sqrt(5)}},
+											 {{ 0,-1}, {0, 0, -1/sqrt(5)}},
+											 {{ 0, 2}, {0, 0,  1/sqrt(5)}},
+											 {{ 0,-2}, {0, 0,  1/sqrt(5)}},
+											};
+
+map<pair<int,int>,Gaunt_coeff> pd_coeff =  	{{{ 1, 2}, {0, -sqrt(6/15), 0,   sqrt(3/245)}},
+											 {{-1,-2}, {0, -sqrt(6/15), 0,   sqrt(3/245)}},
+											 {{ 1, 1}, {0,  sqrt(3/15), 0,  -sqrt(9/245)}},
+											 {{-1,-1}, {0,  sqrt(3/15), 0,  -sqrt(9/245)}},
+											 {{ 1, 0}, {0, -sqrt(1/15), 0,  sqrt(18/245)}},
+											 {{-1, 0}, {0, -sqrt(1/15), 0,  sqrt(18/245)}},
+											 {{ 0, 2}, {0, 			 0, 0,  sqrt(15/245)}},
+											 {{ 0,-2}, {0, 			 0, 0,  sqrt(15/245)}},
+											 {{ 0, 1}, {0, -sqrt(3/15), 0, -sqrt(24/245)}},
+											 {{ 0,-1}, {0, -sqrt(3/15), 0, -sqrt(24/245)}},
+											 {{ 0, 0}, {0,  sqrt(4/15), 0, -sqrt(27/245)}},
+											 {{ 1,-2}, {0, 			 0, 0,  sqrt(45/245)}},
+											 {{-1, 2}, {0,           0, 0,  sqrt(45/245)}},
+											 {{ 1,-1}, {0, 			 0, 0, -sqrt(30/245)}},
+											 {{-1, 1}, {0,           0, 0, -sqrt(30/245)}},
+											};
+
 double* gaunt(int l1, int ml1, int l2, int ml2) {
 	// Return Gaunt coefficient in spherical harmonics
 	// Input: quantumn numbers, Output: pointer to the Gaunt coefficient value array
@@ -74,9 +117,27 @@ double* gaunt(int l1, int ml1, int l2, int ml2) {
 			throw invalid_argument("ml > l, invalid quantum number");
 		}
 		// d-d case
-		if (l1 == 2 && l2 ==2) return dd_coeff.at({ml1,ml2}).g;
+		if (l1 == 2 && l2 == 2) return dd_coeff.at({ml1,ml2}).g;
+		else if (l1 == 1 && l2 == 1) return pp_coeff.at({ml1,ml2}).g;
+		else if (l1 == 0 && l2 == 0) return ss_coeff.at({ml1,ml2}).g;
+		else if (l1 == 0 && l2 == 1) return sp_coeff.at({ml1,ml2}).g;
+		else if (l1 == 0 && l2 == 2) return sd_coeff.at({ml1,ml2}).g;
+		else if (l1 == 1 && l2 == 2) return pd_coeff.at({ml1,ml2}).g;
+		else if (l1 == 1 && l2 == 0) {
+			double *g;
+			for (int i = 0; i <= l1+l2; ++i) g[i] = sp_coeff.at({ml2,ml1}).g[i] * pow(-1,abs(ml1-ml2));
+			return g;
+		} else if (l1 == 2 && l2 == 0) {
+			double *g;
+			for (int i = 0; i <= l1+l2; ++i) g[i] = sd_coeff.at({ml2,ml1}).g[i] * pow(-1,abs(ml1-ml2));
+			return g;
+		} else if (l1 == 2 && l2 == 1) {
+			double *g;
+			for (int i = 0; i <= l1+l2; ++i) g[i] = pd_coeff.at({ml2,ml1}).g[i] * pow(-1,abs(ml1-ml2));
+			return g;
+		}
 		else {
-			throw invalid_argument("anything beside d-d gaunt coefficeints is not coded yet");
+			throw invalid_argument("f-f gaunt coefficeints is not coded yet");
 		}
 	}
 	catch(const exception &ex) {
