@@ -1,5 +1,6 @@
 #include <iostream> 
 #include <fstream>
+#include <cmath>
 #include "diagonalize.h"
 
 
@@ -26,6 +27,21 @@ double trace(double *mat, int n, int m) {
 	return t;
 }
 
+void norm_ev(double* ev, int n) {
+	for (int i = 0; i < n; ++i) {
+		double nm = 0;
+		for (int j = 0; j < n; j++) {
+			if (abs(ev[i*n+j]) < 1e-7) ev[i*n+j] = 0;
+			nm += ev[i*n+j]*ev[i*n+j];
+		}
+		if (nm != 1) {
+			nm = sqrt(nm);
+			for (int j = 0; j < n; j++) ev[i*n+j] /= nm;
+		}
+	}
+	return;
+}
+
 double* diagonalize(double *mat, double *vr, int n, int m) {
 	try {
 		if (n != m){
@@ -36,22 +52,23 @@ double* diagonalize(double *mat, double *vr, int n, int m) {
 	}
 	// allocate data
 	char Nchar='V';
-	double *input = new double[n*n];
+	double *input = new double[n*n]{0};
 	// Copy matrix for input
 	for (int i = 0; i < n*m; ++i) {
 		input[i] = mat[i];
 	}
 
-	double *eigReal = new double[n];
-	double *eigImag = new double[n];
-	double *vl = new double[n*n];
+	double *eigReal = new double[n]{0};
+	double *eigImag = new double[n]{0};
+	double *vl = new double[n*n]{0};
 	int lwork=6*n;
-	double *work=new double[lwork];
+	double *work=new double[lwork]{0};
 	int info;
 
 	// calculate eigenvalues using the DGEEV subroutine
 	dgeev_(&Nchar,&Nchar,&n,input,&n,eigReal,eigImag,
 			vl,&n,vr,&n,work,&lwork,&info);
+	norm_ev(vr,n);
 	// check for errors
 	try {
 		if (info!=0){
@@ -60,16 +77,7 @@ double* diagonalize(double *mat, double *vr, int n, int m) {
 	} catch(const exception &ex) {
 		std::cout << ex.what() << "\n";
 	}
-	// output eigenvalues to stdout
-	// cout << "--- Eigenvalues ---" << endl;
-	// for (int i=0;i<n;i++){
-	// 	cout << "( " << eigReal[i] << " , " << eigImag[i] << " )\n";
-	// }
-	// cout << endl;
 
-	// deallocate
-	// delete [] eigReal;
-	// delete [] eigImag;
 	delete [] work;
 
 	return eigReal;
