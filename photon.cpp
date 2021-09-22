@@ -165,7 +165,7 @@ void XAS(double* SC, double* FG, double tenDQ, double lambda, vector<double>& pv
 
 					cs += gsblk.eigvec[g.second*gsblk.size+gj] * exblk.eigvec[ei*exblk.size+ej]
 							* gaunt(1,chqn.ml,2,vhqn.ml)[1] * proj_pvec(vhqn.ml-chqn.ml,pvec)
-							* GS.Fsign(&vhqn,gs,1) * EX.Fsign(&chqn,exs,1);// Something funny with the fermion sign
+							* GS.Fsign(&vhqn,gs,1);// * EX.Fsign(&chqn,exs,1);// Something funny with the fermion sign
 				}
 			}
 			if (abs(cs) > 1e-7) {
