@@ -4,7 +4,7 @@
 #include <initializer_list>
 #include <map>
 #include <boost/functional/hash.hpp>
-#include "gaunt.h"
+#include "gaunt.hpp"
 
 using namespace std;
 
