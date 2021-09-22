@@ -1,43 +1,13 @@
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <vector>
-#include <utility>
-#include <math.h>
 #include <complex>
-#include <algorithm>
-#include "diagonalize.h"
-#include "gaunt.h"
-#include "multiplet.h"
-#include "hilbert.h"
-#include "site.h"
-#include "photon.h"
+#include <ctime>
+#include "multiplet.hpp"
+#include "photon.hpp"
 
 using namespace std;
 typedef complex<double> dcomp;
+#define LIM = 1E-7;
 
 // Contains photon based spectroscopy
-
-bool is_pw2(int x) {return !(x == 0) && !(x & (x - 1));}
-
-vector<double> printDistinct(double arr[], int n, bool is_print) {
-    // Pick all elements one by one
-    vector<double> unique_eig;
-    for (int i=0; i<n; i++)
-    {
-        // Check if the picked element is already printed
-        int j;
-        for (j=0; j<i; j++)
-           if (abs(arr[i] - arr[j]) < 1e-7)
-               break;
-        // If not printed earlier, then print it
-        if (i == j) {
-        	if (is_print) cout << arr[i] << " ";
-        	unique_eig.push_back(arr[i]);
-        }
-    }
-    return unique_eig;
-}
 
 double* get_eigvec(int index, int size, double* eigvec_mat) {
 	double* eigvec = new double[size];
@@ -61,132 +31,166 @@ dcomp proj_pvec(int ml, vector<double>& pvec) {
 	}
 }
 
+void calc_ham(Hilbert& hilbs, double* SC, double* FG, double const& tenDQ, double const& lambda) {
+	// Calculate Hamiltonian of the hilbert space
+	int nd = 0;
+	for (auto &at:hilbs.atlist) if(at.is_val && at.l == 2) nd = at.num_h - hilbs.is_ex;
+	double del = 3+(nd-1)*(SC[0]-SC[2]*2.0/63-SC[4]*2.0/63); // ep = 3 eV
+	cout << "nd: " << nd << ", del: " << del << endl;
+	calc_coulomb(hilbs,SC);
+	if (hilbs.SO) calc_SO(hilbs, lambda);
+	if (hilbs.CF) calc_CF(hilbs, del, tenDQ, 6);
+	if (hilbs.is_ex && hilbs.CV) calc_CV(hilbs, FG);
+	return;
+}
+
 void XAS(double* SC, double* FG, double tenDQ, double lambda, vector<double>& pvec, int nedos) {
 	// Scatters from p6d9 to p5d10
-	double beta = 0;
-	double racah_B = (SC[2]/49) - (5*SC[4]/441);
-	norm_vec(pvec);
+	double beta = 0, racah_B = (SC[2]/49) - (5*SC[4]/441);
+	// ed::norm_vec(pvec);
 
-	Site cu_gs[1] = {Site("Ni")};
-	Site cu_ex[1] = {Site("Ni",true,true)};
+	cout << "polarization: ";
+	for (auto &v:pvec) cout << v << " ";
+	cout << endl;
 
-	int gs_size = cu_gs[0].hsize;
-	int ex_size = cu_ex[0].hsize;
 
-	double* gs_mat = new double[gs_size*gs_size]{0};
-	double* gs_eigvec = new double[gs_size*gs_size]{0};
-	double* ex_mat = new double[ex_size*ex_size]{0};
-	double* ex_eigvec = new double[ex_size*ex_size]{0};
-	double *gs_eig, *ex_eig;
+	Hilbert GS("./INPUT",false);
+	Hilbert EX("./INPUT",true);
+	calc_ham(GS,SC,FG,tenDQ,lambda);
+	calc_ham(EX,SC,FG,tenDQ,lambda);
+	for (auto & gsblk : GS.hblks) gsblk.diag_dsyev();
+	// CAN PROBABLY DISCARD UNEEDED STATES HERE?
+	for (auto & exblk : EX.hblks) exblk.diag_dsyev();
 
-	populate_hspace(cu_gs,1,gs_mat,SC,tenDQ,0);
-	gs_eig = diagonalize(gs_mat,gs_eigvec,cu_gs[0].hsize,cu_gs[0].hsize); 
-	populate_hspace(cu_ex,1,ex_mat,SC,tenDQ,lambda);
-	cv_interacation(cu_ex[0],cu_ex[0],ex_mat,FG);
-	ex_eig = diagonalize(ex_mat,ex_eigvec,cu_ex[0].hsize,cu_ex[0].hsize); 
-	cout << cu_gs[0].hsize << " " << cu_ex[0].hsize << endl;
+	ed::write_mat(GS.hblks[0].eigvec,GS.hblks[0].size,GS.hblks[0].size,"./gsev.txt");
+	ed::write_mat(EX.hblks[0].eigvec,EX.hblks[0].size,EX.hblks[0].size,"./exev.txt");
 
-	dcomp* xas_mat = new dcomp[cu_gs[0].hsize*cu_ex[0].hsize];
-	for (int i = 0; i < cu_gs[0].hsize*cu_ex[0].hsize; ++i) xas_mat[i] = 0;
+	cout << "gs hsize: " << GS.hblks[0].size << ", ex hsize: " << EX.hblks[0].size << endl;
+	cout << "ground state eigenstates: ";
+	ed::printDistinct(GS.hblks[0].eig,GS.hblks[0].size);
+	cout << endl << "excited state eigenstates: ";
+	ed::printDistinct(EX.hblks[0].eig,EX.hblks[0].size);
+	cout << endl;
 
-	// Calculate XAS matrix element
-	double gs_energy = gs_eig[0];
-	vector<int> gs,ex; // index for ground state and excited states
-	for (int init = 0; init < cu_gs[0].hsize; init++) {
-		if (gs_eig[init] <= gs_energy) gs_energy = gs_eig[init];
-	}
-	cout << "GS energy: " << gs_energy << endl;
+	// Calculate XAS matrix element, can be phased out
+	dcomp* xas_mat = new dcomp[GS.hblks[0].size*EX.hblks[0].size]{0};
+	double gs_en = GS.hblks[0].eig[0];
+	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.size; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
+	vector<pair<int,int>> gsi,exi; // index for ground state and excited states
 	// Calculate Partition function
-	double partZ = 0;
-	for (int init = 0; init < cu_gs[0].hsize; init++) {
-		partZ += exp(-beta*gs_eig[init]);
-		if (abs(gs_eig[init]-gs_energy) < 1e-7) {
-			gs.push_back(init);
+	double Z = 0, emin = -15.0, emax = 15.0;
+	for (size_t i = 0; i < GS.hblks.size(); ++i) {
+		for (size_t j = 0; j < GS.hblks[i].size; ++j) {
+			Z += exp(-beta*GS.hblks[i].eig[j]);
+			if (abs(GS.hblks[i].eig[j]-gs_en) < 1e-7) gsi.push_back({i,j});
 		}
-	}
+	} 
+	cout << "GS energy: " << gs_en << ", degeneracy: " << gsi.size() << endl;
 
-	cout << "partition function: " << partZ << endl;
+	cout << "partition function: " << Z << endl;
+	vector<double> xas_x,xas_y, xas_temp;
+	for (double i = emin; i < emax; i += (emax-emin)/nedos) xas_x.push_back(i);
+	xas_y.resize(xas_x.size(),0.0);
+	xas_temp.resize(xas_x.size(),0.0);
 
-	// Calculate Ground state J
-	// double* gsev = new double[cu_gs[0].hsize];
-	// for (int i = 0; i < cu_gs[0].hsize; ++i) gsev[i] = gs_eigvec[gs[0]*cu_gs[0].hsize+i];
-	// vector<double> LS = cu_gs[0].get_hspace(3,2).momentum(cu_gs[0].simplify_state(gsev,3,2),false);
-	// double Jgs = LS[0];
-	// cout << "J: " << LS[0] << ", L: " << LS[1] << ", S: " << LS[2] << endl;
+	int num_transitions = 0, half_orb = (EX.num_vorb+EX.num_corb)/2;
 
-	// Create a map with index of Angular momentum and their index in Hilbert Space
-	// for (int fin = 0; fin < cu_ex[0].hsize; fin++) {
-	// 	//Calculate J
-	// 	double Jex;
-	// 	double* exev = new double[cu_ex[0].hsize];
-	// 	for (int i = 0; i < cu_ex[0].hsize; ++i) exev[i] = ex_eigvec[fin*cu_ex[0].hsize+i];
-	// 	for (auto & orb : cu_ex[0].orbs) {
-	// 		LS = orb.momentum(cu_ex[0].simplify_state(exev,orb.get_n(),orb.l),false);
-	// 		Jex += LS[0];
-	// 		cout << "J: " << LS[0] << ", L: " << LS[1] << ", S: " << LS[2] << endl;
+	// for (auto &g : gsi) {
+	// 	cout << "Eigen vectors" << endl;
+	// 	cout << "g first: " << g.first << ", g second: " << g.second << endl;
+	// 	Block gsblk = GS.hblks[g.first];
+	// 	for (int gj = 0; gj < gsblk.size; ++gj) {
+	// 		if (abs(gsblk.eigvec[g.second*gsblk.size+gj]) < 1e-7) continue;
+	// 		ulli gs = GS.Hashback(gj);
+	// 		cout << "gj: " << gj << ", basis state: " << gs << ", " << bitset<16>(gs) << ", value: " << gsblk.eigvec[g.second*gsblk.size+gj] << endl;
 	// 	}
-	// 	if (abs(abs(Jgs-Jex)-1) < 1e-5 || true) ex.push_back(fin);
 	// }
 
-	vector<double> E_ax,XAS;
-	double emin = -15.0, emax = 15;
-	for (double i = emin; i < emax; i += (emax-emin)/nedos) E_ax.push_back(i);
-	XAS.resize(E_ax.size(),0.0);
+	// for (int gj = 0; gj < GS.hblks[0].size; ++gj) {
+	// 	for (int ej = 0; ej < EX.hblks[0].size; ++ej) {
+	// 		ulli gs = GS.Hashback(gj), exs = EX.Hashback(ej), ch = exs - (gs & exs), vh = gs - (gs & exs);
+	// 		int coi = EX.orbind(ch), voi = GS.atlist[coi].vind;
+	// 		if (!ed::is_pw2(vh) || !GS.atlist[voi].contains(vh)) continue;
+	// 		QN chqn = EX.atlist[coi].get_qn(ch,half_orb,coi);
+	// 		QN vhqn = GS.atlist[voi].get_qn(vh,half_orb,voi);
+	// 		if (chqn.spin != vhqn.spin || abs(vhqn.ml-chqn.ml) > 1) continue;
+	// 		if (gj == 0 && ej == 10) {
+	// 			cout << "ex: " << bitset<16>(exs) << ", gs: " << bitset<16>(gs) << endl;
+	// 			cout << "ch: " << bitset<16>(ch) << ", vh: " << bitset<16>(vh) << endl;
+	// 			cout << "Gaunt coeff: " << gaunt(1,chqn.ml,2,vhqn.ml)[1] << endl;
+	// 			cout << "Projection Operator: " << proj_pvec(vhqn.ml-chqn.ml,pvec) << endl;
+	// 			cout << "Fermion Sign: " << GS.Fsign(&vhqn,gs,1) * EX.Fsign(&chqn,exs,1) << endl;
+	// 			cout << "result: " << gaunt(1,chqn.ml,2,vhqn.ml)[1] * proj_pvec(vhqn.ml-chqn.ml,pvec) * GS.Fsign(&vhqn,gs,1) * EX.Fsign(&chqn,exs,1);
+	// 		}
+	// 		xas_mat[gj+GS.hblks[0].size*ej] = gaunt(1,chqn.ml,2,vhqn.ml)[1] * proj_pvec(vhqn.ml-chqn.ml,pvec) * GS.Fsign(&vhqn,gs,1) * EX.Fsign(&chqn,exs,1);
+	// 	}
+	// }
+	// ed::write_mat(xas_mat,GS.hblks[0].size,EX.hblks[0].size,"./xas.txt");
+	// gsi = vector<pair<int,int>>{{0,23}};
+	// cout << "bitstate: " << bitset<16>(GS.Hashback(23)) << endl;
+	for (auto &g : gsi) {
+		Block gsblk = GS.hblks[g.first];
+		for (auto &exblk : EX.hblks) {
+		for (int ei = 0; ei < EX.hblks[0].size; ++ei) {
+			// cout << endl << "energy diff: " << exblk.eig[ei]-gs_en;
+			if (exblk.eig[ei]-gs_en < emin || exblk.eig[ei]-gs_en > emax) continue;
+			dcomp cs = 0;
+			for (int gj = 0; gj < gsblk.size; ++gj) {
+				if (abs(gsblk.eigvec[g.second*gsblk.size+gj]) < 1e-7) continue;
+				ulli gs = GS.Hashback(gj);
+				for (int ej = 0; ej < exblk.size; ++ej) {
+					if (abs(exblk.eigvec[ei*exblk.size+ej]) < 1e-7) continue;
+					ulli exs = EX.Hashback(ej), ch = exs - (gs & exs), vh = gs - (gs & exs);
+					int coi = EX.orbind(ch), voi = GS.atlist[coi].vind;
+					if (!ed::is_pw2(vh) || !GS.atlist[voi].contains(vh)) continue;
+					QN chqn = EX.atlist[coi].get_qn(ch,half_orb,coi);
+					QN vhqn = GS.atlist[voi].get_qn(vh,half_orb,voi);
+					if (chqn.spin != vhqn.spin || abs(vhqn.ml-chqn.ml) > 1) continue;  	// Selection rule
 
-	int num_transitions = 0;
-	for (auto &g : gs) {
-		// Evaluate Matrix Element
-		for (int e = 0; e < cu_ex[0].hsize; e++) {
-			if (abs(gs_eig[g]-ex_eig[e]) < emin || abs(gs_eig[g]-ex_eig[e]) > emax) continue;
-			double cs = 0;
-			for (int ee = 0; ee < cu_ex[0].hsize; ++ee) {
-				if (abs(ex_eigvec[e*cu_ex[0].hsize+ee]) < 1e-7) continue;
-				for (int gg = 0; gg < cu_gs[0].hsize; ++gg) {
-					if (abs(gs_eigvec[g*cu_gs[0].hsize+gg]) < 1e-7) continue;
-					int p2_mldiff = cu_gs[0].qn_get_state(2,1,gg) - cu_ex[0].qn_get_state(2,1,ee);
-					int d3_mldiff = cu_ex[0].qn_get_state(3,2,ee) - cu_gs[0].qn_get_state(3,2,gg);
-					struct QN qn2p[1] = {cu_ex[0].get_hspace(2,1).index2qn((int)log2(p2_mldiff))};
-					struct QN qn3d[1] = {cu_gs[0].get_hspace(3,2).index2qn((int)log2(d3_mldiff))};
-					if (qn2p[0].spin != qn3d[0].spin || !is_pw2(p2_mldiff) || !is_pw2(d3_mldiff) || gaunt(1,qn2p[0].ml,2,qn3d[0].ml)[1] == 0) continue;
-					// cout << ", m2p: " << qn2p[0].ml << ",spin " << qn2p[0].spin << ", m3d: " << qn3d[0].ml << ",spin " << qn3d[0].spin << ", gaunt: " << gaunt(1,qn2p[0].ml,2,qn3d[0].ml)[1] << endl;
-					dcomp ne = proj_pvec(qn3d[0].ml-qn2p[0].ml,pvec);
-					QN* emptyqn;
-					double fsign = cu_ex[0].get_hspace(2,1).Psign(qn2p,emptyqn,cu_ex[0].qn_get_state(2,1,ee),0,1,0) // 2p fermion sign
-									* cu_gs[0].get_hspace(3,2).Psign(emptyqn,qn3d,0,cu_gs[0].qn_get_state(3,2,gg),0,1);
-					// cout << "Fermion sign: " << fsign << endl;
-					xas_mat[g+cu_gs[0].hsize*e] = gs_eigvec[g*cu_gs[0].hsize+gg]*ex_eigvec[e*cu_ex[0].hsize+ee]*gaunt(1,qn2p[0].ml,2,qn3d[0].ml)[1]*ne*fsign;
-					// cout << "x: " << g << ", y: " << e << endl;
-					// cout << "Ediff: " << ex_eig[e]-gs_eig[g] << ", index: " << (int)floor((ex_eig[e]-gs_eig[g]-emin)/((emax-emin)/nedos)) <<endl;
-					cs += exp(-beta*gs_eig[g])*pow(abs(gs_eigvec[g*cu_gs[0].hsize+gg]*ex_eigvec[e*cu_ex[0].hsize+ee]*gaunt(1,qn2p[0].ml,2,qn3d[0].ml)[1]*ne),2); // Remember to add back in beta
+					
+					// Debug Block
+					// cout << endl << "one of the cross section" << endl;
+					// // // cout << endl << "gs: " << gj << ", " << bitset<16>(gs) << ", ex: " << ej << ", " << bitset<16>(exs) << endl;
+					// // // cout << "GS Energy: " << gsblk.eig[g.second] << ", EX energy: " << exblk.eig[ei] << endl;
+					// cout << "gs Eigenvector: " << gsblk.eigvec[g.second*gsblk.size+gj] << ", state: " << bitset<16>(gs) << endl;
+					// cout << "ex Eigenvector: " << exblk.eigvec[ei*exblk.size+ej] << ", state: " << bitset<16>(exs) << endl;
+					// cout << "ex: " << bitset<16>(exs) << ", gs: " << bitset<16>(gs) << endl;
+					// cout << "ch: " << bitset<16>(ch) << ", vh: " << bitset<16>(vh) << endl;
+					// // cout << "Fermion Sign: " << GS.Fsign(&vhqn,gs,1) << ", gaunt coeff: " << gaunt(1,chqn.ml,2,vhqn.ml)[1] << ", proj ml: " << vhqn.ml-chqn.ml << endl;
+					// // cout << "ch ml: " << chqn.ml << ", ch spin: " << chqn.spin << ", vh ml: " << vhqn.ml << ", vh spin: " << vhqn.spin << ", voi: "<< voi << endl;
+					// cout << "dcs: " << gsblk.eigvec[g.second*gsblk.size+gj] * exblk.eigvec[ei*exblk.size+ej]
+					// 		* gaunt(1,chqn.ml,2,vhqn.ml)[1] * proj_pvec(vhqn.ml-chqn.ml,pvec)
+					// 		* GS.Fsign(&vhqn,gs,1) * EX.Fsign(&chqn,exs,1) << endl;
+					// Debug Block
+
+					cs += gsblk.eigvec[g.second*gsblk.size+gj] * exblk.eigvec[ei*exblk.size+ej]
+							* gaunt(1,chqn.ml,2,vhqn.ml)[1] * proj_pvec(vhqn.ml-chqn.ml,pvec)
+							* GS.Fsign(&vhqn,gs,1) * EX.Fsign(&chqn,exs,1);// Something funny with the fermion sign
 				}
 			}
-			if (abs(cs) > 1e-4) {
+			if (abs(cs) > 1e-7) {
 				num_transitions += 1;
-				cout << "cross section: " << cs << endl;
+				xas_mat[g.second+GS.hblks[0].size*ei] += cs;
+				xas_temp[(int)floor((exblk.eig[ei]-gs_en-emin)/((emax-emin)/nedos))] = exblk.eig[ei]-gs_en;
+				xas_y[(int)floor((exblk.eig[ei]-gs_en-emin)/((emax-emin)/nedos))] += exp(-beta*gs_en)*pow(abs(cs),2);///Z;
 			}
-			XAS[(int)floor((ex_eig[e]-gs_eig[g]-emin)/((emax-emin)/nedos))] += cs/partZ;
-		}
+		}}
 	}
 
 	cout << "Number of Transitions: " << num_transitions << endl;
 
 	// Normalize XAS intensity
-
-	for (auto &x : XAS) cout << x << " ";
+	ed::write_mat(xas_mat,GS.hblks[0].size,EX.hblks[0].size,"./xas.txt");
+	// for (auto &x : xas_x) cout << setw(5) << x << " ";
+	// cout << endl;
+	// cout.precision(3);
+	for (int i = 0; i < xas_y.size(); ++i) {
+		if (xas_y[i] != 0) {
+			cout << "x: " << setw(5) << xas_temp[i] << ", e: " << setw(10) << xas_y[i] << endl;
+ 		}
+	}
+	for (auto &x : xas_y) cout << x << " ";
 	cout << endl;	
-	write_mat(xas_mat,cu_gs[0].hsize,cu_ex[0].hsize,"xas.txt");
-
-
-
-	write_mat(gs_eigvec,cu_gs[0].hsize,cu_gs[0].hsize,"gs_ev.txt");
-	write_mat(ex_eigvec,cu_ex[0].hsize,cu_ex[0].hsize,"ex_ev.txt");
-	cout << "ground state eigenenergies: ";
-	printDistinct(gs_eig,cu_gs[0].hsize);
-	cout << endl;
-	cout << "excited states eigenenergies: ";
-	printDistinct(ex_eig,cu_ex[0].hsize);
-	cout << endl;
-
 
 	return;
 }
