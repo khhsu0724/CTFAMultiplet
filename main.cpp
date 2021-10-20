@@ -41,21 +41,24 @@ int main(int argc, char** argv){
 
 	string file_dir = "./INPUT";
 	string photon_method;
-	Hilbert input(file_dir,true);
-
-	// double SC[5] = {1.0,0,1.0*49,0,1.0*441};
-	double SC[5] = {6.0,0,0.13*49,0,0.025*441}; //F_0,2,4 = 6, 0.13, 0.025 eV
-	// double FG[4] = {6.0,6.2,6.18,4.63}; // Core-Valence Interaction Parameter
-	double FG[4] = {6.0,6.2,6.18,4.63};
+	double SC[5] = {6.0,0,0.2*49,0,0.02*441}; //F_0,2,4 = 6,0.13,0.025 eV
+	double FG[4] = {6.0,4.63,6.126,2.63}; //F^0,G^1,F^2,G^23 = 6,6.2,6.18,4.63 eV
 	double racah_B = (SC[2]/49) - (5*SC[4]/441);
+	vector<double> pvec = {1,0,0};
+
+	XAS(SC,FG,1,10.5,pvec,500);
+
+	return 0;
+
+	// Tests
+	Hilbert input(file_dir,true);
 	int nd = 0;
 	for (auto &at:input.atlist) if(at.is_val && at.l == 2) nd = at.num_h - input.is_ex;
 	double del = 3+(nd-1)*(SC[0]-SC[2]*2.0/63-SC[4]*2.0/63);
 	cout << "nd: " << nd << ", del: " << del << endl;
 
-	vector<double> pvec = {1,1,1};
 	calc_coulomb(input,SC);
-	// calc_SO(input,10.5); 
+	calc_SO(input,10.5); 
 	// calc_CF(input,del,1,6); 
 	calc_CV(input,FG);
 	// ed::write_mat(input.hblks[0].ham,input.hblks[0].size,input.hblks[0].size,"./ham.txt");
@@ -77,9 +80,6 @@ int main(int argc, char** argv){
 	}
 	cout << uniq_eig << ": " << count;
 	cout << endl;
-
-
-	XAS(SC,FG,0,10.5,pvec,100);
 	
 	// delete [] mat;
 }

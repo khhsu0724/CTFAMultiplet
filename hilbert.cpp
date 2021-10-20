@@ -143,7 +143,8 @@ double Hilbert::Fsign(QN* op, ulli state, int opnum) {
 	int p = 0;
 	for (size_t i = 0; i < opnum; ++i) {
 		ulli o = qn2ulli(1,op+i);
-		state |= o; 					// Should I put checks here?
+		if (!(state & o)) return 0; //Annihilate on vacuum
+		state |= o;
 		p += ed::count_bits(state/o);
 	}
 	return pow(-1,p);

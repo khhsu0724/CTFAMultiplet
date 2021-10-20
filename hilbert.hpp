@@ -58,6 +58,14 @@ struct Atom {
 		if (is_val) num_h = num_h_in;
 		else num_h = 0;
 	};
+	QN fast_qn(ulli s, int half_orb, int order = 0) {
+		// Fast qn if 's' represents one hole
+		QN qn;
+		int i = (int)log2(s);
+		if (i < half_orb) qn = QN(l-i+sind,-0.5,order);
+		else qn = QN(l-i+half_orb+sind,0.5,order);
+		return qn;
+	}
 	QN get_qn(ulli s, int half_orb, int order = 0) {
 		QN qn(0,0,order);
 		for (int i = sind; i <= eind; ++i) {
