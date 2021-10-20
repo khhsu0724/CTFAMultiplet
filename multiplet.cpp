@@ -155,17 +155,15 @@ void calc_SO(Hilbert& hilbs, double lambda) {
 void calc_CV(Hilbert& hilbs, double* FG) {
 	// Calculate core valence interactions in transition metals
 	if (!hilbs.is_ex) return;
-	cout << "core valence" << endl;
 	for (int ci = 0; ci < hilbs.val_ati; ci++) {
 		for (int vi = hilbs.val_ati; vi < hilbs.atlist.size(); vi++) {
-			cout << "ci: " << ci << ", vi: " << vi << endl;
 			int cl = hilbs.atlist[ci].l, vl = hilbs.atlist[vi].l;
 			for (int vml = -vl; vml <= vl; ++vml) {
 			for (int vmr = -vl; vmr <= vl; ++vmr) {
 			for (int cml = -cl; cml <= cl; ++cml) {
 			for (int cmr = -cl; cmr <= cl; ++cmr) {
 				if (vml+cml != vmr+cmr) continue;
-				vector<pair<double,double>> spairs = {{0.5,0.5},{0.5,-0.5},{-0.5,0.5},{-0.5,-0.5}};
+				vector<pair<double,double>> spairs = {{0.5,0.5},{-0.5,0.5},{0.5,-0.5},{-0.5,-0.5}};
 				for (auto & s : spairs) {
 					struct QN qnl[2] = {{vml,s.first,vi},{cml,s.second,ci}};
 					struct QN qnr[2] = {{vmr,s.first,vi},{cmr,s.second,ci}};
@@ -173,12 +171,13 @@ void calc_CV(Hilbert& hilbs, double* FG) {
 					double meF = calc_U(gaunt(vl,vml,vl,vmr),gaunt(cl,cmr,cl,cml),FG,2*cl+1);
 					for (auto& e : entries) 
 						hilbs.fill_hblk(meF*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second);
-					qnl[0] = {vml,s.second,vi}, qnl[1] = {cml,s.first,ci};
+					qnl[1] = {vml,s.second,vi}, qnl[0] = {cml,s.first,ci};
 					qnr[0] = {vmr,s.first,vi}, qnr[1] = {cmr,s.second,ci};
 					entries = hilbs.match(2,qnl,qnr);
-					double meG = calc_U(gaunt(cl,cml,vl,vmr),gaunt(cl,cmr,vl,vml),FG,cl+vl+1);
+					double meG = calc_U(gaunt(vl,vmr,cl,cml),gaunt(vl,vml,cl,cmr),FG,cl+vl+1);
+					if (s.first == s.second) meG *= -1; // This is due to the ordering convention of the fermions in this code
 					for (auto& e : entries)
-						hilbs.fill_hblk(-meG*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second);
+						hilbs.fill_hblk(meG*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second);
 				}
 			}}}}
 			// !!!!!!Shift for particle hole symmetry

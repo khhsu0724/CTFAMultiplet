@@ -6,9 +6,9 @@
 	0 0 1
 /
 &ATOM_POSITIONS
-	# O 0 0 0 2p
-	# O 0 0 0 2p
-	Ni 0 0 0 2p 3d
+	#O 0 0 0 2p
+	#O 0 0 0 2p
+	Mn 0 0 0 2p 3d
 	# Cu 0 0 0 2p 3d
 /
 &PHOTON
