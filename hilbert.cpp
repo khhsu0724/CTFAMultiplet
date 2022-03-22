@@ -39,14 +39,14 @@ bool operator!=(const QN& qn1, const QN& qn2) {
 	return true;
 }
 
-Hilbert::Hilbert(string file_dir, bool is_ex): is_ex(is_ex) {
+Hilbert::Hilbert(string file_dir, double* SC, double* FG, double* CF, double const& SO
+				, bool HYB, bool is_ex): is_ex(is_ex), HYB_on(HYB) {
 	read_from_file(file_dir);
 	if (is_ex) {
-		SO = true;
 		num_vh--;
 		num_ch++;
-	} else SO = false;
-
+	}
+	Assign_Hash(SC,FG,CF,SO);
 	// Fix this so the code doesnt have to rely on a vector allocated
 	vector<ulli> hspace = enum_hspace();
 	// for (auto & h : hspace) {
@@ -101,55 +101,6 @@ vpulli Hilbert::match(int snum, QN* lhs, QN* rhs) {
 	return mp;
 }
 
-int Hilbert::Hash(ulli s) { // Add symmetries
-	// Hash function that convert a state in bits to index
-	int cind = 0, vind = 0;
-	int cnt_c = 0, cnt_v = 0;
-	int chash = num_corb/2, vhash = num_vorb/2;
-	for (int i = 0; i < num_corb/2; ++i)
-		if (s & (1 << i)) cind += ed::choose(i,++cnt_c);
-	for (int i = 0; i < num_corb/2; ++i)
-		if (s & (1 << (i+num_corb/2+num_vorb/2))) cind += ed::choose(i+chash,++cnt_c);
-	for (int i = 0; i < num_vorb/2; ++i)
-		if (s & (1 << (i+num_corb/2))) vind += ed::choose(i,++cnt_v);
-	for (int i = 0; i < num_vorb/2; ++i)
-		if (s & (1 << (i+num_corb+num_vorb/2))) vind += ed::choose(i+vhash,++cnt_v);
-	// if ((cnt_cu+cnt_cd) != num_ch || (cnt_vu+cnt_vd) != num_vh) return -1;
-	return vind + cind * ed::choose(num_vorb,num_vh);
-}
-
-ulli Hilbert::Hashback(int ind) { // Add symmetries
-	// Hash function that convert index to state in bitset
-	int cind = ind / ed::choose(num_vorb,num_vh), ch = num_ch;
-	int vind = ind % ed::choose(num_vorb,num_vh), vh = num_vh;
-	ulli c = 0, v = 0;
-	for (int i = num_vorb-1; i >= 0; --i) {
-		if (vind >= ed::choose(i,vh)) {
-			v |= (1 << i);
-			vind -= ed::choose(i,vh--);
-		}
-	}
-	for (int i = num_corb-1; i >= 0; --i) {
-		if (cind >= ed::choose(i,ch)) {
-			c |= (1 << i);
-			cind -= ed::choose(i,ch--);
-		}
-	}
-	return ed::add_bits(v,c,num_vorb,num_corb);
-}
-
-double Hilbert::Fsign(QN* op, ulli state, int opnum) {
-	// Calculate Fermion Sign Problem, return +1 or -1
-	int p = 0;
-	for (size_t i = 0; i < opnum; ++i) {
-		ulli o = qn2ulli(1,op+i);
-		if (!(state & o)) return 0; //Annihilate on vacuum
-		state |= o;
-		p += ed::count_bits(state/o);
-	}
-	return pow(-1,p);
-}
-
 vector<Block> Hilbert::make_block(vector<ulli>& hilb_vec) {
 	// Allocate memory for the block matrices
 	vector<Block> vb;
@@ -175,8 +126,35 @@ void Hilbert::fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs)
 	int lind = 0, rind = 0;
 	// cout << "size: " << hblks[lind].size << ", Hash: " << Hash(lhs) << ", " << Hash(rhs);
 	// cout << ", bits: " << bitset<16>(lhs) << ", " << bitset<16>(rhs) << endl;
+
+	// DEBUG
+	if (num_ch == 0) {
+		double lspin = 0, rspin = 0;
+		for (int j = num_corb/2; j < (num_vorb+num_corb)/2; ++j) {
+			if (lhs & 1<<j) lspin -= 0.5;
+			if (rhs & 1<<j) rspin -= 0.5;
+		}
+		lspin = 2 * lspin + 0.5 * num_vh;
+		rspin = 2 * rspin + 0.5 * num_vh;
+		if (lspin != rspin) cout << "lhs: " << bitset<16>(lhs) << ", rhs: " << bitset<16>(rhs) << endl;
+	}
+	// DEBUG
+
+
 	if (lind == rind) hblks[lind].ham[Hash(lhs)+hblks[lind].size*Hash(rhs)] += matelem;
 	return;
+}
+
+double Hilbert::Fsign(QN* op, ulli state, int opnum) {
+	// Calculate Fermion Sign Problem, return +1 or -1
+	int p = 0;
+	for (size_t i = 0; i < opnum; ++i) {
+		ulli o = qn2ulli(1,op+i);
+		if (!(state & o)) return 0; //Annihilate on vacuum
+		state |= o;
+		p += ed::count_bits(state/o);
+	}
+	return pow(-1,p);
 }
 
 int Hilbert::orbind(ulli s) {
@@ -192,8 +170,8 @@ void Hilbert::read_from_file(string file_dir) {
 	try {
 		if (input.is_open()) {
 			bool read_cell = false, read_atoms = false;
-			int atind = 0;
-			while (getline (input,line)) {
+			int atind = 0, cpsize = 0;
+			while (getline(input,line)) {
 				if (line[0] == '#') continue;
 				if (line[0] == '/') {
 					read_cell = false;
@@ -202,16 +180,19 @@ void Hilbert::read_from_file(string file_dir) {
 				}
 				if (read_cell) {
 					string cp;
-					for (int s = 0; s < line.size(); ++s) {
+					bool skipline = false;
+					for (int s = 0; s < line.size() && !skipline; ++s) {
 						if (line[s] != ' ') {
 							cp.push_back(line[s]);
 							if (s == line.size()-1) cell_param.emplace_back(stod(cp));
-						}
-						else {
+						} else {
 							cell_param.emplace_back(stod(cp));
 							cp = "";
 						}
+						if (line[s] == '#') skipline = true;
 					}
+					if ((cell_param.size() - cpsize) == 3) cpsize = cell_param.size();
+					else throw invalid_argument("incorrect number of unit cell parameter");
 				}
 				if (read_atoms) {
 					string at;
@@ -237,8 +218,10 @@ void Hilbert::read_from_file(string file_dir) {
 							if (at != "") {
 								entry++;
 								if (regex_match(at,regex(".*[a-zA-Z]+.*"))) {
-									if (entry == 1) atin.atname = at;
-									else {
+									if (entry == 1) {
+										num_at++;
+										atin.atname = at;
+									} else {
 										atin.add_orb(at,atind);
 										atlist.emplace_back(atin);
 										if (!atin.is_val) rotate(atlist.begin(),atlist.end()-1,atlist.end());
@@ -250,8 +233,14 @@ void Hilbert::read_from_file(string file_dir) {
 					}
 					if (atin.pos.size() != 3 && !skipline) throw invalid_argument("Invalid atom position");
 				}
-				if (line == "&CELL") read_cell = true;
-				else if (line == "&ATOM_POSITIONS") read_atoms = true;
+				if (line == "&CELL") {
+					read_cell = true;
+					read_atoms = false;
+				}
+				else if (line == "&ATOM_POSITIONS") {
+					read_atoms = true;
+					read_cell = false;
+				}
 			}
 			input.close();
 			int ind = 0;
@@ -291,8 +280,7 @@ void Hilbert::read_from_file(string file_dir) {
 				atlist[ind].vind = i;
 				atlist[i].cind = ind++;
 			}
-		}
-		else throw invalid_argument("Cannot open INPUT file");
+		} else throw invalid_argument("Cannot open INPUT file");
 	} catch (const exception &ex) {
 		cerr << ex.what() << "\n";
 		exit(0);
@@ -397,4 +385,52 @@ void Hilbert::read_from_file(string file_dir) {
 // 		cout << setw(10) << eig[i] << setw(10) << LS[0] << setw(10) << LS[1] << setw(10) << LS[2] << endl;
 // 	}
 // }
+
+// Here is a nice collection of hash functions
+void Hilbert::Assign_Hash(double* SC, double* FG, double* CF, double const& SO) {
+	// Check the incoming parameter to see which hash function to use
+	if (SO != 0) SO_on = true;
+	if (!ed::is_zero_arr(CF,5)) CF_on = true;
+	if (is_ex && !ed::is_zero_arr(FG,4)) CV_on = true;
+
+	hashfunc = &Hilbert::norm_Hash;
+	hbfunc = &Hilbert::norm_Hashback;
+	return;
+}
+
+int Hilbert::norm_Hash(ulli s) {
+	// Hash function that convert a state in bits to index
+	int cind = 0, vind = 0;
+	int cnt_c = 0, cnt_v = 0;
+	int hc = num_corb/2, hv = num_vorb/2;
+	for (int i = 0; i < hc; ++i)
+		if (s & (1 << i)) cind += ed::choose(i,++cnt_c);
+	for (int i = 0; i < hc; ++i)
+		if (s & (1 << (i+hc+hv))) cind += ed::choose(i+hc,++cnt_c);
+	for (int i = 0; i < hv; ++i)
+		if (s & (1 << (i+hc))) vind += ed::choose(i,++cnt_v);
+	for (int i = 0; i < hv; ++i)
+		if (s & (1 << (i+num_corb+hv))) vind += ed::choose(i+hv,++cnt_v);
+	return vind + cind * ed::choose(num_vorb,num_vh);
+}
+
+ulli Hilbert::norm_Hashback(int ind) {
+	// Hash function that convert index to state in bitset
+	int cind = ind / ed::choose(num_vorb,num_vh), ch = num_ch;
+	int vind = ind % ed::choose(num_vorb,num_vh), vh = num_vh;
+	ulli c = 0, v = 0;
+	for (int i = num_vorb-1; i >= 0; --i) {
+		if (vind >= ed::choose(i,vh)) {
+			v |= (1 << i);
+			vind -= ed::choose(i,vh--);
+		}
+	}
+	for (int i = num_corb-1; i >= 0; --i) {
+		if (cind >= ed::choose(i,ch)) {
+			c |= (1 << i);
+			cind -= ed::choose(i,ch--);
+		}
+	}
+	return ed::add_bits(v,c,num_vorb,num_corb);
+}
 

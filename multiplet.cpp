@@ -68,24 +68,6 @@ void calc_coulomb(Hilbert& hilbs, double* SC) {
 	}
 }
 
-double* CFmat(int l, double tenDQ, int coord) {
-	// Crystal field present when the 2 state has same spin, hole language
-	double* cfmat;
-	try {
-		if (l == 2 && coord == 6) {
-			cfmat = new double[25]{0};
-			cfmat[0] = -0.1 * tenDQ;
-			cfmat[1+5*1] = 0.4 * tenDQ;
-			cfmat[2+5*2] = -0.6 * tenDQ;
-			cfmat[3+5*3] = 0.4 * tenDQ;
-			cfmat[4+5*4] = -0.1 * tenDQ;
-			cfmat[4+5*0] = -0.5 * tenDQ;
-			cfmat[0+5*4] = -0.5 * tenDQ;
-		} else throw invalid_argument("non-d and non-octahedral crystal field not coded yet");
-	} catch(const exception &ex) {cout << ex.what() << "\n";}
-	return cfmat;
-}
-
 double* CTmat(int l, double del) {
 	// Need more flexible implementation in the future
 	double* ctmat;
@@ -100,12 +82,28 @@ double* CTmat(int l, double del) {
 	return ctmat;
 }
 
-void calc_CF(Hilbert& hilbs, double del, double tenDQ, int coord) {
+double* CFmat(int l, double* CF) {
+	// Crystal field present when the 2 state has same spin, hole language
+	double* cfmat;
+	try {
+		if (l == 2) {
+			cfmat = new double[25]{0};
+			cfmat[24] = cfmat[0] = (CF[0] + CF[2])/2;
+			cfmat[20] = cfmat[4] = (CF[0] - CF[2])/2;
+			cfmat[18] = cfmat[6] = (CF[3] + CF[4])/2;
+			cfmat[16] = cfmat[8] = (CF[4] - CF[3])/2;
+			cfmat[12] = CF[1];
+		} else throw invalid_argument("non-d and non-octahedral crystal field not coded yet");
+	} catch(const exception &ex) {cout << ex.what() << "\n";}
+	return cfmat;
+}
+
+void calc_CF(Hilbert& hilbs, double del, double* CF) {
 	//Calculate Crystal Field, Charge Transfer Matrix Element
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		int l = hilbs.atlist[i].l;
 		double* cfmat;
-		if (l == 2 && tenDQ != 0) cfmat = CFmat(l, tenDQ, coord);
+		if (l == 2 && CF != 0) cfmat = CFmat(l, CF);
 		else if (hilbs.atlist[i].is_lig && del != 0) cfmat = CTmat(l, del);
 		else continue;
 		for (int j = 0; j < (l*2+1)*(l*2+1); ++j) {
@@ -116,7 +114,7 @@ void calc_CF(Hilbert& hilbs, double del, double tenDQ, int coord) {
 				vpulli entries = hilbs.match(1,&qn1,&qn2);
 				for (auto& e : entries) {
 					if (e.first == e.second) hilbs.fill_hblk(cfmat[j],e.first,e.second);
-					else hilbs.fill_hblk(cfmat[j]*hilbs.Fsign(&qn1,e.first,1)
+					else hilbs.fill_hblk(cfmat[j]*hilbs.Fsign(&qn1,e.first,1) // Negative for hole language
 						 *hilbs.Fsign(&qn2,e.second,1),e.first,e.second);
 				}
 			}
@@ -188,6 +186,8 @@ void calc_CV(Hilbert& hilbs, double* FG) {
 
 void calc_HYB(Hilbert& hilbs, double* SC) {
 	// Charge Transfer
+	cout << "Calculate Hybridization" << endl;
+	if (hilbs.num_at == 1) return;
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		if (hilbs.atlist[i].is_lig) {
 			cout << "do something" << endl;

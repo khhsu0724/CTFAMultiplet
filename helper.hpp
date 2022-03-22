@@ -8,6 +8,7 @@
 #ifndef HELPER
 #define HELPER
 
+#define TOL 1E-7
 typedef unsigned long long int ulli;
 
 namespace ed {
@@ -17,6 +18,7 @@ namespace ed {
 	void enum_states(std::vector<ulli>& states, ulli n, ulli k, ulli inc = 0, ulli s = 0);
 	ulli add_bits(ulli b1, ulli b2, int b1size, int b2size);
 	int count_bits(ulli b);
+	void sph2tet(double* sph, double* tet);
 
 	template <typename T> T dot(std::vector<T> a, std::vector<T> b) {
 		try {
@@ -71,7 +73,6 @@ namespace ed {
 	    matfile.open (file_dir);
 		for (int j = 0; j < y; ++j) {
 	    	for (int i = 0; i < x; ++i) {
-	    		
 	    		matfile << std::setw(8) << mat[i+x*j];
 	    		if (i < x-1) matfile << " ";
 	    	}
@@ -79,6 +80,20 @@ namespace ed {
 	    }
 	    matfile.close();
 	};
+
+	template <typename DT> void write_vec(std::vector<DT> vec, size_t x, size_t y, std::string file_dir) {
+		std::ofstream matfile;
+	    matfile.open (file_dir);
+		for (int j = 0; j < y; ++j) {
+	    	for (int i = 0; i < x; ++i) {
+	    		matfile << vec.at(i+x*j);
+	    		if (i < x-1) matfile << ",";
+	    	}
+	    	matfile << "\n";
+	    }
+	    matfile.close();
+	};
+
 
 
 	template <typename T> std::vector<T> printDistinct(T arr[], int n, bool is_print = true) {
@@ -94,7 +109,7 @@ namespace ed {
 	        }
 	    }
 	    return unique_eig;
-	}
+	};
 
 	template <typename T> T trace(T *mat, int n) {
 		T t = 0;
@@ -125,6 +140,24 @@ namespace ed {
 		for (size_t i = 0; i < v1.size(); ++i) {
 			if (v1[i] != v2[i]) return false;
 		}
+		return true;
+	};
+
+	template<typename T> int binary_search(std::vector<T> &svec, T t) {
+		int ind = svec.size()/2 - 1, end = svec.size() - 1;
+		while (abs(svec[ind]-t) > TOL) {
+			if (ind == end) return -1;
+			else if (svec[ind] < t) ind = (ind+end+1)/2;
+			else if (svec[ind] > t) {
+				end = ind;
+				ind /= 2;
+			}
+		}
+		return ind;
+	};
+
+	template<typename T> bool is_zero_arr(T* arr, int s) {
+		for (int i = 0; i < s; ++i) if (abs(arr[i]) > TOL) return false;
 		return true;
 	};
 }

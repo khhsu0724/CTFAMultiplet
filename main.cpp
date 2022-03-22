@@ -2,10 +2,17 @@
 #include <ctime> 
 #include <stdlib.h>
 #include <bitset>
+#include <regex>
 #include "multiplet.hpp"
 #include "photon.hpp"
 
 using namespace std;
+
+struct PM {
+	bool XAS = false;
+	bool RIXS = false;
+	bool PE = false; // Photo Emission
+};
 
 void read_input() {
 	return;
@@ -16,10 +23,14 @@ void tb() {
     myfile.open ("./tb.txt");
 	double SC[5] = {0,0,1*49,0,0.078*441};
 	double racah_B = (SC[2]/49) - (5*SC[4]/441);
-	for (double cf = 0.5; cf <= 50; cf += 0.5) {
-		Hilbert input("./INPUT",false);
+	double CF[5] = {1,1,-2.0/3,-2.0/3,-2.0/3};
+	double FG[4]{0};
+	for (double m = 0.5; m <= 50; m += 0.5) {
+		Hilbert input("./INPUT",SC,FG,CF,0,false,false);
+		double* CF_TB = new double[5]{0};
+		for (int c = 0; c < 5; c++) CF_TB[c] = CF[c] * m;
 		calc_coulomb(input,SC);
-		calc_CF(input,0,cf,6);
+		calc_CF(input,0,CF_TB);
 		input.hblks[0].diag_dsyev();
 		vector<double> unique_eig = ed::printDistinct(input.hblks[0].eig,input.hblks[0].size,false);
 		auto min_eig = *min_element(unique_eig.begin(), unique_eig.end());
@@ -33,53 +44,177 @@ void tb() {
 	}
 }
 
+bool read_num(string line, double* tgt, int pnum) {
+	try {
+		string p;
+		bool skip = false;
+		int ncnt = 0;
+		for (int s = 0; s < line.size() && !skip; ++s) {
+			if (line[s] == '#') skip = true;
+			else if (line[s] == '=') p = "";
+			else if (line[s] != ',' && line[s] != ' ' && line[s] != '	') p.push_back(line[s]);
+			else if (regex_match(p,regex(R"(^([+-]?(?:[[:d:]]+\.?|[[:d:]]*\.[[:d:]]+))(?:[Ee][+-]?[[:d:]]+)?$)"))) {
+				if (ncnt < pnum) tgt[ncnt] = stod(p);
+				else throw invalid_argument("Too many input parameter");
+				ncnt++;
+				p = "";
+			} else if (p.size() != 0) throw invalid_argument("Invalid number");
+			else p = "";
+		}
+		if (p.size() != 0 && regex_match(p,regex(R"(^([+-]?(?:[[:d:]]+\.?|[[:d:]]*\.[[:d:]]+))(?:[Ee][+-]?[[:d:]]+)?$)"))) {
+			if (ncnt < pnum) tgt[ncnt] = stod(p);
+			else throw invalid_argument("Too many input parameter");
+			ncnt++;
+			p = "";
+		}
+		if (ncnt != pnum) throw invalid_argument("Wrong number of input parameter");
+	} catch (const exception &ex) {
+		cerr << ex.what() << "\n";
+		exit(0);
+	}
+	return true;
+}
+
+bool read_bool(string line, bool& tgt) {
+	try {
+		string p;
+		bool skip = false;
+		for (int s = 0; s < line.size() && !skip; ++s) {
+			if (line[s] == '#') skip = true;
+			else if (line[s] == '=') p = "";
+			else if (line[s] != ',' && line[s] != ' ' && line[s] != '	') p.push_back(line[s]);
+			else if (regex_match(p,regex(".*[a-zA-Z]+.*"))) {
+				transform(p.begin(),p.end(),p.begin(),::toupper);
+				if (p == "TRUE") tgt = true;
+				else if (p == "FALSE") tgt = false;
+				else throw invalid_argument("Invalid input (True/False)");
+			} else if (p.size() != 0) throw invalid_argument("Invalid input (True/False)");
+			else p = "";
+		}
+		if (p.size() != 0 && regex_match(p,regex(".*[a-zA-Z]+.*"))) {
+			transform(p.begin(),p.end(),p.begin(),::toupper);
+			if (p == "TRUE") tgt = true;
+			else if (p == "FALSE") tgt = false;
+			else throw invalid_argument("Invalid input (True/False)");
+		}
+	} catch (const exception &ex) {
+		cerr << ex.what() << "\n";
+		exit(0);
+	}
+	return true;
+}
+
+void read_input(string IDIR, PM& pm, double* SC, double* FG, double* CF, double& SO, bool& HYB, 
+				double& nedos, vecd& pvin, vecd& pvout) {
+	string line;
+	ifstream input(IDIR);
+	try {
+		if (input.is_open()) {
+			bool read_control = false, read_photon = false;
+			int atind = 0;
+			while (getline(input,line)) {
+				if (line[0] == '#') continue;
+				if (line[0] == '/') {
+					read_control = false;
+					read_photon = false;
+					continue;
+				}
+				if (read_control) {
+					string p;
+					bool skip = false;
+					for (int s = 0; s < line.size() && !skip; ++s) {
+						if (line[s] != ' ' && line[s] != '	' && line[s] != '=') p.push_back(line[s]);
+						else {
+							transform(p.begin(),p.end(),p.begin(),::toupper);
+							if (p == "SO") skip = read_num(line.substr(s+1,line.size()-1),&SO,1);
+							else if (p == "SC") skip = read_num(line.substr(s+1,line.size()-1),SC,5);
+							else if (p == "FG") skip = read_num(line.substr(s+1,line.size()-1),FG,4);
+							else if (p == "CF") skip = read_num(line.substr(s+1,line.size()-1),CF,5);
+							else if (p == "HYB") skip = read_bool(line.substr(s+1,line.size()-1),HYB);
+							else if (p == "NEDOS") skip = read_num(line.substr(s+1,line.size()-1),&nedos,1);
+							p = "";
+						}
+						if (line[s] == '#') skip = true;
+					}
+				}
+				if (read_photon) {
+					string p;
+					bool skip = false;
+					double pvtmp[3]{0};
+					for (int s = 0; s < line.size() && !skip; ++s) {
+						if (line[s] != ' ' && line[s] != '	' && line[s] != '=') p.push_back(line[s]);
+						else {
+							transform(p.begin(),p.end(),p.begin(),::toupper);
+							if (p == "XAS") skip = read_bool(line.substr(s+1,line.size()-1),pm.XAS);
+							else if (p == "RIXS") skip = read_bool(line.substr(s+1,line.size()-1),pm.RIXS);
+							else if (p == "PVIN") {
+								skip = read_num(line.substr(s+1,line.size()-1),pvtmp,3);
+								for (int i = 0; i < 3; ++i) pvin[i] = pvtmp[i];
+							}
+							else if (p == "PVOUT") {
+								skip = read_num(line.substr(s+1,line.size()-1),pvtmp,3);
+								for (int i = 0; i < 3; ++i) pvout[i] = pvtmp[i];
+							}
+							p = "";
+						}
+						if (line[s] == '#') skip = true;
+					}
+				}
+				if (line == "&CONTROL") {
+					read_control = true;
+					read_photon = false;
+				}
+				else if (line == "&PHOTON") {
+					read_photon = true;
+					read_control = false;
+				}
+			}
+		} else throw invalid_argument("Cannot open INPUT file");
+	} catch (const exception &ex) {
+		cerr << ex.what() << "\n";
+		exit(0);
+	}
+	return;
+}
+
 int main(int argc, char** argv){
-	// Process flags
+	PM pm;
+	double SO = 0, nedos = 0;
+	double SC[5]{0}, FG[4]{0}, CF[5]{0};
+	bool HYB;
+	vecd pvin(3,0), pvout(3,0);
 
-	bool CF_on = false;
-	bool SO_on = false;
+	string IDIR = "./INPUT";
+	if (argc == 2) IDIR = string(argv[1]);
+	read_input(IDIR, pm, SC, FG, CF, SO, HYB, nedos, pvin, pvout);
 
-	string file_dir = "./INPUT";
-	string photon_method;
-	double SC[5] = {6.0,0,0.2*49,0,0.02*441}; //F_0,2,4 = 6,0.13,0.025 eV
-	double FG[4] = {6.0,4.63,6.126,2.63}; //F^0,G^1,F^2,G^23 = 6,6.2,6.18,4.63 eV
-	double racah_B = (SC[2]/49) - (5*SC[4]/441);
-	vector<double> pvec = {1,0,0};
+	// U = F^0 + 4*F^2 + 36*F^4
 
-	XAS(SC,FG,1,10.5,pvec,500);
+	cout << "Input parameters" << endl;
+	cout << "SO: " << SO << "eV" << endl;
+	cout << "SC: ";
+	for (int i = 0; i < 5; ++i) cout << SC[i] << ", ";
+	cout << endl;
+	cout << "FG: ";
+	for (int i = 0; i < 4; ++i) cout << FG[i] << ", ";
+	cout << endl;
+	cout << "CF: ";
+	for (int i = 0; i < 5; ++i) cout << CF[i] << ", ";
+	cout << endl;
+	if (HYB) cout << "yes HYB" << endl; 
+	else cout << "no HYB" << endl; 
+	cout << "pvin: ";
+	for (int i = 0; i < 3; ++i) cout << pvin[i] << ", ";
+	cout << endl;
+	cout << "pvout: ";
+	for (int i = 0; i < 3; ++i) cout << pvout[i] << ", ";
+	cout << endl;
+
+	// Adjust Slater Condor Parameter
+	SC[2] *= 49;
+	SC[4] *= 441;
+	if (pm.XAS) XAS(IDIR,SC,FG,CF,SO,HYB,pvin,nedos);
+	if (pm.RIXS) RIXS(IDIR,SC,FG,CF,SO,HYB,pvin,pvout,nedos);
 
 	return 0;
-
-	// Tests
-	Hilbert input(file_dir,true);
-	int nd = 0;
-	for (auto &at:input.atlist) if(at.is_val && at.l == 2) nd = at.num_h - input.is_ex;
-	double del = 3+(nd-1)*(SC[0]-SC[2]*2.0/63-SC[4]*2.0/63);
-	cout << "nd: " << nd << ", del: " << del << endl;
-
-	calc_coulomb(input,SC);
-	calc_SO(input,10.5); 
-	// calc_CF(input,del,1,6); 
-	calc_CV(input,FG);
-	// ed::write_mat(input.hblks[0].ham,input.hblks[0].size,input.hblks[0].size,"./ham.txt");
-	input.hblks[0].diag_dsyev();
-	// cout << "eigenvalues: ";
-	// ed::printDistinct(input.hblks[0].eig,input.hblks[0].size);
-	// cout << endl;
-
-	cout << "sorted eigenvalues: " << endl;
-	sort(input.hblks[0].eig,input.hblks[0].eig+input.hblks[0].size);
-	double uniq_eig = input.hblks[0].eig[0],  count = 1;
-	for (int i = 1; i < input.hblks[0].size; i++) {
-		if (abs(uniq_eig-input.hblks[0].eig[i]) < 1e-7) count++;
-		else {
-			cout << uniq_eig << ": " << count << ", ";
-			count = 1;
-			uniq_eig = input.hblks[0].eig[i];
-		}
-	}
-	cout << uniq_eig << ": " << count;
-	cout << endl;
-	
-	// delete [] mat;
 }

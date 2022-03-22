@@ -3,7 +3,7 @@
 #include "helper.hpp"
 
 double* dgeev(double *mat, double *vr, int n);
-double* dsyev(double *mat, double *vr, int n);
+double* dsyev(double *mat, int n);
 
 class Block {
 private:
@@ -17,6 +17,7 @@ public:
 	double get_Lz() {return Lz;};
 	double get_K() {return K;};	
 	int size;
+	int *eind;
 	double *ham, *eig, *eigvec;
 	void diag_dgeev() {
 		eigvec = new double[size*size]{0};
@@ -25,8 +26,12 @@ public:
 		delete[] ham;
 	}
 	void diag_dsyev() {
-		eig = dsyev(ham,eigvec,size);
+		eig = dsyev(ham,size);
 		eigvec = ham;
+		// delete[] ham; // This is worrysome hmmmm
+	}
+	void alloc_eind() {
+		eind = new int[size]{0};
 	}		
 };
 

@@ -36,3 +36,7 @@ int ed::count_bits(ulli b) {
 	for (c = 0; b; c++) b &= b - 1;
 	return c;
 }
+
+void ed::sph2tet(double* sph, double* tet) {
+
+}
