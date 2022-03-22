@@ -65,7 +65,7 @@ struct Atom {
 		if (i < half_orb) qn = QN(l-i+sind,-0.5,order);
 		else qn = QN(l-i+half_orb+sind,0.5,order);
 		return qn;
-	}
+	};
 	QN get_qn(ulli s, int half_orb, int order = 0) {
 		QN qn(0,0,order);
 		for (int i = sind; i <= eind; ++i) {
@@ -94,31 +94,42 @@ struct Atom {
 
 class Hilbert {
 public:
-	int hsize = 1, num_sites = 0;
+	int hsize = 1, num_sites = 0, num_at = 0;
 	int val_ati = 0, val_ind = 0, num_vh = 0, num_vorb = 0; // These doess not account for up/down spin
 	int num_ch = 0, num_corb = 0;
-	bool SO = true, CF = true, CV = true, HYB = false;
+	bool SO_on = false, CV_on = false, CF_on = false, HYB_on = false;
 	bool is_ex;
 	std::vector<Atom> atlist; // atlist is ordered 
 	std::vector<double> a1, a2, a3, b1, b2, b3;
 	std::vector<int> rehash, states; // Phase out
 	std::vector<Block> hblks;
+	using Hashptr = int (Hilbert::*)(ulli s);
+	using HBptr = ulli (Hilbert::*)(int ind);
+	Hashptr hashfunc;
+	HBptr hbfunc;
 
 public:
 	Hilbert() {};
 	~Hilbert() {};
-	explicit Hilbert(std::string file_dir, bool is_ex = false);
+	explicit Hilbert(std::string file_dir, double* SC, double* FG, double* CF, double const& SO
+				, bool HYB, bool is_ex = false);
 	std::vector<ulli> enum_hspace(int inc_val = 0, int inc_core = 0, int vmod = 0, int cmod = 0);
 	ulli qn2ulli(int snum, QN* qn, bool only_val = false, bool only_core = false);
 	vpulli match(int snum, QN* lhs, QN* rhs);
-	int Hash(ulli s);
-	ulli Hashback(int ind);
+	double total_spin(int blk, int state);
 	void fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs);
 	double Fsign(QN* op, ulli state, int opnum);
 	std::vector<Block> make_block(std::vector<ulli>& hilb_vec);
 	int orbind(ulli s);
 	void read_from_file(std::string file_dir);
 	double pheshift(double trace, int k);
+
+	// Nice Collection of Hash Functions
+	void Assign_Hash(double* SC, double* FG, double* CF, double const& SO);
+	int Hash(ulli s) {return (this->*hashfunc)(s);};
+	ulli Hashback(int ind) {return (this->*hbfunc)(ind);};
+	int norm_Hash(ulli s);
+	ulli norm_Hashback(int ind);
 
 	// Need to fix these
 	// Maybe a copy constructor?????

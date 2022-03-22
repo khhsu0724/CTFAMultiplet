@@ -30,7 +30,7 @@ double* dgeev(double *mat, double *vr, int n) {
 
 	dgeev_(&JOBVL,&JOBVR,&n,input,&n,eigReal,eigImag,
 			vl,&n,vr,&n,work,&lwork,&info);
-	ed::norm_ev(vr,n);
+	// ed::norm_ev(vr,n);
 	// check for errors
 	try {
 		if (info!=0) throw runtime_error( "Error: dgeev returned error code ");
@@ -40,9 +40,9 @@ double* dgeev(double *mat, double *vr, int n) {
 	return eigReal;
 }
 
-double* dsyev(double *mat, double *vr, int n) {
+double* dsyev(double *mat, int n) {
 	char JOBZ='V',UPLO='U';
-	int info, lwork = -1;
+	int info = 0, lwork = -1;
 	double *eigReal = new double[n]{0};
 	double *work;
 	double wkopt;
@@ -50,8 +50,7 @@ double* dsyev(double *mat, double *vr, int n) {
 	dsyev_(&JOBZ,&UPLO,&n,mat,&n,eigReal,&wkopt,&lwork,&info); // get lwork size
 	lwork = (int)wkopt;
 	work = new double[lwork]{0};
-	dsyev_(&JOBZ,&UPLO,&n,mat,&n,eigReal,work,&lwork,&info);
-	ed::norm_ev(mat,n);
+	dsyev_(&JOBZ,&UPLO,&n,mat,&n,eigReal,work,&lwork,&info); // Should return orthonormal ev
 
 	try {
 		if (info!=0) throw runtime_error( "Error: dsyev returned error code ");
