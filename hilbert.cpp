@@ -50,15 +50,15 @@ Hilbert::Hilbert(string file_dir, double* SC, double* FG, double* CF, double con
 	// Fix this so the code doesnt have to rely on a vector allocated
 	vector<ulli> hspace = enum_hspace();
 	// for (auto & h : hspace) {
-	// 	cout << h << ", " << bitset<16>(h) << ", Hash: " << Hash(h) << ", Hashback: " << Hashback(Hash(h)) << endl;
-	// 	if (h != Hashback(Hash(h))) cout << "error hashing" << endl;
+	// 	// cout << h << ", " << bitset<28>(h) << ", Hash: " << Hash(h) << ", Hashback: " << Hashback(Hash(h)) << endl;
+	// 	// if (h != Hashback(Hash(h))) cout << "error hashing" << endl;
 	// }
 	// for (auto & at : atlist) cout << at.atname << ", " << at.is_lig << endl;
 	hsize = ed::choose(num_vorb,num_vh)*ed::choose(num_corb,num_ch);
 	make_block(hspace);
 }
 
-vector<ulli> Hilbert::enum_hspace(int inc_val, int inc_core, int vmod, int cmod) {
+vector<ulli> Hilbert::enum_hspace(ulli inc_val, ulli inc_core, int vmod, int cmod) {
 	vector<ulli> val,core,hspace;
 	ed::enum_states(val,num_vorb,num_vh+vmod,inc_val);
 	ed::enum_states(core,num_corb,num_ch+cmod,inc_core);
@@ -85,6 +85,7 @@ inline ulli Hilbert::qn2ulli(int snum, QN* qn, bool only_val, bool only_core) {
 vpulli Hilbert::match(int snum, QN* lhs, QN* rhs) {
 	// Match input states within the Hilbert Space, atomic number needs to match
 	ulli rhs_val = 0, lhs_val = 0, rhs_core = 0, lhs_core = 0;
+	// if snum <= 1, then the we don't need to compute this for loop?
 	for (size_t i = 0; i < snum; ++i) {
 		if (atlist[rhs[i].order].is_val) rhs_val += qn2ulli(1,&rhs[i],true,false);
 		else rhs_core += qn2ulli(1,&rhs[i],false,true);
@@ -117,7 +118,7 @@ vector<Block> Hilbert::make_block(vector<ulli>& hilb_vec) {
 
 
 	// !!!!Come up with a faster way to reserve memory for blocks!!!!
-	hblks.push_back(Block(0,0,0,hsize));
+	hblks.emplace_back(std::move(Block(0,0,0,hsize)));
 	return vb;
 }
 
@@ -128,16 +129,16 @@ void Hilbert::fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs)
 	// cout << ", bits: " << bitset<16>(lhs) << ", " << bitset<16>(rhs) << endl;
 
 	// DEBUG
-	if (num_ch == 0) {
-		double lspin = 0, rspin = 0;
-		for (int j = num_corb/2; j < (num_vorb+num_corb)/2; ++j) {
-			if (lhs & 1<<j) lspin -= 0.5;
-			if (rhs & 1<<j) rspin -= 0.5;
-		}
-		lspin = 2 * lspin + 0.5 * num_vh;
-		rspin = 2 * rspin + 0.5 * num_vh;
-		if (lspin != rspin) cout << "lhs: " << bitset<16>(lhs) << ", rhs: " << bitset<16>(rhs) << endl;
-	}
+	// if (num_ch == 0) {
+	// 	double lspin = 0, rspin = 0;
+	// 	for (int j = num_corb/2; j < (num_vorb+num_corb)/2; ++j) {
+	// 		if (lhs & 1<<j) lspin -= 0.5;
+	// 		if (rhs & 1<<j) rspin -= 0.5;
+	// 	}
+	// 	lspin = 2 * lspin + 0.5 * num_vh;
+	// 	rspin = 2 * rspin + 0.5 * num_vh;
+	// 	if (lspin != rspin) cout << "lhs: " << bitset<16>(lhs) << ", rhs: " << bitset<16>(rhs) << endl;
+	// }
 	// DEBUG
 
 
@@ -161,6 +162,10 @@ int Hilbert::orbind(ulli s) {
 	int i = 0;
 	while (!(atlist[i].check & s)) ++i;
 	return i;
+}
+
+void build_adjmat() {
+	
 }
 
 void Hilbert::read_from_file(string file_dir) {

@@ -2,6 +2,7 @@
 #include <fstream>
 #include <vector>
 #include <cmath>
+#include <complex>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -10,6 +11,8 @@
 
 #define TOL 1E-7
 typedef unsigned long long int ulli;
+typedef std::complex<double> dcomp;
+typedef std::vector<double> vecd;
 
 namespace ed {
 	bool is_pw2(int x);
@@ -18,7 +21,7 @@ namespace ed {
 	void enum_states(std::vector<ulli>& states, ulli n, ulli k, ulli inc = 0, ulli s = 0);
 	ulli add_bits(ulli b1, ulli b2, int b1size, int b2size);
 	int count_bits(ulli b);
-	void sph2tet(double* sph, double* tet);
+	void sph2real(double* sph, double* tet);
 
 	template <typename T> T dot(std::vector<T> a, std::vector<T> b) {
 		try {
@@ -96,18 +99,18 @@ namespace ed {
 
 
 
-	template <typename T> std::vector<T> printDistinct(T arr[], int n, bool is_print = true) {
+	template <typename T> std::vector<T> printDistinct(std::unique_ptr<T[]>& arr, int n, bool is_print = true) {
 	    std::vector<T> unique_eig;
 	    for (int i = 0; i < n; i++) {
 	        int j;
 	        for (j = 0; j < i; j++)
 	           if (abs(arr[i] - arr[j]) < 1e-7)
 	               break;
-	        if (i == j) {
-	        	if (is_print) std::cout << arr[i] << " ";
-	        	unique_eig.push_back(arr[i]);
-	        }
+	        if (i == j) unique_eig.push_back(arr[i]);
 	    }
+	    std::sort(unique_eig.begin(), unique_eig.end());
+	    if (is_print) for (int i =0; i < unique_eig.size(); ++i)std::cout << unique_eig[i] << " ";
+	    if (is_print) std::cout << std::endl;
 	    return unique_eig;
 	};
 
