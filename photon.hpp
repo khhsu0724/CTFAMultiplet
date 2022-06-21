@@ -4,8 +4,6 @@
 #ifndef PHOTON
 #define PHOTON
 
-typedef std::vector<double> vecd;
-
 std::complex<double> proj_pvec(int ml, vecd& pvec);
 void calc_ham(Hilbert& hilbs, double* SC, double* FG, double* CF, double const& SO);
 void write_XAS(vecd const& aben, vecd const& intensity, std::string file_dir, bool print = true);

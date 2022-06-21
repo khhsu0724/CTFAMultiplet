@@ -95,13 +95,14 @@ struct Atom {
 class Hilbert {
 public:
 	int hsize = 1, num_sites = 0, num_at = 0;
-	int val_ati = 0, val_ind = 0, num_vh = 0, num_vorb = 0; // These doess not account for up/down spin
-	int num_ch = 0, num_corb = 0;
+	int val_ati = 0, val_ind = 0; // These doess not account for up/down spin
+	int num_ch = 0, num_vh = 0;
+	int num_corb = 0, num_vorb = 0; // This is number of orbital * 2, sorry...
 	bool SO_on = false, CV_on = false, CF_on = false, HYB_on = false;
 	bool is_ex;
+	std::string coord = "sqpl"; // Adjacency matrix for atoms, coordination
 	std::vector<Atom> atlist; // atlist is ordered 
 	std::vector<double> a1, a2, a3, b1, b2, b3;
-	std::vector<int> rehash, states; // Phase out
 	std::vector<Block> hblks;
 	using Hashptr = int (Hilbert::*)(ulli s);
 	using HBptr = ulli (Hilbert::*)(int ind);
@@ -113,14 +114,15 @@ public:
 	~Hilbert() {};
 	explicit Hilbert(std::string file_dir, double* SC, double* FG, double* CF, double const& SO
 				, bool HYB, bool is_ex = false);
-	std::vector<ulli> enum_hspace(int inc_val = 0, int inc_core = 0, int vmod = 0, int cmod = 0);
+	std::vector<ulli> enum_hspace(ulli inc_val = 0, ulli inc_core = 0, int vmod = 0, int cmod = 0);
 	ulli qn2ulli(int snum, QN* qn, bool only_val = false, bool only_core = false);
 	vpulli match(int snum, QN* lhs, QN* rhs);
 	double total_spin(int blk, int state);
 	void fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs);
 	double Fsign(QN* op, ulli state, int opnum);
-	std::vector<Block> make_block(std::vector<ulli>& hilb_vec);
+	std::vector<Block> make_block(std::vector<ulli>& hilb_vec); //
 	int orbind(ulli s);
+	void build_adjmat();
 	void read_from_file(std::string file_dir);
 	double pheshift(double trace, int k);
 

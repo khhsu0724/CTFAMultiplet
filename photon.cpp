@@ -4,7 +4,6 @@
 #include "photon.hpp"
 
 using namespace std;
-typedef complex<double> dcomp;
 #define LIM = TOL;
 
 // Contains photon based spectroscopy
@@ -50,7 +49,9 @@ void write_XAS(vecd const& aben, vecd const& intensity, string file_dir, bool pr
 	xasfile.close();
 }
 
+
 void XAS(string input_dir, double* SC, double* FG, double* CF, double SO, bool HYB, vecd& pvec, int nedos) {
+	// Note: different diagonalize routine might yield different results, if the width of delta function is not small enough.
 	double beta = 0, racah_B = (SC[2]/49) - (5*SC[4]/441);
 
 	cout << "Reading files..." << endl;
@@ -93,7 +94,7 @@ void XAS(string input_dir, double* SC, double* FG, double* CF, double SO, bool H
 	vector<dcomp> blap(GS.hsize*EX.hsize,0);
 	int half_orb = (EX.num_vorb+EX.num_corb)/2;
 
-	cout << "Calculating cross section..." << endl;
+	cout << "Calculating cross section" << endl;
 	start = chrono::high_resolution_clock::now();
 	// Calculating basis state overlap
 	for (size_t g = 0; g < GS.hsize; g++) {
@@ -109,9 +110,9 @@ void XAS(string input_dir, double* SC, double* FG, double* CF, double SO, bool H
 								* GS.Fsign(&vhqn,gs,1) * EX.Fsign(&chqn,exs,1);
 		}
 	}
-
-	for (auto &g : gsi) {
-		Block gsblk = GS.hblks[g.first];
+	
+	for (auto &g  : gsi) {
+		Block& gsblk = GS.hblks[g.first];
 		for (auto &exblk : EX.hblks) {
 		for (int ei = 0; ei < exblk.size; ++ei) {
 			if (exblk.eig[ei]-gs_en < emin || exblk.eig[ei]-gs_en > emax) continue;
@@ -126,6 +127,7 @@ void XAS(string input_dir, double* SC, double* FG, double* CF, double SO, bool H
 			}
 			if (abs(cs) > TOL) {
 				xas_aben[round((exblk.eig[ei]-gs_en-emin)/((emax-emin)/nedos))] = exblk.eig[ei]-gs_en;
+				// Peaks position might be differe if delta function is too wide, we can fix this by taking the smaller value
 				xas_int[round((exblk.eig[ei]-gs_en-emin)/((emax-emin)/nedos))] += exp(-beta*gs_en)*pow(abs(cs),2);
 			}
 		}}
@@ -254,10 +256,10 @@ void RIXS(string input_dir, double* SC, double* FG, double* CF, double SO, bool 
 	double emin = ab_emin > em_emin ? ab_emin + gs_en : em_emin + gs_en;
 	double emax = ab_emax > em_emax ? ab_emax + gs_en : em_emax + gs_en;
 	for (auto &exblk : EX.hblks) {
-		exblk.alloc_eind();
+		exblk.init_einrange();
 		for (int ei = 0; ei < exblk.size; ++ei) {
 			if (exblk.eig[ei] < emin || exblk.eig[ei] > emax) {
-				exblk.eind[ei] = -1;
+				exblk.einrange[ei] = -1;
 				continue;
 			}
 			bool is_dup = false;
@@ -280,12 +282,12 @@ void RIXS(string input_dir, double* SC, double* FG, double* CF, double SO, bool 
 	if (exen.size() > 1) { // Skip this if there are less than 1 excited state
 		for (auto &exblk : EX.hblks) {
 		for (int ei = 0; ei < exblk.size; ++ei) {
-			if (exblk.eind[ei] == -1) continue;
-			exblk.eind[ei] = ed::binary_search(exen,exblk.eig[ei]);
+			if (exblk.einrange[ei] == -1) continue;
+			exblk.einrange[ei] = ed::binary_search(exen,exblk.eig[ei]);
 		}}
 	}
 
-	for (int i = 0; i < EX.hblks[0].size; ++i) cout << EX.hblks[0].eind[i] << ", ";
+	for (int i = 0; i < EX.hblks[0].size; ++i) cout << EX.hblks[0].einrange[i] << ", ";
 	cout << endl << endl;
 
 	// Figure out total spin of ground and final state
@@ -385,10 +387,10 @@ void RIXS(string input_dir, double* SC, double* FG, double* CF, double SO, bool 
 	// return;
 
 	// Calculate and store <v|D|i> and elastic scattering line
-	dcomp* rixskern = new dcomp[gsi.size()*EX.hsize]{0};
+	vector<dcomp> rixskern(gsi.size()*EX.hsize,0);
 	gscnt = 0, excnt = 0;
 	for (auto &g : gsi) {
-		Block gsblk = GS.hblks[g.first];	
+		Block& gsblk = GS.hblks[g.first];	
 		// vector<dcomp> csum(exen.size(),0);
 		for (auto &exblk : EX.hblks) {
 		for (int ei = 0; ei < exblk.size; ++ei) {
@@ -437,7 +439,7 @@ void RIXS(string input_dir, double* SC, double* FG, double* CF, double SO, bool 
 			for (int gi = 0; gi < gsi.size(); ++gi) {
 				// Probably have to calculate spin flip here
 				if (abs(rixskern[gi*EX.hsize+ei]) < TOL) continue;
-				if (abs(gsts[gi]-gsts[fi]) < TOL) csum[gi*exen.size()+exblk.eind[ei]] += conj(csvf) * rixskern[gi*EX.hsize+ei];
+				if (abs(gsts[gi]-gsts[fi]) < TOL) csum[gi*exen.size()+exblk.einrange[ei]] += conj(csvf) * rixskern[gi*EX.hsize+ei];
 				// cout << "gi: " << gi << ", gi spin: " << gsts[gi] << ", fi: " << fi << ", fi spin: " << gsts[fi] << ", spin diff: " << gsts[gi]-gsts[fi] << endl;
 				// cout << "eind: " << exblk.eind[ei] << ", eigen: " << exblk.eig[ei] << ", en: " << conj(csvf) * rixskern[gi*EX.hsize+ei] << endl;
 			}
@@ -489,6 +491,5 @@ void RIXS(string input_dir, double* SC, double* FG, double* CF, double SO, bool 
 	cout << "Writing results..." << endl << endl;
 	// ed::write_vec(rixs_peaks,nedos,nedos,"rixs_mat.txt");
 	write_RIXS(rixs_peaks,rixs_ab,rixs_em,"rixs_peaks.txt");
-
 	return;
 }

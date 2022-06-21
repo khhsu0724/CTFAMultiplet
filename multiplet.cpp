@@ -15,7 +15,7 @@ void calc_coulomb(Hilbert& hilbs, double* SC) {
 	//Calculate Coulomb Matrix Element
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		int l = hilbs.atlist[i].l;
-		int* ml_arr = new int[l*2+1]{0};
+		vector<int> ml_arr(l*2+1,0);
 		for (int ml = -l; ml <= l; ++ml) ml_arr[ml+l] = ml;
 		for (int msum = -l*2; msum <= l*2; ++msum) {
 			vector<pair<int,int>> mpair_p, mpair_a;
@@ -68,26 +68,12 @@ void calc_coulomb(Hilbert& hilbs, double* SC) {
 	}
 }
 
-double* CTmat(int l, double del) {
-	// Need more flexible implementation in the future
-	double* ctmat;
-	try {
-		if (l == 1) {
-			ctmat = new double[9]{0};
-			ctmat[0] = del;
-			ctmat[1+3*1] = del;
-			ctmat[2+3*2] = del;
-		} else throw invalid_argument("invalid orbital for calculating charge transfer energy");
-	} catch(const exception &ex) {cout << ex.what() << "\n";}
-	return ctmat;
-}
-
-double* CFmat(int l, double* CF) {
+vecd CFmat(int l, double* CF) {
 	// Crystal field present when the 2 state has same spin, hole language
-	double* cfmat;
+	vecd cfmat;
 	try {
 		if (l == 2) {
-			cfmat = new double[25]{0};
+			cfmat = vecd(25,0);
 			cfmat[24] = cfmat[0] = (CF[0] + CF[2])/2;
 			cfmat[20] = cfmat[4] = (CF[0] - CF[2])/2;
 			cfmat[18] = cfmat[6] = (CF[3] + CF[4])/2;
@@ -99,12 +85,12 @@ double* CFmat(int l, double* CF) {
 }
 
 void calc_CF(Hilbert& hilbs, double del, double* CF) {
-	//Calculate Crystal Field, Charge Transfer Matrix Element
+	// Calculate Crystal Field, Charge Transfer Matrix Element
+	// if (hilbs.HYB_on) return; // If Hybridization is on, opt for calc_HYB 
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		int l = hilbs.atlist[i].l;
-		double* cfmat;
-		if (l == 2 && CF != 0) cfmat = CFmat(l, CF);
-		else if (hilbs.atlist[i].is_lig && del != 0) cfmat = CTmat(l, del);
+		vecd cfmat;
+		if (l == 2 && CF != 0 && !hilbs.atlist[i].is_lig) cfmat = CFmat(l, CF);
 		else continue;
 		for (int j = 0; j < (l*2+1)*(l*2+1); ++j) {
 			if (cfmat[j] == 0) continue;
@@ -127,7 +113,7 @@ void calc_SO(Hilbert& hilbs, double lambda) {
 	if (lambda == 0) return;
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		int l = hilbs.atlist[i].l;
-		if (l != 1 || hilbs.atlist[i].is_lig) continue;// Only 2p orbitals get spin orbit coupling for now
+		if (l != 1 || hilbs.atlist[i].is_lig) continue;// Only 2p core orbitals get spin orbit coupling for now
 		for (int ml = -l; ml <= l; ++ml) {
 			// longitudinal phonon
 			for (auto spin : {-0.5,0.5}) {
@@ -184,15 +170,92 @@ void calc_CV(Hilbert& hilbs, double* FG) {
 	return;
 }
 
+vecd HYBmat(Hilbert& hilbs) {
+	// Calculate Hybridization, charge transfer and crystal field energy
+	// !!!! Need to factor in different sites...how to do this?
+	// Can we identify what type of geomtery algorithmically
+	string coord = hilbs.coord;
+	cout << "building hybdrization matrix" << endl;
+	vecd hybmat;
+	double tpd = 1.2, tpdz = 0.3, tpdxy = 0.7, tpdxz = 0.8, tpdyz = 0.8, delta = 3; // Temp place holdler
+	try {
+		int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
+		hybmat = vecd(nvo*nvo,0);
+		if (coord == "sqpl") { // Square Planar
+			// Fill in matrix according to the order of the input of atoms list
+			if (hilbs.num_at != 3) throw invalid_argument("invalid amount of orbitals");
+			// Fill in hybridization matrix first using tesseral harmonics and then transform to spherical and hole language
+			for (int ai = 0; ai < hilbs.atlist.size(); ++ai) {
+			for (int aj = ai; aj < hilbs.atlist.size(); ++aj) {
+				auto ati = hilbs.atlist[ai];
+				auto atj = hilbs.atlist[aj];
+				if (!ati.is_val || !atj.is_val || (ati.is_lig && atj.is_lig)) continue; // Ligand/Ligand interaction is crystal field
+				cout << "ati: " << ati.atname << ", atj: " << atj.atname << endl;
+				cout << "ati pos: " << ati.atname << ", atj: " << atj.atname << endl;
+				for (size_t i = ati.sind-nco; i <= ati.eind-nco; ++i) {
+				for (size_t j = atj.sind-nco; j <= atj.eind-nco; ++j) {
+					// d orbital order: xy,yz,z^2,xz,x^2-y^2, p orbital order: x,y,z
+					cout << i << ", " << j << endl;
+
+					// This matrix is transformed to hole basis and spherical harmonics
+					
+
+
+					// Fill in matrix elements, add in case for PBC as well
+					// if (i == 10 && j == 10) {
+					// 	hybmat[(i-nco)*nvo+j-nco] = 0.5;
+					// 	cout << (i-nco) << ", " << j-nco << endl;
+					// }
+					// cout << "i: " << i <<  ", j: " << j << endl;
+				}}
+			}}
+			// Put in hand coded matrix here first
+		}  else throw invalid_argument("coordination other than square planar is not yet coded");
+	} catch(const exception &ex) {cout << ex.what() << "\n";}
+	return hybmat;
+}	
+
 void calc_HYB(Hilbert& hilbs, double* SC) {
-	// Charge Transfer
+	// Charge Transfer and Hybridization
+	// Temperory implementation for square planar geometry
 	cout << "Calculate Hybridization" << endl;
 	if (hilbs.num_at == 1) return;
-	for (int i = 0; i < hilbs.atlist.size(); ++i) {
-		if (hilbs.atlist[i].is_lig) {
-			cout << "do something" << endl;
+	vecd hybmat = HYBmat(hilbs);
+	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
+	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
+	// Loop through hyb matrix
+	for (int i = 0; i < nvo; ++i) {
+		for (int j = 0; j < nvo; ++j) {
+			if (abs(hybmat[i*nvo+j]) < TOL) continue;
+			// Fill in spin down matrix element
+			ulli lhssd = 2 << (i-1), rhssd = 2 << (j-1), incsd = (rhssd|lhssd);
+			ulli lhssd_shift = (incsd-lhssd) << nco, rhssd_shift = (incsd-rhssd) << nco;	
+			ulli lhssu = 2 << (i-1+nvo), rhssu = 2 << (j-1+nvo), incsu = (rhssu|lhssu);
+			ulli lhssu_shift = (incsu-lhssu) << (2*nco), rhssu_shift = (incsu-rhssu) << (2*nco);
+			QN qnlu, qnru, qnld, qnrd;
+			for (auto& at : hilbs.atlist) {
+				if ((i+nco) >= at.sind && (i+nco) <= at.eind) {
+					int ml = at.val_l - i + at.sind - nco;
+					qnlu = QN(ml,0.5,at.atind);
+					qnld = QN(ml,-0.5,at.atind);
+				}
+				if ((j+nco) >= at.sind && (j+nco) <= at.eind) {
+					int ml = at.val_l - j + at.sind - nco;
+					qnru = QN(ml,0.5,at.atind);
+					qnrd = QN(ml,-0.5,at.atind);
+				}
+			}
+			vector<ulli> match_entries = hilbs.enum_hspace(incsd,0,ed::count_bits(incsd)-1,0);
+			vpulli entries;
+			for (auto &me : match_entries) entries.emplace_back(pair<ulli,ulli>(me-lhssd_shift,me-rhssd_shift)); // We can probably fill in the matrix at this point
+			for (auto &e : entries) hilbs.fill_hblk(hybmat[i*nvo+j]*hilbs.Fsign(&qnld,e.first,1)*hilbs.Fsign(&qnrd,e.second,1),e.first,e.second);
+
+			// Fill in spin up matrix element
+			match_entries = hilbs.enum_hspace(incsu,0,ed::count_bits(incsu)-1,0);
+			entries.clear();
+			for (auto &me : match_entries) entries.emplace_back(pair<ulli,ulli>(me-lhssu_shift,me-rhssu_shift));
+			for (auto &e : entries) hilbs.fill_hblk(hybmat[i*nvo+j]*hilbs.Fsign(&qnlu,e.first,1)*hilbs.Fsign(&qnld,e.second,1),e.first,e.second);
 		}
 	}
-	// Hybridization
 	return;
 }

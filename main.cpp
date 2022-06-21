@@ -27,7 +27,7 @@ void tb() {
 	double FG[4]{0};
 	for (double m = 0.5; m <= 50; m += 0.5) {
 		Hilbert input("./INPUT",SC,FG,CF,0,false,false);
-		double* CF_TB = new double[5]{0};
+		double CF_TB[5]{0};
 		for (int c = 0; c < 5; c++) CF_TB[c] = CF[c] * m;
 		calc_coulomb(input,SC);
 		calc_CF(input,0,CF_TB);
@@ -214,7 +214,7 @@ int main(int argc, char** argv){
 	SC[2] *= 49;
 	SC[4] *= 441;
 	if (pm.XAS) XAS(IDIR,SC,FG,CF,SO,HYB,pvin,nedos);
-	if (pm.RIXS) RIXS(IDIR,SC,FG,CF,SO,HYB,pvin,pvout,nedos);
+	if (pm.RIXS) RIXS(IDIR,SC,FG,CF,SO,HYB,pvin,pvout,nedos);	
 
 	return 0;
 }
