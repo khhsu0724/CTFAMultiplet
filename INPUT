@@ -1,13 +1,13 @@
 &CONTROL
 	SO = 10.5 # Spin orbit coupling (eV)
-	SC = 6 0 0.13 0 0.025 #F_0,2,4 = 6,0.13,0.025 eV
-	#FG = 0 0 0 0 
-	FG = 6 4.63 6.18 2.63 #F^0,G^1,F^2,G^23 = 6.0,4.63,6.18,2.63 eV
+	SC = 4.0 0 0.12857 0 0.025 #F_0,2,4 = 6,0.13,0.025 eV
+	FG = 4.0 4.635 6.18 2.63 
+	#FG = 6 4.63 6.18 2.63 #F^0,G^1,F^2,G^23 = 6.0,4.63,6.18,2.63 eV
 	#CF = 0 0 0 0 0
 	CF = 0 0 1 1 1
 	# CF = 0 2.6 1.6 1.95 1.95 #dx2y2, dz2, dxy, dxz, dyz
-	HYB = false
-	NEDOS = 1000000 # Number of bins for XAS/RIXS
+	HYB = true
+	NEDOS = 1000 # Number of bins for XAS/RIXS
 	# PBC = Periodic Boundary Condition
 	# Geometry
 /
@@ -17,14 +17,14 @@
 	0 0 1
 /
 &ATOM_POSITIONS
-	#O 1 0 0 2p
-	#O 0 1 0 2p
-	Ni 0 0 0 2p 3d
+	Co 1 0 0 2p 3d
+	O  0 1 0 2p
+	O  0 0 1 2p
 /
 &PHOTON
 	XAS = true
 	RIXS = false
-	pvin = 1 0 0
+	pvin = 0 0 1
 	pvout = 1 0 0
 	# Edge (K,L edge)
 	# SPIN FLIP IMPLEMENTATION

@@ -50,8 +50,8 @@ Hilbert::Hilbert(string file_dir, double* SC, double* FG, double* CF, double con
 	// Fix this so the code doesnt have to rely on a vector allocated
 	vector<ulli> hspace = enum_hspace();
 	// for (auto & h : hspace) {
-	// 	// cout << h << ", " << bitset<28>(h) << ", Hash: " << Hash(h) << ", Hashback: " << Hashback(Hash(h)) << endl;
-	// 	// if (h != Hashback(Hash(h))) cout << "error hashing" << endl;
+	// 	cout << h << ", " << bitset<28>(h) << ", Hash: " << Hash(h) << ", Hashback: " << Hashback(Hash(h)) << endl;
+	// 	if (h != Hashback(Hash(h))) cout << "error hashing" << endl;
 	// }
 	// for (auto & at : atlist) cout << at.atname << ", " << at.is_lig << endl;
 	hsize = ed::choose(num_vorb,num_vh)*ed::choose(num_corb,num_ch);
@@ -62,7 +62,7 @@ vector<ulli> Hilbert::enum_hspace(ulli inc_val, ulli inc_core, int vmod, int cmo
 	vector<ulli> val,core,hspace;
 	ed::enum_states(val,num_vorb,num_vh+vmod,inc_val);
 	ed::enum_states(core,num_corb,num_ch+cmod,inc_core);
-	for (auto &c : core) for (auto &v : val) hspace.push_back(ed::add_bits(v,c,num_vorb,num_corb));
+	for (auto &c : core) for (auto &v : val) hspace.emplace_back(ed::add_bits(v,c,num_vorb,num_corb));
 	return hspace;
 }
 

@@ -10,9 +10,11 @@
 #define HELPER
 
 #define TOL 1E-7
+#define PI 3.141592653589793238462643383279502884L
 typedef unsigned long long int ulli;
 typedef std::complex<double> dcomp;
 typedef std::vector<double> vecd;
+typedef std::vector<std::complex<double>> vecc;
 
 namespace ed {
 	bool is_pw2(int x);
@@ -21,6 +23,7 @@ namespace ed {
 	void enum_states(std::vector<ulli>& states, ulli n, ulli k, ulli inc = 0, ulli s = 0);
 	ulli add_bits(ulli b1, ulli b2, int b1size, int b2size);
 	int count_bits(ulli b);
+	void ctranspose(vecc& mat, int m, int n);
 	void sph2real(double* sph, double* tet);
 
 	template <typename T> T dot(std::vector<T> a, std::vector<T> b) {
@@ -144,6 +147,32 @@ namespace ed {
 			if (v1[i] != v2[i]) return false;
 		}
 		return true;
+	};
+
+	template<typename T> std::vector<T> matmult(std::vector<T> v1, std::vector<T> v2, int size) {
+		if (v1.size() != size*size || v2.size() != size*size) {
+			std::invalid_argument("invalid input matrices for multiplication");
+		}
+		std::vector<T> vmult(size*size,0);
+		for (size_t i = 0; i < size; ++i) {
+			for (size_t j = 0; j < size; ++j) {
+				for(size_t m = 0; m < size; ++m) {
+					vmult[i*size+j] += v1[i*size+m] * v2[m*size+j];
+				}
+			}
+		}
+		return vmult;
+	};
+
+	template<typename T> void transpose(std::vector<T>& mat, int m, int n) {
+		std::vector<T> trans(m*n);
+		for (size_t i = 0; i < n; i++) {
+			for (size_t j = 0; j < m; j++) {
+				trans[j*n+i] = mat[i*m+j];
+			}
+		}
+		mat = std::move(trans);
+		return;
 	};
 
 	template<typename T> int binary_search(std::vector<T> &svec, T t) {

@@ -24,9 +24,8 @@ dcomp proj_pvec(int ml, vecd& pvec) {
 
 void calc_ham(Hilbert& hilbs, double* SC, double* FG, double* CF, double const& SO) {
 	// Calculate Hamiltonian of the hilbert space
-	int nd = 0;
+	int nd = 0, del = 0;
 	for (auto &at:hilbs.atlist) if(at.is_val && at.l == 2) nd = at.num_h - hilbs.is_ex;
-	double del = 3+(nd-1)*(SC[0]-SC[2]*2.0/63-SC[4]*2.0/63); // ep = 3 eV
 	// cout << "nd: " << nd << ", del: " << del << endl;
 	if (!ed::is_zero_arr(SC,5)) calc_coulomb(hilbs,SC); 
 	if (hilbs.SO_on) calc_SO(hilbs,SO);

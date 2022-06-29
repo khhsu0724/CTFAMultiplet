@@ -37,6 +37,18 @@ int ed::count_bits(ulli b) {
 	return c;
 }
 
+void ed::ctranspose(vecc& mat, int m, int n) {
+	// Conjugate Transpose of a matrix
+	vecc trans(m*n);
+	for (size_t i = 0; i < n; i++) {
+		for (size_t j = 0; j < m; j++) {
+			trans[j*n+i] = std::conj(mat[i*m+j]);
+		}
+	}
+	mat = std::move(trans);
+	return;
+};
+
 void ed::sph2real(double* sph, double* tet) {
 /** Converts spherical harmonics to real space
 	https://en.wikipedia.org/wiki/Table_of_spherical_harmonics#Real_spherical_harmonics
