@@ -104,6 +104,7 @@ public:
 	std::vector<Atom> atlist; // atlist is ordered 
 	std::vector<double> a1, a2, a3, b1, b2, b3;
 	std::vector<Block> hblks;
+	std::vector<std::pair<int,int>> cvpairs;
 	using Hashptr = int (Hilbert::*)(ulli s);
 	using HBptr = ulli (Hilbert::*)(int ind);
 	Hashptr hashfunc;
