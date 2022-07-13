@@ -1,4 +1,3 @@
-#include <unordered_map>
 #include "helper.hpp"
 #include "diagonalize.hpp"
 #ifndef HILBERT
@@ -22,14 +21,23 @@ bool operator<(const QN& qn1, const QN& qn2);
 bool operator!=(const QN& qn1, const QN& qn2);
 
 struct Atom {
-	int val_n,val_l,n,l,num_h;
-	int sind,eind,atnum,atind; // atom variable tracks which atom it is
+	// TODO: make some of the variables private
+	int val_n,val_l,n,l,num_h,atnum;
+	int sind,eind,atind; // atom variable tracks which atom it is
 	int vind = -1, cind = -1;
 	ulli check = 0; 	   	   // Convenient Number to check if a digit contains in this atom
 	bool is_val, is_lig;
 	std::string atname;
-	std::vector<double> pos, kp;
+	std::vector<double> kp; // change this to site
+	std::vector<int> site;
 	Atom() {};
+	Atom(std::string orb, int atind, int val_n, int val_l, int num_h, std::vector<int> site):
+		atind(atind), site(site), atname("temp") {
+		if (orb.size() != 2) std::cerr << "invalid orbital input\n";
+		n = (int) orb[0] - '0';
+		l = conv_lchar(orb[1]);
+		set_num_h(val_n,val_l,num_h,0);
+	};
 	void add_orb(std::string orb, int atind) {
 		this->atind = atind;
 		if (orb.size() != 2) std::cerr << "invalid orbital input\n";
@@ -80,31 +88,23 @@ struct Atom {
 		}
 		return qn;
 	};
-	double get_k(ulli s, int half_orb) {
-		double cnt = 0;
-		for (int i = sind; i <= eind; ++i) {
-			if (s & 1<<i) cnt++;
-			if (s & 1<<(i+half_orb)) cnt++;
-		}
-		return ed::norm(kp)*cnt;
-	};
 	int get_occ(ulli s, int half_orb) {return ed::count_bits(s & check);};
 	bool contains(ulli const& s) {return s & check;};
 };
 
 class Hilbert {
 public:
-	int hsize = 1, num_sites = 0, num_at = 0;
-	int val_ati = 0, val_ind = 0; // These doess not account for up/down spin
+	// TODO: make some of the variables private
+	int hsize = 1, num_at = 0, at_per_site = 0;
+	int val_ati = 0, val_ind = 0; // Index/Orbital index of first valence atom, TODO: delete val_ati
 	int num_ch = 0, num_vh = 0;
-	int num_corb = 0, num_vorb = 0; // This is number of orbital * 2, sorry...
+	int num_corb = 0, num_vorb = 0; // This is number of orbital*2 (number of electron sites)
 	bool SO_on = false, CV_on = false, CF_on = false, HYB_on = false;
 	bool is_ex;
-	std::string coord = "sqpl"; // Adjacency matrix for atoms, coordination
-	std::vector<Atom> atlist; // atlist is ordered 
-	std::vector<double> a1, a2, a3, b1, b2, b3;
+	std::string coord = "none", edge; // Adjacency matrix for atoms, coordination
+	std::vector<Atom> atlist; // atlist is ordered
 	std::vector<Block> hblks;
-	std::vector<std::pair<int,int>> cvpairs;
+	std::vector<int> sites = {1,1,1};
 	using Hashptr = int (Hilbert::*)(ulli s);
 	using HBptr = ulli (Hilbert::*)(int ind);
 	Hashptr hashfunc;
@@ -113,7 +113,7 @@ public:
 public:
 	Hilbert() {};
 	~Hilbert() {};
-	explicit Hilbert(std::string file_dir, double* SC, double* FG, double* CF, double const& SO
+	explicit Hilbert(std::string file_dir, std::vector<double*>& SC, double* FG, double* CF, double const& SO
 				, bool HYB, bool is_ex = false);
 	std::vector<ulli> enum_hspace(ulli inc_val = 0, ulli inc_core = 0, int vmod = 0, int cmod = 0);
 	ulli qn2ulli(int snum, QN* qn, bool only_val = false, bool only_core = false);
@@ -121,14 +121,18 @@ public:
 	double total_spin(int blk, int state);
 	void fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs);
 	double Fsign(QN* op, ulli state, int opnum);
-	std::vector<Block> make_block(std::vector<ulli>& hilb_vec); //
 	int orbind(ulli s);
-	void build_adjmat();
-	void read_from_file(std::string file_dir);
+	int tot_site_num();
 	double pheshift(double trace, int k);
 
+	// Class for input file parsing
+	std::vector<Block> make_block(std::vector<ulli>& hilb_vec); // TODO
+	void make_atlist(std::string edge, const int& tm_per_site, const int& lig_per_site);
+	bool build_coordination(bool nh_read,int& tm_per_site, int& lig_per_site);
+	void read_from_file(std::string file_dir);
+
 	// Nice Collection of Hash Functions
-	void Assign_Hash(double* SC, double* FG, double* CF, double const& SO);
+	void Assign_Hash(double* FG, double* CF, double const& SO);
 	int Hash(ulli s) {return (this->*hashfunc)(s);};
 	ulli Hashback(int ind) {return (this->*hbfunc)(ind);};
 	int norm_Hash(ulli s);

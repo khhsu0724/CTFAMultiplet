@@ -12,17 +12,17 @@ struct PM {
 	bool XAS = false;
 	bool RIXS = false;
 	bool PE = false; // Photo Emission
+	string edge;
 };
-
-void read_input() {
-	return;
-}
 
 void tb() {
 	ofstream myfile;
     myfile.open ("./tb.txt");
-	double SC[5] = {0,0,1*49,0,0.078*441};
-	double racah_B = (SC[2]/49) - (5*SC[4]/441);
+	double SC2[5] = {0,0,1*49,0,0.078*441};
+	double SC1[3] = {0,0,0};
+	vector<double*> SC;
+	SC.emplace_back(SC1);
+	SC.emplace_back(SC2);
 	double CF[5] = {1,1,-2.0/3,-2.0/3,-2.0/3};
 	double FG[4]{0};
 	for (double m = 0.5; m <= 50; m += 0.5) {
@@ -104,8 +104,9 @@ bool read_bool(string line, bool& tgt) {
 	return true;
 }
 
-void read_input(string IDIR, PM& pm, double* SC, double* FG, double* CF, double& SO, bool& HYB, 
-				double& nedos, vecd& pvin, vecd& pvout) {
+void read_input(string IDIR, PM& pm, vector<double*> SC, double* FG, 
+				double* CF, double& SO, bool& HYB, double& nedos, 
+				vecd& pvin, vecd& pvout) {
 	string line;
 	ifstream input(IDIR);
 	try {
@@ -127,7 +128,8 @@ void read_input(string IDIR, PM& pm, double* SC, double* FG, double* CF, double&
 						else {
 							transform(p.begin(),p.end(),p.begin(),::toupper);
 							if (p == "SO") skip = read_num(line.substr(s+1,line.size()-1),&SO,1);
-							else if (p == "SC") skip = read_num(line.substr(s+1,line.size()-1),SC,5);
+							else if (p == "SC1") skip = read_num(line.substr(s+1,line.size()-1),SC[0],3);
+							else if (p == "SC2") skip = read_num(line.substr(s+1,line.size()-1),SC[1],5);
 							else if (p == "FG") skip = read_num(line.substr(s+1,line.size()-1),FG,4);
 							else if (p == "CF") skip = read_num(line.substr(s+1,line.size()-1),CF,5);
 							else if (p == "HYB") skip = read_bool(line.substr(s+1,line.size()-1),HYB);
@@ -155,6 +157,12 @@ void read_input(string IDIR, PM& pm, double* SC, double* FG, double* CF, double&
 								skip = read_num(line.substr(s+1,line.size()-1),pvtmp,3);
 								for (int i = 0; i < 3; ++i) pvout[i] = pvtmp[i];
 							}
+							else if (p == "EDGE") {
+								cout << p << endl;
+								// TODO: if FG size does not match edge then throw error
+								// if edge => K, FG size = 2
+								// if edge => L, FG size = 4
+							}
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -180,41 +188,46 @@ void read_input(string IDIR, PM& pm, double* SC, double* FG, double* CF, double&
 int main(int argc, char** argv){
 	PM pm;
 	double SO = 0, nedos = 0;
-	double SC[5]{0}, FG[4]{0}, CF[5]{0};
+	// Change SC Parameter here to l = 1 & l = 2
+	double SC2[5]{0}, SC1[3]{0}, FG[4]{0}, CF[5]{0};
+	vecd HYB_param; // Use vector since the size  is unknown
 	bool HYB;
+	vector<double*> SC;
+	SC.emplace_back(SC1);
+	SC.emplace_back(SC2);
 	vecd pvin(3,0), pvout(3,0);
 
 	string IDIR = "./INPUT";
 	if (argc == 2) IDIR = string(argv[1]);
-	read_input(IDIR, pm, SC, FG, CF, SO, HYB, nedos, pvin, pvout);
+	read_input(IDIR,pm,SC,FG,CF,SO,HYB,nedos,pvin,pvout);
 
 	// U = F^0 + 4*F^2 + 36*F^4
 
 	cout << "Input parameters" << endl;
 	cout << "SO: " << SO << "eV" << endl;
-	cout << "SC: ";
-	for (int i = 0; i < 5; ++i) cout << SC[i] << ", ";
-	cout << endl;
-	cout << "FG: ";
+	cout << "SC1: ";
+	for (int i = 0; i < 3; ++i) cout << SC[0][i] << ", ";
+	cout << endl << "SC2: ";
+	for (int i = 0; i < 5; ++i) cout << SC[1][i] << ", ";
+	cout << endl << "FG: ";
 	for (int i = 0; i < 4; ++i) cout << FG[i] << ", ";
-	cout << endl;
-	cout << "CF: ";
+	cout << endl << "CF: ";
 	for (int i = 0; i < 5; ++i) cout << CF[i] << ", ";
 	cout << endl;
 	if (HYB) cout << "yes HYB" << endl; 
 	else cout << "no HYB" << endl; 
 	cout << "pvin: ";
 	for (int i = 0; i < 3; ++i) cout << pvin[i] << ", ";
-	cout << endl;
-	cout << "pvout: ";
+	cout << endl << "pvout: ";
 	for (int i = 0; i < 3; ++i) cout << pvout[i] << ", ";
 	cout << endl;
-
+	
 	// Adjust Slater Condor Parameter
-	SC[2] *= 49;
-	SC[4] *= 441;
-	if (pm.XAS) XAS(IDIR,SC,FG,CF,SO,HYB,pvin,nedos);
-	if (pm.RIXS) RIXS(IDIR,SC,FG,CF,SO,HYB,pvin,pvout,nedos);	
+	SC[0][2] *= 49;
+	SC[1][2] *= 49;
+	SC[1][4] *= 441;
+	if (pm.XAS) XAS(IDIR,SC,FG,CF,SO,HYB,pvin,nedos,pm.edge);
+	if (pm.RIXS) RIXS(IDIR,SC,FG,CF,SO,HYB,pvin,pvout,nedos,pm.edge);	
 
 	return 0;
 }

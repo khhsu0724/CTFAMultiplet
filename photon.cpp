@@ -22,12 +22,11 @@ dcomp proj_pvec(int ml, vecd& pvec) {
 	}
 }
 
-void calc_ham(Hilbert& hilbs, double* SC, double* FG, double* CF, double const& SO) {
+void calc_ham(Hilbert& hilbs, vector<double*>& SC, double* FG, double* CF, double const& SO) {
 	// Calculate Hamiltonian of the hilbert space
 	int nd = 0, del = 0;
 	for (auto &at:hilbs.atlist) if(at.is_val && at.l == 2) nd = at.num_h - hilbs.is_ex;
-	// cout << "nd: " << nd << ", del: " << del << endl;
-	if (!ed::is_zero_arr(SC,5)) calc_coulomb(hilbs,SC); 
+	calc_coulomb(hilbs,SC); 
 	if (hilbs.SO_on) calc_SO(hilbs,SO);
 	if (hilbs.CF_on) calc_CF(hilbs,del,CF);
 	if (hilbs.CV_on) calc_CV(hilbs,FG);
@@ -49,9 +48,10 @@ void write_XAS(vecd const& aben, vecd const& intensity, string file_dir, bool pr
 }
 
 
-void XAS(string input_dir, double* SC, double* FG, double* CF, double SO, bool HYB, vecd& pvec, int nedos) {
+void XAS(string input_dir, vector<double*>& SC, double* FG, double* CF, double SO, 
+			bool HYB, vecd& pvec, int nedos, string edge) {
 	// Note: different diagonalize routine might yield different results, if the width of delta function is not small enough.
-	double beta = 0, racah_B = (SC[2]/49) - (5*SC[4]/441);
+	double beta = 0;//, racah_B = (SC[2]/49) - (5*SC[4]/441);
 
 	cout << "Reading files..." << endl;
 	auto start = chrono::high_resolution_clock::now();
@@ -93,7 +93,7 @@ void XAS(string input_dir, double* SC, double* FG, double* CF, double SO, bool H
 	vector<dcomp> blap(GS.hsize*EX.hsize,0);
 	int half_orb = (EX.num_vorb+EX.num_corb)/2;
 
-	cout << "Calculating cross section" << endl;
+	cout << "Calculating cross section..." << endl;
 	start = chrono::high_resolution_clock::now();
 	// Calculating basis state overlap
 	for (size_t g = 0; g < GS.hsize; g++) {
@@ -109,7 +109,9 @@ void XAS(string input_dir, double* SC, double* FG, double* CF, double SO, bool H
 								* GS.Fsign(&vhqn,gs,1) * EX.Fsign(&chqn,exs,1);
 		}
 	}
-	
+
+	cout << "Assembling basis state overlap -- DONE" << endl;
+
 	for (auto &g  : gsi) {
 		Block& gsblk = GS.hblks[g.first];
 		for (auto &exblk : EX.hblks) {
@@ -166,10 +168,12 @@ void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, string file_d
 	return;
 }
 
-void RIXS(string input_dir, double* SC, double* FG, double* CF, double SO, bool HYB, vecd& pvin, vecd& pvout, int nedos) {
+void RIXS(string input_dir, vector<double*>& SC, double* FG, double* CF, double SO, 
+			bool HYB, vecd& pvin, vecd& pvout, int nedos, string edge) {
+
 	bool sf = true, nsf = true; // Spin Flip & No Spin Flip
 	double beta = 0, hbar = 6.58e-16;
-	double Racah_B = (SC[2]/49) - (5*SC[4]/441);
+	// double Racah_B = (SC[2]/49) - (5*SC[4]/441);
 	dcomp igamma(0,1*0.1);
 
 	cout << "Reading files..." << endl;

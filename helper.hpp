@@ -24,6 +24,7 @@ namespace ed {
 	ulli add_bits(ulli b1, ulli b2, int b1size, int b2size);
 	int count_bits(ulli b);
 	void ctranspose(vecc& mat, int m, int n);
+	std::vector<int> distribute(int num_h, int num_at);
 	void sph2real(double* sph, double* tet);
 
 	template <typename T> T dot(std::vector<T> a, std::vector<T> b) {

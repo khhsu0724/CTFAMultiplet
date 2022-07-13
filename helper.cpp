@@ -47,7 +47,16 @@ void ed::ctranspose(vecc& mat, int m, int n) {
 	}
 	mat = std::move(trans);
 	return;
-};
+}
+
+
+std::vector<int> ed::distribute(int num_h, int num_at) {
+	int base = num_h / num_at;
+	int mod = num_h % num_at;
+	std::vector<int> dist(num_at,base);
+	for (int i = 0; i < mod; ++i) ++dist[i];
+	return dist;
+}
 
 void ed::sph2real(double* sph, double* tet) {
 /** Converts spherical harmonics to real space
@@ -75,3 +84,4 @@ void ed::sph2real(double* sph, double* tet) {
 
 	return;
 }
+

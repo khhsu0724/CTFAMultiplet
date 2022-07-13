@@ -1,23 +1,22 @@
 &CONTROL
 	SO = 10.5 # Spin orbit coupling (eV)
-	SC = 4.0 0 0.12857 0 0.025 #F_0,2,4 = 6,0.13,0.025 eV
-	FG = 4.0 4.635 6.18 2.63 
-	#FG = 6 4.63 6.18 2.63 #F^0,G^1,F^2,G^23 = 6.0,4.63,6.18,2.63 eV
-	#CF = 0 0 0 0 0
-	CF = 0 0 1 1 1
-	# CF = 0 2.6 1.6 1.95 1.95 #dx2y2, dz2, dxy, dxz, dyz
+	SC1 = 1.0 0 0.1 #F_0,2 for l = 1
+	SC2 = 4.0 0 0.12857 0 0.025 #F_0,2,4 for l = 2
+	FG = 4.0 4.635 6.18 2.63 #F^0,G^1,F^2,G^23
+	#FG = 1.0 0.25 0 0 #F^0,G^1
+	CF = 0 0 1 1 1 #dx2y2, dz2, dxy, dxz, dyz
 	HYB = true
 	NEDOS = 1000 # Number of bins for XAS/RIXS
 	# PBC = Periodic Boundary Condition
-	# Geometry
 /
 &CELL
-	1 0 0 
-	0 1 0
-	0 0 1
+	Coordination = "None" # Defaults to no coordination
+	Sites = 1 # x,y,z, Defaults to 1 site
+	Holes = 3 # If this is read then &Atom's will be skipped
 /
-&ATOM_POSITIONS
-	Co 1 0 0 2p 3d
+&ATOMS
+	# Each line is a site, with atoms and ligands in the site
+	Ni 1 0 0 2p 3d
 	O  0 1 0 2p
 	O  0 0 1 2p
 /
@@ -26,6 +25,7 @@
 	RIXS = false
 	pvin = 0 0 1
 	pvout = 1 0 0
+	Edge = K
 	# Edge (K,L edge)
 	# SPIN FLIP IMPLEMENTATION
 &HYB # Fill in information about hybdridization matrix
