@@ -39,21 +39,23 @@ bool operator!=(const QN& qn1, const QN& qn2) {
 	return true;
 }
 
-Hilbert::Hilbert(string file_dir, double* SC, double* FG, double* CF, double const& SO
+Hilbert::Hilbert(string file_dir, vector<double*>& SC, double* FG, double* CF, double const& SO
 				, bool HYB, bool is_ex): is_ex(is_ex), HYB_on(HYB) {
 	read_from_file(file_dir);
 	if (is_ex) {
 		num_vh--;
 		num_ch++;
 	}
-	Assign_Hash(SC,FG,CF,SO);
+	Assign_Hash(FG,CF,SO);
 	// Fix this so the code doesnt have to rely on a vector allocated
 	vector<ulli> hspace = enum_hspace();
+	// DEBUG
 	// for (auto & h : hspace) {
-	// 	cout << h << ", " << bitset<28>(h) << ", Hash: " << Hash(h) << ", Hashback: " << Hashback(Hash(h)) << endl;
+	// 	cout << h << ", " << bitset<26>(h) << ", Hash: " << Hash(h) << ", Hashback: " << Hashback(Hash(h)) << endl;
 	// 	if (h != Hashback(Hash(h))) cout << "error hashing" << endl;
 	// }
 	// for (auto & at : atlist) cout << at.atname << ", " << at.is_lig << endl;
+	// DEBUG
 	hsize = ed::choose(num_vorb,num_vh)*ed::choose(num_corb,num_ch);
 	make_block(hspace);
 }
@@ -102,26 +104,6 @@ vpulli Hilbert::match(int snum, QN* lhs, QN* rhs) {
 	return mp;
 }
 
-vector<Block> Hilbert::make_block(vector<ulli>& hilb_vec) {
-	// Allocate memory for the block matrices
-	vector<Block> vb;
-	double max_sz = (num_vh+num_ch <= num_vorb+num_corb) ? 
-					(num_vh+num_ch)/2 : (num_vorb+num_corb-num_vh-num_ch)/2;
-	// if (SO && !is_ex) {
-	// 	// Group by K
-	// } else if (CF || HYB) {
-	// 	// Group by Sz and K
-
-	// } else {
-	// 	// Group by Sz K and L
-	// }
-
-
-	// !!!!Come up with a faster way to reserve memory for blocks!!!!
-	hblks.emplace_back(std::move(Block(0,0,0,hsize)));
-	return vb;
-}
-
 void Hilbert::fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs) {
 	// Find block index for lhs and rhs
 	int lind = 0, rind = 0;
@@ -164,42 +146,148 @@ int Hilbert::orbind(ulli s) {
 	return i;
 }
 
-void build_adjmat() {
-	
+int Hilbert::tot_site_num() {
+	// Returns number of total sites
+	int tsn = 1;
+	for (const auto& s : sites) tsn *= s;
+	return tsn; 
+}
+
+vector<Block> Hilbert::make_block(vector<ulli>& hilb_vec) {
+	// Allocate memory for the block matrices
+	vector<Block> vb;
+	double max_sz = (num_vh+num_ch <= num_vorb+num_corb) ? 
+					(num_vh+num_ch)/2 : (num_vorb+num_corb-num_vh-num_ch)/2;
+	// if (SO && !is_ex) {
+	// 	// Group by K
+	// } else if (CF || HYB) {
+	// 	// Group by Sz and K
+
+	// } else {
+	// 	// Group by Sz K and L
+	// }
+
+
+	// !!!!Come up with a faster way to reserve memory for blocks!!!!
+	hblks.emplace_back(std::move(Block(0,0,0,hsize)));
+	return vb;
+}
+
+bool Hilbert::build_coordination(bool nh_read, int& tm_per_site, int& lig_per_site) {
+	// This function builds information on atom relative 
+	// positions and what sites they are on
+	string edge = "L";
+	if (coord == "none") {
+		tm_per_site = 1;
+		if (edge == "K") throw invalid_argument("TM K edge unavailable");
+	}
+	else if (coord == "sqpl") {
+		tm_per_site = 1;
+		lig_per_site = 2;
+	}
+	if (nh_read) make_atlist(edge,tm_per_site,lig_per_site);
+	return true;
+}
+
+void Hilbert::make_atlist(string edge, const int& tm_per_site, const int& lig_per_site) {
+	int num_sites = tot_site_num(), atind = 0, siteind = 0;
+	vector<int> dist = ed::distribute(num_vh,num_sites);
+	for (int x = 0; x < this->sites[0]; ++x) {
+	for (int y = 0; y < this->sites[1]; ++y) {
+	for (int z = 0; z < this->sites[2]; ++z) {
+		vector<int> site = {x,y,z};
+		for (size_t tm = 0; tm < tm_per_site; ++tm) {
+			if (edge == "L") atlist.emplace(atlist.begin(),Atom("2p",atind,3,2,0,site));
+			atlist.emplace_back(Atom("3d",atind,3,2,dist[siteind],site));
+			atind++;
+		}
+		for (size_t lig = 0; lig < lig_per_site; ++lig) {
+			if (edge == "K") atlist.emplace(atlist.begin(),Atom("1s",atind,2,1,0,site));
+			atlist.emplace_back(Atom("2p",atind,2,1,0,site));
+			atind++;
+		}
+		siteind++;
+	}}}
+	this->num_at = atind;
+	return;
 }
 
 void Hilbert::read_from_file(string file_dir) {
 	string line;
-	ifstream input(file_dir);
-	vector<double> cell_param;
+	ifstream input_file(file_dir);
 	try {
-		if (input.is_open()) {
-			bool read_cell = false, read_atoms = false;
-			int atind = 0, cpsize = 0;
-			while (getline(input,line)) {
+		if (input_file.is_open()) {
+			bool read_cell = false, read_atoms = false, coord_built = false, nh_read = false;
+			int atind = 0, cpsize = 0, tm_per_site = 0, lig_per_site = 0;
+			while (getline(input_file,line)) {
 				if (line[0] == '#') continue;
 				if (line[0] == '/') {
+					if (read_cell) coord_built = build_coordination(nh_read,tm_per_site,lig_per_site);
 					read_cell = false;
 					read_atoms = false;
 					continue;
 				}
 				if (read_cell) {
-					string cp;
-					bool skipline = false;
-					for (int s = 0; s < line.size() && !skipline; ++s) {
-						if (line[s] != ' ') {
-							cp.push_back(line[s]);
-							if (s == line.size()-1) cell_param.emplace_back(stod(cp));
-						} else {
-							cell_param.emplace_back(stod(cp));
-							cp = "";
+					string p;
+					bool skip = false;
+					for (int s = 0; s < line.size() && !skip; ++s) {
+						if (line[s] != ' ' && line[s] != '	' && line[s] != '=') p.push_back(line[s]);	
+						else {
+							transform(p.begin(),p.end(),p.begin(),::toupper);
+							if (p == "COORDINATION") {
+								string input = line;
+								size_t ep, sp = input.find('"');
+								if (sp != string::npos) {
+								 	ep = input.find('"',++sp);
+								 	if (ep != string::npos) input = input.substr(sp,ep-sp);
+								 	else throw invalid_argument("No end quote");
+								} else throw invalid_argument("Quotation needed for argument");
+								transform(input.begin(),input.end(),input.begin(),::toupper);
+								if (input == "SQUARE PLANAR" || input == "SQPL") coord = "sqpl";
+								else if (input == "" || input == "NONE") coord = "none";
+								else throw invalid_argument("unavailable coordination");
+ 								skip = true;
+							}
+							else if (p == "SITES") {
+								vector<int> site_vec;
+								size_t eqpos = line.find('=');
+								string input = line.substr(eqpos+1,line.find('#')-eqpos-1);
+								size_t sp = input.find(' ');
+								while (sp!= string::npos) {
+							        if (sp != 0) site_vec.push_back(stoi(input.substr(0,sp)));
+							        input = input.substr(++sp);
+							        sp = input.find(' ');
+							    }
+							    if (input.find_first_not_of(' ') != string::npos) site_vec.push_back(stoi(input));
+							    if (site_vec.size() > 3) throw invalid_argument("incorrect site number");
+							    for (size_t i = 0; i < site_vec.size(); ++i) sites[i] = site_vec[i];
+								skip = true;
+							}                    
+							else if (p == "HOLES") {
+								nh_read = true;
+								size_t eqpos = line.find('=');
+								string input = line.substr(eqpos+1,line.find('#')-eqpos-1);
+								eqpos = input.find_first_not_of(' ');
+								input = input.substr(eqpos,line.size()-eqpos);
+								size_t sp = input.find(' ');
+								if (sp == string::npos) num_vh = stoi(input);
+								else {
+								    num_vh = stoi(input.substr(0,sp));
+							        if(input.substr(sp+1).find_first_not_of(' ') != string::npos) {
+							        	throw invalid_argument("more than 1 argument");
+							        }
+								}
+								cout << "number of holes: " << num_vh << endl;
+								skip = true;
+							}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
 						}
-						if (line[s] == '#') skipline = true;
 					}
-					if ((cell_param.size() - cpsize) == 3) cpsize = cell_param.size();
-					else throw invalid_argument("incorrect number of unit cell parameter");
+					// call build coord and make sure sites & coordination are both read
 				}
 				if (read_atoms) {
+					//gets how many line, edge determine what orbitals are included
+					if (nh_read)  continue;
+					if (!coord_built) throw invalid_argument("&Cell missing or needs to precede &Atoms");
 					string at;
 					Atom atin;
 					int entry = 0;
@@ -214,7 +302,7 @@ void Hilbert::read_from_file(string file_dir) {
 						if (line[s] != ' ' && line[s] != '	') {
 							at.push_back(line[s]);
 							if (s == line.size()-1) {
-								atin.add_orb(at,atind);
+								atin.add_orb(at,atind-1);
 								atlist.emplace_back(atin);
 								if (!atin.is_val) rotate(atlist.begin(),atlist.end()-1,atlist.end());
 							}
@@ -227,55 +315,46 @@ void Hilbert::read_from_file(string file_dir) {
 										num_at++;
 										atin.atname = at;
 									} else {
-										atin.add_orb(at,atind);
+										atin.add_orb(at,atind-1);
 										atlist.emplace_back(atin);
 										if (!atin.is_val) rotate(atlist.begin(),atlist.end()-1,atlist.end());
 									}
-								} else atin.pos.emplace_back(stod(at));
+								} else atin.kp.emplace_back(stod(at));
 							}
 							at = "";
 						}
 					}
-					if (atin.pos.size() != 3 && !skipline) throw invalid_argument("Invalid atom position");
+					if (atin.kp.size() != 3 && !skipline) throw invalid_argument("Invalid atom position");
 				}
 				if (line == "&CELL") {
 					read_cell = true;
 					read_atoms = false;
 				}
-				else if (line == "&ATOM_POSITIONS") {
+				else if (line == "&ATOMS") {
 					read_atoms = true;
 					read_cell = false;
 				}
 			}
-			input.close();
+			input_file.close();
 			int ind = 0;
 			for (size_t i = 0; i < atlist.size(); ++i) {
 				atlist[i].sind = ind;
 				atlist[i].eind = ind + (2*atlist[i].l+1)-1;
 				ind = atlist[i].eind + 1;
 				if (atlist[i].is_val) {
-					num_vh += atlist[i].num_h;
+					if (!nh_read) num_vh += atlist[i].num_h;
 					num_vorb += 2*(2*atlist[i].l+1);
 				} else {
-					num_ch += atlist[i].num_h;
+					if (!nh_read) num_ch += atlist[i].num_h;
 					num_corb += 2*(2*atlist[i].l+1);
 					val_ind = atlist[i].eind + 1;
 					val_ati = i + 1;
 				}
-				size_t j = 0;
-				for (j = 0; j < i; ++j) if(ed::veccmp(atlist[i].pos,atlist[j].pos)) break;
-				if (i == j) num_sites++;
+				// size_t j = 0;
+				// for (j = 0; j < i; ++j) if(ed::veccmp(atlist[i].kp,atlist[j].kp)) break;
 			}
-			if (cell_param.size() != 9)  throw invalid_argument("Invalid unit cell parameter");
-			a1 = ed::slice(cell_param,0,2);
-			a2 = ed::slice(cell_param,3,5);
-			a3 = ed::slice(cell_param,6,8);
-			double V = 	ed::dot(a1,ed::vec_cross(a2,a3));
-			b1 = ed::vec_mult(ed::vec_cross(a2,a3),2*M_PI/V);
-			b2 = ed::vec_mult(ed::vec_cross(a3,a1),2*M_PI/V);
-			b3 = ed::vec_mult(ed::vec_cross(a1,a2),2*M_PI/V);
+			if (num_vh > num_vorb) throw invalid_argument("too many holes from input");
 			for (auto &at : atlist) {
-				for (size_t i = 0; i < 3; ++i) at.kp.emplace_back(at.pos[i]*(b1[i]+b2[i]+b3[i]));
 				for (size_t i = at.sind; i <= at.eind; i++) at.check += (1 << i | 1 << (i+num_corb/2+num_vorb/2));
 			}
 			ind = 0;
@@ -285,6 +364,17 @@ void Hilbert::read_from_file(string file_dir) {
 				atlist[ind].vind = i;
 				atlist[i].cind = ind++;
 			}
+			//DEBUG
+			for (auto & at : atlist) {
+				cout << "atom ind: " << at.atind << ", val_n: " << at.val_n << ", val_l: " << at.val_l <<  ", n: " << at.n << ", l: " << at.l << ", num hole: " << at.num_h << endl;
+				cout << "atom sind: " << at.sind << ", eind: " << at.eind << ", vind: " << at.vind << ", cind: " << at.cind;
+				if (at.is_lig) cout << ", is ligand";
+				if (at.is_val) cout << ", is valence";
+				cout << ", sites: ";
+				for (auto s:at.site) cout << s << ",";
+				cout << "check: " << at.check << endl << endl;
+			}
+			// DEBUG
 		} else throw invalid_argument("Cannot open INPUT file");
 	} catch (const exception &ex) {
 		cerr << ex.what() << "\n";
@@ -392,7 +482,7 @@ void Hilbert::read_from_file(string file_dir) {
 // }
 
 // Here is a nice collection of hash functions
-void Hilbert::Assign_Hash(double* SC, double* FG, double* CF, double const& SO) {
+void Hilbert::Assign_Hash(double* FG, double* CF, double const& SO) {
 	// Check the incoming parameter to see which hash function to use
 	if (SO != 0) SO_on = true;
 	if (!ed::is_zero_arr(CF,5)) CF_on = true;

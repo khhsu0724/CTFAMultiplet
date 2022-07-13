@@ -10,23 +10,11 @@ double calc_U(double* gaunt1, double* gaunt2, double* SC, int size) {
 	return u;
 }
 
-void calc_coulomb(Hilbert& hilbs, double* SC) {
+void calc_coulomb(Hilbert& hilbs, vector<double*>& SC) {
 	//Calculate Coulomb Matrix Element
-	double SC0 = SC[0], SC2 = SC[2];
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		int l = hilbs.atlist[i].l;
-
-		// Temporary solution to p orbital SC
-		if (hilbs.atlist[i].is_lig && hilbs.atlist[i].is_val) {
-			SC[0] = 1;
-			SC[2] = 0.1*49;
-		} else {
-			SC[0] = SC0;
-			SC[2] = SC2;
-		}
-		cout << "name: " << hilbs.atlist[i].atname << ", SC0: " << SC[0] << ", SC2: " << SC[2] << endl;
-		// Temporary solution to p orbital SC
-
+		if (l <= 0 || ed::is_zero_arr(SC[l-1],l*2+1)) continue;
 		vector<int> ml_arr(l*2+1,0);
 		for (int ml = -l; ml <= l; ++ml) ml_arr[ml+l] = ml;
 		for (int msum = -l*2; msum <= l*2; ++msum) {
@@ -49,7 +37,7 @@ void calc_coulomb(Hilbert& hilbs, double* SC) {
 					vpulli entries = hilbs.match(2,qn12,qn34);
 					for (auto e : entries) {
 						double matelem = calc_U(gaunt(l,m12.first,l,m34.first),
-										gaunt(l,m34.second,l,m12.second),SC,2*l+1);
+										gaunt(l,m34.second,l,m12.second),SC[l-1],2*l+1);
 						if (e.first != e.second) matelem *= hilbs.Fsign(qn12,e.first,2)*hilbs.Fsign(qn34,e.second,2);
 						hilbs.fill_hblk(matelem,e.first,e.second);
 					}
@@ -64,9 +52,9 @@ void calc_coulomb(Hilbert& hilbs, double* SC) {
 						vpulli entries = hilbs.match(2,qn12,qn34);
 						for (auto e : entries) {
 							double matelem = calc_U(gaunt(l,m12.first,l,m34.first),
-											gaunt(l,m34.second,l,m12.second),SC,2*l+1) -
+											gaunt(l,m34.second,l,m12.second),SC[l-1],2*l+1) -
 										 	calc_U(gaunt(l,m12.second,l,m34.first),
-										 	gaunt(l,m34.second,l,m12.first),SC,2*l+1);
+										 	gaunt(l,m34.second,l,m12.first),SC[l-1],2*l+1);
 							if (e.first != e.second) matelem *= hilbs.Fsign(qn12,e.first,2)*hilbs.Fsign(qn34,e.second,2);
 							hilbs.fill_hblk(matelem,e.first,e.second);
 						}
@@ -78,9 +66,6 @@ void calc_coulomb(Hilbert& hilbs, double* SC) {
 		// double eshift = hilbs.pheshift(ed::trace(mat,hilbs.hmat_size),2);
 		// for (int i = 0; i < hilbs.hmat_size; ++i) mat[i+hilbs.hmat_size*i] -= eshift;
 	}
-
-	SC[0] = SC0;
-	SC[2] = SC2;
 	return;
 }
 
@@ -155,9 +140,9 @@ void calc_SO(Hilbert& hilbs, double lambda) {
 void calc_CV(Hilbert& hilbs, double* FG) {
 	// Calculate core valence interactions
 	if (!hilbs.is_ex) return;
-	int ci = 0, vi = 1;
-	// for (int ci = 0; ci < hilbs.val_ati; ci++) {
-	// 	for (int vi = hilbs.val_ati; vi < hilbs.atlist.size(); vi++) {
+	// int ci = 0, vi = 1;
+	for (int ci = 0; ci < hilbs.val_ati; ci++) {
+		int vi = hilbs.atlist[ci].vind;
 		int cl = hilbs.atlist[ci].l, vl = hilbs.atlist[vi].l;
 		for (int vml = -vl; vml <= vl; ++vml) {
 		for (int vmr = -vl; vmr <= vl; ++vmr) {
@@ -181,9 +166,8 @@ void calc_CV(Hilbert& hilbs, double* FG) {
 					hilbs.fill_hblk(meG*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second);
 			}
 		}}}}
-			// !!!!!!Shift for particle hole symmetry
-	// 	}
-	// }
+		// !!!!!!Shift for particle hole symmetry
+	}
 	return;
 }
 
@@ -192,7 +176,7 @@ vecd HYBmat(Hilbert& hilbs, double del) {
 	// !!!! Need to factor in different sites...how to do this?
 	// Can we identify what type of geomtery algorithmically
 	string coord = hilbs.coord;
-	cout << "building hybdrization matrix" << endl;
+	// cout << "building hybdrization matrix" << endl;
 	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
 	vecd hybmat(nvo*nvo,0);
 	double tpd = 1, tpdz = 0.25, tpdxy = 0.225, tpdxz = 0.225, tpdyz = 0.225, tpppi = 0, tppsigma = 0.25, tppzpi = 0; // Temp place holdler
@@ -323,47 +307,48 @@ vecd HYBmat(Hilbert& hilbs, double del) {
 	return hybmat;
 }	
 
-void calc_HYB(Hilbert& hilbs, double* SC) {
+void calc_HYB(Hilbert& hilbs, vector<double*>& SC) {
 	// Charge Transfer and Hybridization
 	// Temperory implementation for square planar geometry
-	cout << "Calculate Hybridization" << endl;
 	if (hilbs.num_at == 1) return;
 	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
 	double nd = 0;
 	for (auto &at : hilbs.atlist) if(!at.is_lig && at.is_val) nd = at.num_h;
-	double delta = nd * (SC[0] - SC[2]*2/63 - SC[4]*2/63);// This needs to be changed since 
-	cout << "nd: " << nd << ", del: " << delta << endl;
-	cout << "atoms: ";
-	for (auto &at: hilbs.atlist) {
-		cout << at.atname << ", " << at.n << "; ";
-	}
+	double delta = nd * (SC[1][0] - SC[1][2]*2/63 - SC[1][4]*2/63);// This needs to be changed since 
+
+	// cout << "nd: " << nd << ", del: " << delta << endl;
+	// cout << "atoms: ";
+	// for (auto &at: hilbs.atlist) {
+	// 	cout << at.atname << ", " << at.n << "; ";
+	// }
+
 	cout << endl;
 	vecd hybmat = HYBmat(hilbs,delta);
-	ed::write_vec(hybmat,11,11,"./hybmat.txt"); 
+	// ed::write_vec(hybmat,11,11,"./hybmat.txt"); 
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
-	// Loop through hyb matrix
+	// Loop through hyb matrix, TODO: Loop through each site
 	for (int i = 0; i < nvo; ++i) {
 		for (int j = 0; j < nvo; ++j) {
 			if (abs(hybmat[i*nvo+j]) < TOL) continue;
-			// Salvage symmetry
-			// if (i != 5 || j != 5) continue;
 			// Fill in spin down matrix element
 			ulli lhssd = 1 << i, rhssd = 1 << j, incsd = (rhssd|lhssd);
 			ulli lhssd_shift = (incsd-lhssd) << nco, rhssd_shift = (incsd-rhssd) << nco;	
 			ulli lhssu = 1 << (i+nvo), rhssu = 1 << (j+nvo), incsu = (rhssu|lhssu);
 			ulli lhssu_shift = (incsu-lhssu) << (2*nco), rhssu_shift = (incsu-rhssu) << (2*nco);
 			QN qnlu, qnru, qnld, qnrd;
+			int atlist_ind = 0;
 			for (auto& at : hilbs.atlist) {
 				if ((i+nco) >= at.sind && (i+nco) <= at.eind) {
 					int ml = at.val_l - i + at.sind - nco;
-					qnlu = QN(ml,0.5,at.atind);
-					qnld = QN(ml,-0.5,at.atind);
+					qnlu = QN(ml,0.5,atlist_ind);
+					qnld = QN(ml,-0.5,atlist_ind);
 				}
 				if ((j+nco) >= at.sind && (j+nco) <= at.eind) {
 					int ml = at.val_l - j + at.sind - nco;
-					qnru = QN(ml,0.5,at.atind);
-					qnrd = QN(ml,-0.5,at.atind);
+					qnru = QN(ml,0.5,atlist_ind);
+					qnrd = QN(ml,-0.5,atlist_ind);
 				}
+				atlist_ind++;
 			}
 			vector<ulli> match_entries = hilbs.enum_hspace(incsd,0,ed::count_bits(incsd)-1,0);
 
