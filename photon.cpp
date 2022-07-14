@@ -55,8 +55,8 @@ void XAS(string input_dir, vector<double*>& SC, double* FG, double* CF, double S
 
 	cout << "Reading files..." << endl;
 	auto start = chrono::high_resolution_clock::now();
-	Hilbert GS(input_dir,SC,FG,CF,SO,HYB,false);
-	Hilbert EX(input_dir,SC,FG,CF,SO,HYB,true);
+	Hilbert GS(input_dir,SC,FG,CF,SO,HYB,edge,false);
+	Hilbert EX(input_dir,SC,FG,CF,SO,HYB,edge,true);
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -83,19 +83,21 @@ void XAS(string input_dir, vector<double*>& SC, double* FG, double* CF, double S
 	// Calculate Partition function
 	double Z = 0, emin = -25.0, emax = 25.0;
 	for (size_t i = 0; i < GS.hblks.size(); ++i) {
-		for (size_t j = 0; j < GS.hblks[i].size; ++j) {
+	for (size_t j = 0; j < GS.hblks[i].size; ++j) {
+		if (abs(GS.hblks[i].eig[j]-gs_en) < TOL) {
 			Z += exp(-beta*GS.hblks[i].eig[j]);
-			if (abs(GS.hblks[i].eig[j]-gs_en) < 1e-4) gsi.push_back({i,j});
+			gsi.push_back({i,j});
 		}
-	}
+	}}
 
 	vecd xas_aben(nedos,0), xas_int(nedos,0);
 	vector<dcomp> blap(GS.hsize*EX.hsize,0);
 	int half_orb = (EX.num_vorb+EX.num_corb)/2;
 
-	cout << "Calculating cross section..." << endl;
+	cout << "Calculating basis overlap..." << endl;
 	start = chrono::high_resolution_clock::now();
 	// Calculating basis state overlap
+	int cl = GS.atlist[0].l, vl =  GS.atlist[GS.atlist[0].vind].l;
 	for (size_t g = 0; g < GS.hsize; g++) {
 		for (size_t e = 0; e < EX.hsize; e++) {
 			ulli gs = GS.Hashback(g), exs = EX.Hashback(e);
@@ -105,12 +107,18 @@ void XAS(string input_dir, vector<double*>& SC, double* FG, double* CF, double S
 			QN chqn = EX.atlist[coi].fast_qn(ch,half_orb,coi);
 			QN vhqn = GS.atlist[voi].fast_qn(vh,half_orb,voi);
 			if (chqn.spin != vhqn.spin || abs(vhqn.ml-chqn.ml) > 1) continue;
-			blap[g*EX.hsize+e] = gaunt(1,chqn.ml,2,vhqn.ml)[1] * proj_pvec(vhqn.ml-chqn.ml,pvec)
-								* GS.Fsign(&vhqn,gs,1) * EX.Fsign(&chqn,exs,1);
+			blap[g*EX.hsize+e] = gaunt(cl,chqn.ml,vl,vhqn.ml)[1] * GS.Fsign(&vhqn,gs,1)
+				* EX.Fsign(&chqn,exs,1) * proj_pvec(vhqn.ml-chqn.ml,pvec);
 		}
 	}
 
-	cout << "Assembling basis state overlap -- DONE" << endl;
+	
+	stop = chrono::high_resolution_clock::now();
+	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+	cout << "Run time = " << duration.count() << " ms\n";
+
+	cout << "Calculating cross section..." << endl;
+	start = chrono::high_resolution_clock::now();
 
 	for (auto &g  : gsi) {
 		Block& gsblk = GS.hblks[g.first];
@@ -128,7 +136,7 @@ void XAS(string input_dir, vector<double*>& SC, double* FG, double* CF, double S
 			}
 			if (abs(cs) > TOL) {
 				xas_aben[round((exblk.eig[ei]-gs_en-emin)/((emax-emin)/nedos))] = exblk.eig[ei]-gs_en;
-				// Peaks position might be differe if delta function is too wide, we can fix this by taking the smaller value
+				// Peaks position might be different if delta function is too wide, we can fix this by taking the smaller value
 				xas_int[round((exblk.eig[ei]-gs_en-emin)/((emax-emin)/nedos))] += exp(-beta*gs_en)*pow(abs(cs),2);
 			}
 		}}
@@ -178,8 +186,8 @@ void RIXS(string input_dir, vector<double*>& SC, double* FG, double* CF, double 
 
 	cout << "Reading files..." << endl;
 	auto start = chrono::high_resolution_clock::now();
-	Hilbert GS(input_dir,SC,FG,CF,SO,HYB,false);
-	Hilbert EX(input_dir,SC,FG,CF,SO,HYB,true);
+	Hilbert GS(input_dir,SC,FG,CF,SO,HYB,edge,false);
+	Hilbert EX(input_dir,SC,FG,CF,SO,HYB,edge,true);
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n" << endl;

@@ -40,7 +40,7 @@ bool operator!=(const QN& qn1, const QN& qn2) {
 }
 
 Hilbert::Hilbert(string file_dir, vector<double*>& SC, double* FG, double* CF, double const& SO
-				, bool HYB, bool is_ex): is_ex(is_ex), HYB_on(HYB) {
+				, bool HYB, string edge, bool is_ex): is_ex(is_ex), HYB_on(HYB), edge(edge) {
 	read_from_file(file_dir);
 	if (is_ex) {
 		num_vh--;
@@ -176,7 +176,6 @@ vector<Block> Hilbert::make_block(vector<ulli>& hilb_vec) {
 bool Hilbert::build_coordination(bool nh_read, int& tm_per_site, int& lig_per_site) {
 	// This function builds information on atom relative 
 	// positions and what sites they are on
-	string edge = "L";
 	if (coord == "none") {
 		tm_per_site = 1;
 		if (edge == "K") throw invalid_argument("TM K edge unavailable");
@@ -185,6 +184,7 @@ bool Hilbert::build_coordination(bool nh_read, int& tm_per_site, int& lig_per_si
 		tm_per_site = 1;
 		lig_per_site = 2;
 	}
+	this->at_per_site = tm_per_site + lig_per_site;
 	if (nh_read) make_atlist(edge,tm_per_site,lig_per_site);
 	return true;
 }
@@ -277,7 +277,6 @@ void Hilbert::read_from_file(string file_dir) {
 							        	throw invalid_argument("more than 1 argument");
 							        }
 								}
-								cout << "number of holes: " << num_vh << endl;
 								skip = true;
 							}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
 						}
@@ -365,15 +364,15 @@ void Hilbert::read_from_file(string file_dir) {
 				atlist[i].cind = ind++;
 			}
 			//DEBUG
-			for (auto & at : atlist) {
-				cout << "atom ind: " << at.atind << ", val_n: " << at.val_n << ", val_l: " << at.val_l <<  ", n: " << at.n << ", l: " << at.l << ", num hole: " << at.num_h << endl;
-				cout << "atom sind: " << at.sind << ", eind: " << at.eind << ", vind: " << at.vind << ", cind: " << at.cind;
-				if (at.is_lig) cout << ", is ligand";
-				if (at.is_val) cout << ", is valence";
-				cout << ", sites: ";
-				for (auto s:at.site) cout << s << ",";
-				cout << "check: " << at.check << endl << endl;
-			}
+			// for (auto & at : atlist) {
+			// 	cout << "atom ind: " << at.atind << ", val_n: " << at.val_n << ", val_l: " << at.val_l <<  ", n: " << at.n << ", l: " << at.l << ", num hole: " << at.num_h << endl;
+			// 	cout << "atom sind: " << at.sind << ", eind: " << at.eind << ", vind: " << at.vind << ", cind: " << at.cind;
+			// 	if (at.is_lig) cout << ", is ligand";
+			// 	if (at.is_val) cout << ", is valence";
+			// 	cout << ", sites: ";
+			// 	for (auto s:at.site) cout << s << ",";
+			// 	cout << "check: " << at.check << endl << endl;
+			// }
 			// DEBUG
 		} else throw invalid_argument("Cannot open INPUT file");
 	} catch (const exception &ex) {
