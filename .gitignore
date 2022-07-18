@@ -34,3 +34,4 @@
 # Others
 *.txt
 ./XAS_DATA
+.DS_Store
