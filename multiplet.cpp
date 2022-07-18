@@ -259,10 +259,10 @@ vecd HYBmat(Hilbert& hilbs, double del) {
 	tmat = ed::matmult(tmat,a,nvo);
 	ed::ctranspose(a,nvo,nvo);
 	tmat = ed::matmult(a,tmat,nvo);
-	ed::write_vec(tmat,11,11,"hyb.txt");
+	// ed::write_vec(tmat,11,11,"hyb.txt");
 	// vecd tmatd(nvo*nvo);
 	std::transform(tmat.begin(), tmat.end(), hybmat.begin(), [](complex<double> c) {return c.real();});
-	ed::write_vec(hybmat,nvo,nvo,"hybmat2.txt");
+	// ed::write_vec(hybmat,nvo,nvo,"hybmat2.txt");
 	// Particle hole transformation???????
 
 	// Temporary implementation

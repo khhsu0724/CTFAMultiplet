@@ -95,18 +95,18 @@ struct Atom {
 class Hilbert {
 public:
 	// TODO: make some of the variables private
-	int hsize = 1, num_at = 0, at_per_site = 0;
+	size_t hsize = 1;
+	int num_at = 0, at_per_site = 0;
 	int val_ati = 0, val_ind = 0; // Index/Orbital index of first valence atom
-	int num_ch = 0, num_vh = 0;
-	int num_corb = 0, num_vorb = 0; // This is number of orbital*2 (number of electron sites)
+	int num_ch = 0, num_vh = 0, num_corb = 0, num_vorb = 0; // This is number of orbital*2 (number of electron sites)
 	bool SO_on = false, CV_on = false, CF_on = false, HYB_on = false;
 	bool is_ex;
 	std::string coord = "none", edge; // Adjacency matrix for atoms, coordination
 	std::vector<Atom> atlist; // atlist is ordered
 	std::vector<Block> hblks;
 	std::vector<int> sites = {1,1,1};
-	using Hashptr = int (Hilbert::*)(ulli s);
-	using HBptr = ulli (Hilbert::*)(int ind);
+	using Hashptr = size_t (Hilbert::*)(ulli s);
+	using HBptr = ulli (Hilbert::*)(size_t ind);
 	Hashptr hashfunc;
 	HBptr hbfunc;
 
@@ -133,10 +133,10 @@ public:
 
 	// Nice Collection of Hash Functions
 	void Assign_Hash(double* FG, double* CF, double const& SO);
-	int Hash(ulli s) {return (this->*hashfunc)(s);};
-	ulli Hashback(int ind) {return (this->*hbfunc)(ind);};
-	int norm_Hash(ulli s);
-	ulli norm_Hashback(int ind);
+	size_t Hash(ulli s) {return (this->*hashfunc)(s);};
+	ulli Hashback(size_t ind) {return (this->*hbfunc)(ind);};
+	size_t norm_Hash(ulli s);
+	ulli norm_Hashback(size_t ind);
 
 	// Need to fix these
 	// Maybe a copy constructor?????
