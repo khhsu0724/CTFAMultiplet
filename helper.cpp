@@ -1,6 +1,6 @@
 #include "helper.hpp"
 
-int ed::choose(int n, int k) {
+size_t ed::choose(size_t n, size_t k) {
 	if (k > n) return 0;
 	if (k == 0) return 1;
     return (n*choose(n-1, k-1))/k;
@@ -37,7 +37,7 @@ int ed::count_bits(ulli b) {
 	return c;
 }
 
-void ed::ctranspose(vecc& mat, int m, int n) {
+void ed::ctranspose(vecc& mat, size_t m, size_t n) {
 	// Conjugate Transpose of a matrix
 	vecc trans(m*n);
 	for (size_t i = 0; i < n; i++) {

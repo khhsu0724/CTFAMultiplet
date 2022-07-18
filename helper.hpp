@@ -18,12 +18,12 @@ typedef std::vector<std::complex<double>> vecc;
 
 namespace ed {
 	bool is_pw2(int x);
-	int choose(int n, int k);
+	size_t choose(size_t n, size_t k);
 	ulli next_perm(ulli v);
 	void enum_states(std::vector<ulli>& states, ulli n, ulli k, ulli inc = 0, ulli s = 0);
 	ulli add_bits(ulli b1, ulli b2, int b1size, int b2size);
 	int count_bits(ulli b);
-	void ctranspose(vecc& mat, int m, int n);
+	void ctranspose(vecc& mat, size_t m, size_t n);
 	std::vector<int> distribute(int num_h, int num_at);
 	void sph2real(double* sph, double* tet);
 

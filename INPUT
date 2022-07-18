@@ -12,7 +12,7 @@
 &CELL
 	Coordination = "Square Planar" # Defaults to no coordination
 	Sites = 1 # x,y,z, Defaults to 1 site
-	Holes = 4 # If this is read then &Atom's will be skipped
+	Holes = 6 # If this is read then &Atom's will be skipped
 /
 &ATOMS
 	# Each line is a site, with atoms and ligands in the site

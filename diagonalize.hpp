@@ -2,22 +2,25 @@
 #define DIAGONALIZE
 #include <memory>
 #include "helper.hpp"
+// #include <armadillo>
 
 typedef std::unique_ptr<double[]> uptrd;
 
-void dgees(double *_mat, double *_eigvec, double* _eigReal, int n);
-void dsyev(double* _mat, double* _eigval, int n);
+void dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n);
+void dsyev(double* _mat, double* _eigval, size_t n);
 
 class Block {
 private:
 	double Sz = 0, Lz = 0, K = 0;
 	double *_ham, *_eig, *_eigvec; // Implicit pointer that faciliates diagonalization
 public:
-	Block(double Sz, double Lz, double K, int size): Sz(Sz), Lz(Lz), K(K), size(size) {
+	Block(double Sz, double Lz, double K, size_t size): Sz(Sz), Lz(Lz), K(K), size(size) {
 		// We can preallocate this with a number. i.e. Hilbert space size/number of blocks * 1.2
 		// Also need to build something that prevents premature access of eig & eigvec
+		if (size > std::sqrt(SIZE_MAX)) throw std::overflow_error("matrix too large");
 		ham = std::make_unique<double[]>(size*size);
 	};
+
 	Block(Block&& blk) : Sz(blk.Sz), Lz(blk.Lz), K(blk.K), size(blk.size) {
 		ham = std::move(blk.ham);
 		eig = std::move(blk.eig);
@@ -31,9 +34,12 @@ public:
 	double get_Sz() {return Sz;};
 	double get_Lz() {return Lz;};
 	double get_K() {return K;};	
-	int size;
+	size_t size;
 	uptrd ham, eig, eigvec; // Use unique pointers that are auto-managed
 	std::vector<int> einrange;
+	void diagonalize() {
+		// Chooose what function to diagonalize
+	}
 	void diag_dgees() {
 		_ham = ham.release();
 		_eig = new double[size]{0};
