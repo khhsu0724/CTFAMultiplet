@@ -94,10 +94,6 @@ void XAS(string input_dir, vector<double*>& SC, double* FG, double* CF, double S
 	vector<dcomp> blap(GS.hsize*EX.hsize,0);
 	int half_orb = (EX.num_vorb+EX.num_corb)/2;
 
-
-	cout << "Calculating first polarization (010)" << endl;
-	pvec = {0,1,0};
-
 	cout << "Calculating basis overlap..." << endl;
 	start = chrono::high_resolution_clock::now();
 	// Calculating basis state overlap
@@ -153,70 +149,7 @@ void XAS(string input_dir, vector<double*>& SC, double* FG, double* CF, double S
 	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n";
 	cout << "Writing results..." << endl << endl;
-	write_XAS(xas_aben,xas_int,"xas_peaks_010.txt");
-
-
-
-	// Temp
-	cout << "Calculating first polarization (001)" << endl;
-	pvec = {0,0,1};
-
-	cout << "Calculating basis overlap..." << endl;
-	start = chrono::high_resolution_clock::now();
-	// Calculating basis state overlap
-	#pragma omp parallel for
-	for (size_t g = 0; g < GS.hsize; g++) {
-		for (size_t e = 0; e < EX.hsize; e++) {
-			ulli gs = GS.Hashback(g), exs = EX.Hashback(e);
-			ulli ch = exs - (gs & exs), vh = gs - (gs & exs);
-			int coi = EX.orbind(ch), voi = GS.atlist[coi].vind;
-			if (!ed::is_pw2(vh) || !GS.atlist[voi].contains(vh)) continue;
-			QN chqn = EX.atlist[coi].fast_qn(ch,half_orb,coi);
-			QN vhqn = GS.atlist[voi].fast_qn(vh,half_orb,voi);
-			if (chqn.spin != vhqn.spin || abs(vhqn.ml-chqn.ml) > 1) continue;
-			blap[g*EX.hsize+e] = gaunt(cl,chqn.ml,vl,vhqn.ml)[1] * GS.Fsign(&vhqn,gs,1)
-				* EX.Fsign(&chqn,exs,1) * proj_pvec(vhqn.ml-chqn.ml,pvec);
-		}
-	}
-
-	
-	stop = chrono::high_resolution_clock::now();
-	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-	cout << "Run time = " << duration.count() << " ms\n";
-
-	cout << "Calculating cross section..." << endl;
-	start = chrono::high_resolution_clock::now();
-
-	for (auto &g  : gsi) {
-		Block& gsblk = GS.hblks[g.first];
-		for (auto &exblk : EX.hblks) {
-		for (size_t ei = 0; ei < exblk.size; ++ei) {
-			if (exblk.eig[ei]-gs_en < emin || exblk.eig[ei]-gs_en > emax) continue;
-			dcomp cs = 0;
-			#pragma omp parallel for
-			for (size_t gj = 0; gj < gsblk.size; ++gj) {
-				if (abs(gsblk.eigvec[g.second*gsblk.size+gj]) < TOL) continue;
-				for (size_t ej = 0; ej < exblk.size; ++ej) {
-					if (abs(exblk.eigvec[ei*exblk.size+ej]) < TOL || abs(blap[gj*EX.hsize+ej]) < TOL) continue;
-					cs +=  gsblk.eigvec[g.second*gsblk.size+gj] * exblk.eigvec[ei*exblk.size+ej]
-						   * blap[gj*EX.hsize+ej];
-				}
-			}
-			if (abs(cs) > TOL) {
-				xas_aben[round((exblk.eig[ei]-gs_en-emin)/((emax-emin)/nedos))] = exblk.eig[ei]-gs_en;
-				// Peaks position might be different if delta function is too wide, we can fix this by taking the smaller value
-				xas_int[round((exblk.eig[ei]-gs_en-emin)/((emax-emin)/nedos))] += exp(-beta*gs_en)*pow(abs(cs),2);
-			}
-		}}
-	}
-
-	stop = chrono::high_resolution_clock::now();
-	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-	cout << "Run time = " << duration.count() << " ms\n";
-	cout << "Writing results..." << endl << endl;
-	write_XAS(xas_aben,xas_int,"xas_peaks_001.txt");
-
-	//Temp
+	write_XAS(xas_aben,xas_int,"xas_peaks.txt");
 
 	return;
 }
@@ -249,7 +182,7 @@ void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, string file_d
 void RIXS(string input_dir, vector<double*>& SC, double* FG, double* CF, double SO, 
 			bool HYB, vecd& pvin, vecd& pvout, int nedos, string edge) {
 
-	bool sf = true, nsf = true; // Spin Flip & No Spin Flip
+	bool sf = false, nsf = true; // Spin Flip & No Spin Flip
 	double beta = 0, hbar = 6.58e-16;
 	// double Racah_B = (SC[2]/49) - (5*SC[4]/441);
 	dcomp igamma(0,1*0.1);
@@ -269,8 +202,7 @@ void RIXS(string input_dir, vector<double*>& SC, double* FG, double* CF, double 
 	stop = chrono::high_resolution_clock::now();
 	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
-	
-	// DEBUG
+
 
 	int gscnt = 0, excnt = 0;
 	vecd gbss(GS.hsize,0), gsts(GS.hsize,0);
@@ -278,10 +210,12 @@ void RIXS(string input_dir, vector<double*>& SC, double* FG, double* CF, double 
 	for (size_t i = 0; i < GS.hsize; ++i) {
 		// sum up all atoms qn.spin in gbss
 		ulli s = GS.Hashback(i);
+		// cout << i << ", state: " << bitset<28>(s) << ", spin: " << gbss[i] << endl;
 		for (size_t j = GS.num_corb/2; j < (GS.num_vorb+GS.num_corb)/2; ++j) if (s & 1<<j) gbss[i] -= 0.5;
 		gbss[i] = 2 * gbss[i] + 0.5 * GS.num_vh;
-		// cout << i << ", state: " << bitset<28>(s) << ", spin: " << gbss[i] << endl;
 	}
+	
+	// DEBUG
 	// cout << "non zero of ham" << endl;
 	// for (int i = 0; i < GS.hsize; ++i) {
 	// 	for (int j = 0; j < GS.hsize; ++j) {
