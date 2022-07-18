@@ -119,7 +119,6 @@ void Hilbert::fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs)
 	// 	rspin = 2 * rspin + 0.5 * num_vh;
 	// 	if (lspin != rspin) cout << "lhs: " << bitset<16>(lhs) << ", rhs: " << bitset<16>(rhs) << endl;
 	// }
-	cout << "index: " << Hash(lhs)+hblks[lind].size*Hash(rhs) << endl;
 	// DEBUG
 
 	if (lind == rind) hblks[lind].ham[Hash(lhs)+hblks[lind].size*Hash(rhs)] += matelem;
@@ -362,15 +361,15 @@ void Hilbert::read_from_file(string file_dir) {
 				atlist[i].cind = ind++;
 			}
 			//DEBUG
-			for (auto & at : atlist) {
-				cout << "atom ind: " << at.atind << ", val_n: " << at.val_n << ", val_l: " << at.val_l <<  ", n: " << at.n << ", l: " << at.l << ", num hole: " << at.num_h << endl;
-				cout << "atom sind: " << at.sind << ", eind: " << at.eind << ", vind: " << at.vind << ", cind: " << at.cind;
-				if (at.is_lig) cout << ", is ligand";
-				if (at.is_val) cout << ", is valence";
-				cout << ", sites: ";
-				for (auto s:at.site) cout << s << ",";
-				cout << "check: " << at.check << endl << endl;
-			}
+			// for (auto & at : atlist) {
+			// 	cout << "atom ind: " << at.atind << ", val_n: " << at.val_n << ", val_l: " << at.val_l <<  ", n: " << at.n << ", l: " << at.l << ", num hole: " << at.num_h << endl;
+			// 	cout << "atom sind: " << at.sind << ", eind: " << at.eind << ", vind: " << at.vind << ", cind: " << at.cind;
+			// 	if (at.is_lig) cout << ", is ligand";
+			// 	if (at.is_val) cout << ", is valence";
+			// 	cout << ", sites: ";
+			// 	for (auto s:at.site) cout << s << ",";
+			// 	cout << "check: " << at.check << endl << endl;
+			// }
 			// DEBUG
 		} else throw invalid_argument("Cannot open INPUT file");
 	} catch (const exception &ex) {
@@ -511,13 +510,13 @@ ulli Hilbert::norm_Hashback(size_t ind) {
 	size_t cind = ind / ed::choose(num_vorb,num_vh), ch = num_ch;
 	size_t vind = ind % ed::choose(num_vorb,num_vh), vh = num_vh;
 	ulli c = 0, v = 0;
-	for (size_t i = num_vorb-1; i >= 0; --i) {
+	for (size_t i = num_vorb-1; i --> 0;) {
 		if (vind >= ed::choose(i,vh)) {
 			v |= (1 << i);
 			vind -= ed::choose(i,vh--);
 		}
 	}
-	for (size_t i = num_corb-1; i >= 0; --i) {
+	for (size_t i = num_vorb-1; i --> 0;) {
 		if (cind >= ed::choose(i,ch)) {
 			c |= (1 << i);
 			cind -= ed::choose(i,ch--);
