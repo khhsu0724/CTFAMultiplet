@@ -40,7 +40,7 @@ bool operator!=(const QN& qn1, const QN& qn2) {
 }
 
 Hilbert::Hilbert(string file_dir, vector<double*>& SC, double* FG, double* CF, double const& SO
-				, bool HYB, bool is_ex): is_ex(is_ex), HYB_on(HYB) {
+				, bool HYB, string edge, bool is_ex): is_ex(is_ex), HYB_on(HYB), edge(edge) {
 	read_from_file(file_dir);
 	if (is_ex) {
 		num_vh--;
@@ -107,6 +107,8 @@ vpulli Hilbert::match(int snum, QN* lhs, QN* rhs) {
 void Hilbert::fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs) {
 	// Find block index for lhs and rhs
 	int lind = 0, rind = 0;
+	// cout << "size: " << hblks[lind].size << ", Hash: " << Hash(lhs) << ", " << Hash(rhs);
+	// cout << ", bits: " << bitset<16>(lhs) << ", " << bitset<16>(rhs) << endl;
 
 	// DEBUG
 	// if (num_ch == 0) {
@@ -120,6 +122,7 @@ void Hilbert::fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs)
 	// 	if (lspin != rspin) cout << "lhs: " << bitset<16>(lhs) << ", rhs: " << bitset<16>(rhs) << endl;
 	// }
 	// DEBUG
+
 
 	if (lind == rind) hblks[lind].ham[Hash(lhs)+hblks[lind].size*Hash(rhs)] += matelem;
 	return;
@@ -173,7 +176,6 @@ vector<Block> Hilbert::make_block(vector<ulli>& hilb_vec) {
 bool Hilbert::build_coordination(bool nh_read, int& tm_per_site, int& lig_per_site) {
 	// This function builds information on atom relative 
 	// positions and what sites they are on
-	string edge = "L";
 	if (coord == "none") {
 		tm_per_site = 1;
 		if (edge == "K") throw invalid_argument("TM K edge unavailable");
@@ -182,6 +184,7 @@ bool Hilbert::build_coordination(bool nh_read, int& tm_per_site, int& lig_per_si
 		tm_per_site = 1;
 		lig_per_site = 2;
 	}
+	this->at_per_site = tm_per_site + lig_per_site;
 	if (nh_read) make_atlist(edge,tm_per_site,lig_per_site);
 	return true;
 }
@@ -274,7 +277,6 @@ void Hilbert::read_from_file(string file_dir) {
 							        	throw invalid_argument("more than 1 argument");
 							        }
 								}
-								cout << "number of holes: " << num_vh << endl;
 								skip = true;
 							}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
 						}
@@ -362,15 +364,15 @@ void Hilbert::read_from_file(string file_dir) {
 				atlist[i].cind = ind++;
 			}
 			//DEBUG
-			for (auto & at : atlist) {
-				cout << "atom ind: " << at.atind << ", val_n: " << at.val_n << ", val_l: " << at.val_l <<  ", n: " << at.n << ", l: " << at.l << ", num hole: " << at.num_h << endl;
-				cout << "atom sind: " << at.sind << ", eind: " << at.eind << ", vind: " << at.vind << ", cind: " << at.cind;
-				if (at.is_lig) cout << ", is ligand";
-				if (at.is_val) cout << ", is valence";
-				cout << ", sites: ";
-				for (auto s:at.site) cout << s << ",";
-				cout << "check: " << at.check << endl << endl;
-			}
+			// for (auto & at : atlist) {
+			// 	cout << "atom ind: " << at.atind << ", val_n: " << at.val_n << ", val_l: " << at.val_l <<  ", n: " << at.n << ", l: " << at.l << ", num hole: " << at.num_h << endl;
+			// 	cout << "atom sind: " << at.sind << ", eind: " << at.eind << ", vind: " << at.vind << ", cind: " << at.cind;
+			// 	if (at.is_lig) cout << ", is ligand";
+			// 	if (at.is_val) cout << ", is valence";
+			// 	cout << ", sites: ";
+			// 	for (auto s:at.site) cout << s << ",";
+			// 	cout << "check: " << at.check << endl << endl;
+			// }
 			// DEBUG
 		} else throw invalid_argument("Cannot open INPUT file");
 	} catch (const exception &ex) {
@@ -492,32 +494,33 @@ void Hilbert::Assign_Hash(double* FG, double* CF, double const& SO) {
 
 size_t Hilbert::norm_Hash(ulli s) {
 	// Hash function that convert a state in bits to index
-	int cind = 0, vind = 0;
-	int cnt_c = 0, cnt_v = 0;
-	int hc = num_corb/2, hv = num_vorb/2;
-	for (int i = 0; i < hc; ++i)
+	size_t cind = 0, vind = 0;
+	size_t cnt_c = 0, cnt_v = 0;
+	size_t hc = num_corb/2, hv = num_vorb/2;
+	for (size_t i = 0; i < hc; ++i)
 		if (s & (1 << i)) cind += ed::choose(i,++cnt_c);
-	for (int i = 0; i < hc; ++i)
+	for (size_t i = 0; i < hc; ++i)
 		if (s & (1 << (i+hc+hv))) cind += ed::choose(i+hc,++cnt_c);
-	for (int i = 0; i < hv; ++i)
+	for (size_t i = 0; i < hv; ++i)
 		if (s & (1 << (i+hc))) vind += ed::choose(i,++cnt_v);
-	for (int i = 0; i < hv; ++i)
+	for (size_t i = 0; i < hv; ++i)
 		if (s & (1 << (i+num_corb+hv))) vind += ed::choose(i+hv,++cnt_v);
 	return vind + cind * ed::choose(num_vorb,num_vh);
 }
 
 ulli Hilbert::norm_Hashback(size_t ind) {
 	// Hash function that convert index to state in bitset
-	int cind = ind / ed::choose(num_vorb,num_vh), ch = num_ch;
-	int vind = ind % ed::choose(num_vorb,num_vh), vh = num_vh;
+	size_t edchoose = ed::choose(num_vorb,num_vh);
+	size_t cind = ind / edchoose, ch = num_ch;
+	size_t vind = ind % edchoose, vh = num_vh;
 	ulli c = 0, v = 0;
-	for (int i = num_vorb-1; i >= 0; --i) {
+	for (size_t i = num_vorb; i --> 0;) {
 		if (vind >= ed::choose(i,vh)) {
 			v |= (1 << i);
 			vind -= ed::choose(i,vh--);
 		}
 	}
-	for (int i = num_corb-1; i >= 0; --i) {
+	for (size_t i = num_vorb; i --> 0;) {
 		if (cind >= ed::choose(i,ch)) {
 			c |= (1 << i);
 			cind -= ed::choose(i,ch--);

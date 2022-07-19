@@ -14,17 +14,11 @@ extern "C" {
 	extern void dsyev_(char*,char*,size_t*,double*,size_t*,double*,double*,int*,int*);
 }
 
-// Scalapack functions
-// extern void pdsyevd_( char* jobz, char* uplo, int* n, double* a, int* ia, int* ja, int* desca,
-//                 double* w, double* z, int* iz, int* jz, int* descz, double* work,
-//                 int* lwork, double* iwork, int* liwork, int* info );
-
 void dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n) {
 	// Can also use for diagonlizing non-symmetric Hamiltonians
 	char JOBVS='V',SORT='N';
 	double *eigImag = new double[n]{0};
-	int info = 0, lwork = 6*n;
-	int sdim = 0;
+	int info = 0, sdim = 0, lwork = 6*n;
 	int *bwork;
 	double *work = new double[lwork]{0};
 	int (*select)(double*,double*);
@@ -33,7 +27,7 @@ void dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n) {
 			_eigvec,&n,work,&lwork,bwork,&info);
 
 	try {
-		if (info!=0) throw runtime_error( "Error: dgees returned error code ");
+		if (info!=0) throw runtime_error( "Error: dgeev returned error code ");
 	} catch(const exception &ex) {std::cout << ex.what() << "\n";}
 
 	delete [] work;
