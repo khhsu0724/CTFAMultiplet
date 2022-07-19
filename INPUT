@@ -10,9 +10,9 @@
 	# PBC = Periodic Boundary Condition
 /
 &CELL
-	Coordination = "None" # Defaults to no coordination
+	Coordination = "Square Planar" # Defaults to no coordination
 	Sites = 1 # x,y,z, Defaults to 1 site
-	Holes = 2 # If this is read then &Atom's will be skipped
+	Holes = 3 # If this is read then &Atom's will be skipped
 /
 &ATOMS
 	# Each line is a site, with atoms and ligands in the site
@@ -23,7 +23,7 @@
 &PHOTON
 	XAS = true
 	RIXS = false
-	pvin = 0 0 1
+	pvin = 0 1 0
 	pvout = 1 0 0
 	Edge = K
 	# Edge (K,L edge)

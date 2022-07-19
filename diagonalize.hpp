@@ -2,7 +2,6 @@
 #define DIAGONALIZE
 #include <memory>
 #include "helper.hpp"
-// #include <armadillo>
 
 typedef std::unique_ptr<double[]> uptrd;
 
@@ -20,7 +19,6 @@ public:
 		if (size > std::sqrt(SIZE_MAX)) throw std::overflow_error("matrix too large");
 		ham = std::make_unique<double[]>(size*size);
 	};
-
 	Block(Block&& blk) : Sz(blk.Sz), Lz(blk.Lz), K(blk.K), size(blk.size) {
 		ham = std::move(blk.ham);
 		eig = std::move(blk.eig);
@@ -37,9 +35,6 @@ public:
 	size_t size;
 	uptrd ham, eig, eigvec; // Use unique pointers that are auto-managed
 	std::vector<int> einrange;
-	void diagonalize() {
-		// Chooose what function to diagonalize
-	}
 	void diag_dgees() {
 		_ham = ham.release();
 		_eig = new double[size]{0};
