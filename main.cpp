@@ -26,7 +26,7 @@ void tb() {
 	double CF[5] = {1,1,-2.0/3,-2.0/3,-2.0/3};
 	double FG[4]{0};
 	for (double m = 0.5; m <= 50; m += 0.5) {
-		Hilbert input("./INPUT",SC,FG,CF,0,false,"L",false);
+		Hilbert input("./INPUT",SC,FG,CF,0,false,false);
 		double CF_TB[5]{0};
 		for (int c = 0; c < 5; c++) CF_TB[c] = CF[c] * m;
 		calc_coulomb(input,SC);
@@ -158,12 +158,10 @@ void read_input(string IDIR, PM& pm, vector<double*> SC, double* FG,
 								for (int i = 0; i < 3; ++i) pvout[i] = pvtmp[i];
 							}
 							else if (p == "EDGE") {
-								size_t eqpos = line.find('=');
-								string input = line.substr(eqpos+1,line.find('#')-eqpos-1);
-								eqpos = input.find_first_not_of(' ');
-								size_t string_size = input.find_last_not_of(' ')-eqpos+1;
-								pm.edge = input.substr(eqpos,string_size);
-								skip = true;
+								cout << p << endl;
+								// TODO: if FG size does not match edge then throw error
+								// if edge => K, FG size = 2
+								// if edge => L, FG size = 4
 							}
 							p = "";
 						}
@@ -202,9 +200,7 @@ int main(int argc, char** argv){
 	string IDIR = "./INPUT";
 	if (argc == 2) IDIR = string(argv[1]);
 	read_input(IDIR,pm,SC,FG,CF,SO,HYB,nedos,pvin,pvout);
-	if (pm.edge == "K") {
-		if (FG[2] != 0 || FG[3] != 0) throw invalid_argument("invalid FG input");
-	} else if (pm.edge != "L") throw invalid_argument("invalid edge input");
+
 	// U = F^0 + 4*F^2 + 36*F^4
 
 	cout << "Input parameters" << endl;
@@ -220,7 +216,6 @@ int main(int argc, char** argv){
 	cout << endl;
 	if (HYB) cout << "yes HYB" << endl; 
 	else cout << "no HYB" << endl; 
-	cout << "photon edge: " << pm.edge << endl;
 	cout << "pvin: ";
 	for (int i = 0; i < 3; ++i) cout << pvin[i] << ", ";
 	cout << endl << "pvout: ";

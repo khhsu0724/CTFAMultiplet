@@ -55,8 +55,8 @@ void XAS(string input_dir, vector<double*>& SC, double* FG, double* CF, double S
 
 	cout << "Reading files..." << endl;
 	auto start = chrono::high_resolution_clock::now();
-	Hilbert GS(input_dir,SC,FG,CF,SO,HYB,edge,false);
-	Hilbert EX(input_dir,SC,FG,CF,SO,HYB,edge,true);
+	Hilbert GS(input_dir,SC,FG,CF,SO,HYB,false);
+	Hilbert EX(input_dir,SC,FG,CF,SO,HYB,true);
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -83,22 +83,20 @@ void XAS(string input_dir, vector<double*>& SC, double* FG, double* CF, double S
 	// Calculate Partition function
 	double Z = 0, emin = -25.0, emax = 20.0;
 	for (size_t i = 0; i < GS.hblks.size(); ++i) {
-	for (size_t j = 0; j < GS.hblks[i].size; ++j) {
-		if (abs(GS.hblks[i].eig[j]-gs_en) < TOL) {
+		for (size_t j = 0; j < GS.hblks[i].size; ++j) {
 			Z += exp(-beta*GS.hblks[i].eig[j]);
-			gsi.push_back({i,j});
+			if (abs(GS.hblks[i].eig[j]-gs_en) < 1e-4) gsi.push_back({i,j});
 		}
-	}}
+	}
 
 	vecd xas_aben(nedos,0), xas_int(nedos,0);
 	vector<dcomp> blap(GS.hsize*EX.hsize,0);
 	int half_orb = (EX.num_vorb+EX.num_corb)/2;
 
-	cout << "Calculating basis overlap..." << endl;
+cout << "Calculating basis overlap..." << endl;
 	start = chrono::high_resolution_clock::now();
 	// Calculating basis state overlap
 	int cl = GS.atlist[0].l, vl =  GS.atlist[GS.atlist[0].vind].l;
-	#pragma omp parallel for
 	for (size_t g = 0; g < GS.hsize; g++) {
 		for (size_t e = 0; e < EX.hsize; e++) {
 			ulli gs = GS.Hashback(g), exs = EX.Hashback(e);
@@ -120,19 +118,17 @@ void XAS(string input_dir, vector<double*>& SC, double* FG, double* CF, double S
 
 	cout << "Calculating cross section..." << endl;
 	start = chrono::high_resolution_clock::now();
-	// std::cout << "max threads: " << omp_get_max_threads()<< std::endl;
 
 	for (auto &g  : gsi) {
 		Block& gsblk = GS.hblks[g.first];
 		for (auto &exblk : EX.hblks) {
-		for (size_t ei = 0; ei < exblk.size; ++ei) {
+		for (int ei = 0; ei < exblk.size; ++ei) {
 			if (exblk.eig[ei]-gs_en < emin || exblk.eig[ei]-gs_en > emax) continue;
 			dcomp cs = 0;
-			#pragma omp parallel for
-			for (size_t gj = 0; gj < gsblk.size; ++gj) {
+			for (int gj = 0; gj < gsblk.size; ++gj) {
 				if (abs(gsblk.eigvec[g.second*gsblk.size+gj]) < TOL) continue;
-				for (size_t ej = 0; ej < exblk.size; ++ej) {
-					if (abs(exblk.eigvec[ei*exblk.size+ej]) < TOL || abs(blap[gj*EX.hsize+ej]) < TOL) continue;
+				for (int ej = 0; ej < exblk.size; ++ej) {
+					if (abs(exblk.eigvec[ei*exblk.size+ej]) < TOL && abs(blap[gj*EX.hsize+ej]) < TOL) continue;
 					cs +=  gsblk.eigvec[g.second*gsblk.size+gj] * exblk.eigvec[ei*exblk.size+ej]
 						   * blap[gj*EX.hsize+ej];
 				}
@@ -189,8 +185,8 @@ void RIXS(string input_dir, vector<double*>& SC, double* FG, double* CF, double 
 
 	cout << "Reading files..." << endl;
 	auto start = chrono::high_resolution_clock::now();
-	Hilbert GS(input_dir,SC,FG,CF,SO,HYB,edge,false);
-	Hilbert EX(input_dir,SC,FG,CF,SO,HYB,edge,true);
+	Hilbert GS(input_dir,SC,FG,CF,SO,HYB,false);
+	Hilbert EX(input_dir,SC,FG,CF,SO,HYB,true);
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
