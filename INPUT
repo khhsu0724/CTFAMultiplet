@@ -10,7 +10,7 @@
 	# PBC = Periodic Boundary Condition
 /
 &CELL
-	Coordination = "Square Planar" # Defaults to no coordination
+	Coordination = "None" # Defaults to no coordination
 	Sites = 1 # x,y,z, Defaults to 1 site
 	Holes = 2 # If this is read then &Atom's will be skipped
 /
@@ -23,9 +23,10 @@
 &PHOTON
 	XAS = true
 	RIXS = false
-	pvin = 0 1 0
+	pvin = 0 0 1
 	pvout = 1 0 0
 	Edge = K
+	# Edge (K,L edge)
 	# SPIN FLIP IMPLEMENTATION
 &HYB # Fill in information about hybdridization matrix
 /

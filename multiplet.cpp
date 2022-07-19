@@ -310,7 +310,7 @@ vecd HYBmat(Hilbert& hilbs, double del) {
 void calc_HYB(Hilbert& hilbs, vector<double*>& SC) {
 	// Charge Transfer and Hybridization
 	// Temperory implementation for square planar geometry
-	if (hilbs.at_per_site == 1) return;
+	if (hilbs.num_at == 1) return;
 	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
 	double nd = 0;
 	for (auto &at : hilbs.atlist) if(!at.is_lig && at.is_val) nd = at.num_h;
