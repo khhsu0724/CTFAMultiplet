@@ -491,32 +491,32 @@ void Hilbert::Assign_Hash(double* FG, double* CF, double const& SO) {
 
 size_t Hilbert::norm_Hash(ulli s) {
 	// Hash function that convert a state in bits to index
-	size_t cind = 0, vind = 0;
-	size_t cnt_c = 0, cnt_v = 0;
-	size_t hc = num_corb/2, hv = num_vorb/2;
-	for (size_t i = 0; i < hc; ++i)
+	int cind = 0, vind = 0;
+	int cnt_c = 0, cnt_v = 0;
+	int hc = num_corb/2, hv = num_vorb/2;
+	for (int i = 0; i < hc; ++i)
 		if (s & (1 << i)) cind += ed::choose(i,++cnt_c);
-	for (size_t i = 0; i < hc; ++i)
+	for (int i = 0; i < hc; ++i)
 		if (s & (1 << (i+hc+hv))) cind += ed::choose(i+hc,++cnt_c);
-	for (size_t i = 0; i < hv; ++i)
+	for (int i = 0; i < hv; ++i)
 		if (s & (1 << (i+hc))) vind += ed::choose(i,++cnt_v);
-	for (size_t i = 0; i < hv; ++i)
+	for (int i = 0; i < hv; ++i)
 		if (s & (1 << (i+num_corb+hv))) vind += ed::choose(i+hv,++cnt_v);
 	return vind + cind * ed::choose(num_vorb,num_vh);
 }
 
 ulli Hilbert::norm_Hashback(size_t ind) {
 	// Hash function that convert index to state in bitset
-	size_t cind = ind / ed::choose(num_vorb,num_vh), ch = num_ch;
-	size_t vind = ind % ed::choose(num_vorb,num_vh), vh = num_vh;
+	int cind = ind / ed::choose(num_vorb,num_vh), ch = num_ch;
+	int vind = ind % ed::choose(num_vorb,num_vh), vh = num_vh;
 	ulli c = 0, v = 0;
-	for (size_t i = num_vorb-1; i --> 0;) {
+	for (int i = num_vorb-1; i >= 0; --i) {
 		if (vind >= ed::choose(i,vh)) {
 			v |= (1 << i);
 			vind -= ed::choose(i,vh--);
 		}
 	}
-	for (size_t i = num_vorb-1; i --> 0;) {
+	for (int i = num_corb-1; i >= 0; --i) {
 		if (cind >= ed::choose(i,ch)) {
 			c |= (1 << i);
 			cind -= ed::choose(i,ch--);
