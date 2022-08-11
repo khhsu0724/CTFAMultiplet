@@ -85,9 +85,8 @@ vecd CFmat(int l, double* CF) {
 	return cfmat;
 }
 
-void calc_CF(Hilbert& hilbs, double del, double* CF) {
+void calc_CF(Hilbert& hilbs, double* CF) {
 	// Calculate Crystal Field, Charge Transfer Matrix Element
-	// if (hilbs.HYB_on) return; // If Hybridization is on, opt for calc_HYB 
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		int l = hilbs.atlist[i].l;
 		vecd cfmat;
@@ -178,13 +177,14 @@ vecd HYBmat(Hilbert& hilbs, double del) {
 	string coord = hilbs.coord;
 	// cout << "building hybdrization matrix" << endl;
 	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
-	vecd hybmat(nvo*nvo,0);
+	vecd hybmat(nvo*nvo,0),tmatreal(nvo*nvo,0);
 	double tpd = 1, tpdz = 0.25, tpdxy = 0.225, tpdxz = 0.225, tpdyz = 0.225, tpppi = 0, tppsigma = 0.25, tppzpi = 0; // Temp place holdler
 	// Temporary implementation
 	// Omit tpppi since it will give imaginary number
 	double kx = PI, ky = PI, kz = 0; // one site momentum = 0, p-h transformation k+Q = pi
 	double t0 = tpdz/sqrt(2), t1x = tpdxz/sqrt(2), t1y = tpdyz/sqrt(2), t2p = 0.5*(tpd+tpdxy), t2m = 0.5*(tpd-tpdxy);
 	double sx = 2*sin(kx/2), sy = 2*sin(ky/2), cx = 2*cos(kx/2), cy = 2*cos(ky/2), tpsigma = tppsigma; // = 2*tppsigma???
+	cx = cy = 2;
 	hybmat[5*nvo+0] = hybmat[0*nvo+5] = t2m*cx;//-0.5*(tpd+tpdxy)*2;
 	hybmat[7*nvo+0] = hybmat[0*nvo+7] = t2p*cx;//-0.5*(tpd-tpdxy)*2;
 	hybmat[8*nvo+0] = hybmat[0*nvo+8] = -t2m*cy;//-0.5*(-tpd+tpdxy)*2;
@@ -261,13 +261,12 @@ vecd HYBmat(Hilbert& hilbs, double del) {
 	tmat = ed::matmult(a,tmat,nvo);
 	// ed::write_vec(tmat,11,11,"hyb.txt");
 	// vecd tmatd(nvo*nvo);
-	std::transform(tmat.begin(), tmat.end(), hybmat.begin(), [](complex<double> c) {return c.real();});
-	// ed::write_vec(hybmat,nvo,nvo,"hybmat2.txt");
+	std::transform(tmat.begin(), tmat.end(), tmatreal.begin(), [](complex<double> c) {return c.real();});
 	// Particle hole transformation???????
 
 	// Temporary implementation
 	// real basis -> angular momentum basis ->  Hole basis
-	return hybmat;
+	return tmatreal;
 
 	// Temporary implementation
 	try {
@@ -315,6 +314,12 @@ void calc_HYB(Hilbert& hilbs, vector<double*>& SC) {
 	double nd = 0;
 	for (auto &at : hilbs.atlist) if(!at.is_lig && at.is_val) nd = at.num_h;
 	double delta = nd * (SC[1][0] - SC[1][2]*2/63 - SC[1][4]*2/63);// This needs to be changed since 
+	int nh = hilbs.is_ex ? hilbs.num_vh+1 : hilbs.num_vh;
+	double U = (SC[1][0] - SC[1][2]*2/63 - SC[1][4]*2/63);
+	delta = 0.7*nh*U-0.45;
+	delta = nh*U;
+	// delta = -4;
+	cout << "U: " << (SC[1][0] - SC[1][2]*2/63 - SC[1][4]*2/63) << ", holes: " << nh << ", delta: " << delta << endl;
 
 	// cout << "nd: " << nd << ", del: " << delta << endl;
 	// cout << "atoms: ";
@@ -324,7 +329,6 @@ void calc_HYB(Hilbert& hilbs, vector<double*>& SC) {
 
 	cout << endl;
 	vecd hybmat = HYBmat(hilbs,delta);
-	// ed::write_vec(hybmat,11,11,"./hybmat.txt"); 
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
 	// Loop through hyb matrix, TODO: Loop through each site
 	for (int i = 0; i < nvo; ++i) {
@@ -360,11 +364,13 @@ void calc_HYB(Hilbert& hilbs, vector<double*>& SC) {
 				// cout << "            " << bitset<28>(me) << endl;
 				// cout << "sd entries: " << bitset<28>(me-lhssd_shift) << endl << "            " << bitset<28>(me-rhssd_shift) << endl << endl;
 			}
+
 			for (auto &e : entries) {
 				if (e.first == e.second) hilbs.fill_hblk(hybmat[i*nvo+j],e.first,e.second);
 				else hilbs.fill_hblk(hybmat[i*nvo+j]*hilbs.Fsign(&qnld,e.first,1)*hilbs.Fsign(&qnrd,e.second,1),
 									 e.first,e.second);
 			}
+			// cout << endl;
 			// Fill in spin up matrix element
 			match_entries = hilbs.enum_hspace(incsu,0,ed::count_bits(incsu)-1,0);
 			entries.clear();
@@ -378,6 +384,7 @@ void calc_HYB(Hilbert& hilbs, vector<double*>& SC) {
 				else hilbs.fill_hblk(hybmat[i*nvo+j]*hilbs.Fsign(&qnlu,e.first,1)*hilbs.Fsign(&qnru,e.second,1),
 									 e.first,e.second);
 			}
+			// cout << endl;
 		}
 	}
 	return;

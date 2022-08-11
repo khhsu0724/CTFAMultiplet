@@ -373,6 +373,7 @@ void Hilbert::read_from_file(string file_dir) {
 			// 	for (auto s:at.site) cout << s << ",";
 			// 	cout << "check: " << at.check << endl << endl;
 			// }
+			// cout << "num_ch: " << num_ch << ", num_vh: " << num_vh << ", num_corb: " << num_corb << ", num_vorb: " << num_vorb << endl;
 			// DEBUG
 		} else throw invalid_argument("Cannot open INPUT file");
 	} catch (const exception &ex) {

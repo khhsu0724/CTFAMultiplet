@@ -56,7 +56,7 @@ namespace ed {
 		for (int i = 0; i < n; ++i) {
 			T nm = 0;
 			for (int j = 0; j < n; j++) {
-				// if (abs(ev[i*n+j]) < 1e-7) ev[i*n+j] = 0;
+				if (abs(ev[i*n+j]) < 1e-7) ev[i*n+j] = 0;
 				nm += ev[i*n+j]*ev[i*n+j];
 			}
 			if (nm != 1) {
@@ -75,7 +75,7 @@ namespace ed {
 	    return v3;
 	};
 
-	template <typename DT> void write_mat(DT* mat, size_t x, size_t y, std::string file_dir) {
+	template <typename DT> void write_mat(std::unique_ptr<DT[]>& mat, size_t x, size_t y, std::string file_dir) {
 		std::ofstream matfile;
 	    matfile.open (file_dir);
 		for (int j = 0; j < y; ++j) {
@@ -100,8 +100,6 @@ namespace ed {
 	    }
 	    matfile.close();
 	};
-
-
 
 	template <typename T> std::vector<T> printDistinct(std::unique_ptr<T[]>& arr, int n, bool is_print = true) {
 	    std::vector<T> unique_eig;
@@ -164,6 +162,21 @@ namespace ed {
 		}
 		return vmult;
 	};
+
+	template<typename T> std::vector<T> matmultvec(std::vector<T> mat, std::vector<T> vec, int size) {
+		// Matrix multiply a vector
+		if (mat.size() != size*size || vec.size() != size) {
+			std::invalid_argument("invalid input matrices for multiplication");
+		}
+		std::vector<T> vmult(size,0);
+		for (size_t i = 0; i < size; ++i) {
+			for (size_t j = 0; j < size; ++j) {
+				vmult[i] += mat[i*size+j] * vec[j];
+			}
+		}
+		return vmult;
+	};
+
 
 	template<typename T> void transpose(std::vector<T>& mat, int m, int n) {
 		std::vector<T> trans(m*n);

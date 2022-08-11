@@ -8,13 +8,6 @@
 
 using namespace std;
 
-struct PM {
-	bool XAS = false;
-	bool RIXS = false;
-	bool PE = false; // Photo Emission
-	string edge;
-};
-
 void tb() {
 	ofstream myfile;
     myfile.open ("./tb.txt");
@@ -30,7 +23,7 @@ void tb() {
 		double CF_TB[5]{0};
 		for (int c = 0; c < 5; c++) CF_TB[c] = CF[c] * m;
 		calc_coulomb(input,SC);
-		calc_CF(input,0,CF_TB);
+		calc_CF(input,CF_TB);
 		input.hblks[0].diag_dsyev();
 		vector<double> unique_eig = ed::printDistinct(input.hblks[0].eig,input.hblks[0].size,false);
 		auto min_eig = *min_element(unique_eig.begin(), unique_eig.end());
@@ -105,8 +98,7 @@ bool read_bool(string line, bool& tgt) {
 }
 
 void read_input(string IDIR, PM& pm, vector<double*> SC, double* FG, 
-				double* CF, double& SO, bool& HYB, double& nedos, 
-				vecd& pvin, vecd& pvout) {
+				double* CF, double& SO, bool& HYB, double& nedos) {
 	string line;
 	ifstream input(IDIR);
 	try {
@@ -151,11 +143,11 @@ void read_input(string IDIR, PM& pm, vector<double*> SC, double* FG,
 							else if (p == "RIXS") skip = read_bool(line.substr(s+1,line.size()-1),pm.RIXS);
 							else if (p == "PVIN") {
 								skip = read_num(line.substr(s+1,line.size()-1),pvtmp,3);
-								for (int i = 0; i < 3; ++i) pvin[i] = pvtmp[i];
+								for (int i = 0; i < 3; ++i) pm.pvin[i] = pvtmp[i];
 							}
 							else if (p == "PVOUT") {
 								skip = read_num(line.substr(s+1,line.size()-1),pvtmp,3);
-								for (int i = 0; i < 3; ++i) pvout[i] = pvtmp[i];
+								for (int i = 0; i < 3; ++i) pm.pvout[i] = pvtmp[i];
 							}
 							else if (p == "EDGE") {
 								size_t eqpos = line.find('=');
@@ -164,6 +156,11 @@ void read_input(string IDIR, PM& pm, vector<double*> SC, double* FG,
 								size_t string_size = input.find_last_not_of(' ')-eqpos+1;
 								pm.edge = input.substr(eqpos,string_size);
 								skip = true;
+							}
+							else if (p == "ELOSS") {
+								bool el;
+								skip = read_bool(line.substr(s+1,line.size()-1),el);
+								pm.set_eloss(el);
 							}
 							p = "";
 						}
@@ -197,11 +194,10 @@ int main(int argc, char** argv){
 	vector<double*> SC;
 	SC.emplace_back(SC1);
 	SC.emplace_back(SC2);
-	vecd pvin(3,0), pvout(3,0);
 
 	string IDIR = "./INPUT";
 	if (argc == 2) IDIR = string(argv[1]);
-	read_input(IDIR,pm,SC,FG,CF,SO,HYB,nedos,pvin,pvout);
+	read_input(IDIR,pm,SC,FG,CF,SO,HYB,nedos);
 	if (pm.edge == "K") {
 		if (FG[2] != 0 || FG[3] != 0) throw invalid_argument("invalid FG input");
 	} else if (pm.edge != "L") throw invalid_argument("invalid edge input");
@@ -220,19 +216,24 @@ int main(int argc, char** argv){
 	cout << endl;
 	if (HYB) cout << "yes HYB" << endl; 
 	else cout << "no HYB" << endl; 
+	if (pm.RIXS) {
+		if (pm.eloss) cout << "Using energy loss" << endl;
+		else cout << "using omega/omega" << endl;
+	}
 	cout << "photon edge: " << pm.edge << endl;
 	cout << "pvin: ";
-	for (int i = 0; i < 3; ++i) cout << pvin[i] << ", ";
+	for (int i = 0; i < 3; ++i) cout << pm.pvin[i] << ", ";
 	cout << endl << "pvout: ";
-	for (int i = 0; i < 3; ++i) cout << pvout[i] << ", ";
+	for (int i = 0; i < 3; ++i) cout << pm.pvout[i] << ", ";
 	cout << endl;
 	
 	// Adjust Slater Condor Parameter
-	SC[0][2] *= 49;
+	SC[0][2] *= 25;
 	SC[1][2] *= 49;
 	SC[1][4] *= 441;
-	if (pm.XAS) XAS(IDIR,SC,FG,CF,SO,HYB,pvin,nedos,pm.edge);
-	if (pm.RIXS) RIXS(IDIR,SC,FG,CF,SO,HYB,pvin,pvout,nedos,pm.edge);	
+
+	if (pm.XAS) XAS(IDIR,SC,FG,CF,SO,HYB,nedos,pm);
+	if (pm.RIXS) RIXS(IDIR,SC,FG,CF,SO,HYB,nedos,pm);	
 
 	return 0;
 }
