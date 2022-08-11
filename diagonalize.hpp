@@ -19,6 +19,7 @@ public:
 		if (size > std::sqrt(SIZE_MAX)) throw std::overflow_error("matrix too large");
 		ham = std::make_unique<double[]>(size*size);
 	};
+	
 	Block(Block&& blk) : Sz(blk.Sz), Lz(blk.Lz), K(blk.K), size(blk.size) {
 		ham = std::move(blk.ham);
 		eig = std::move(blk.eig);
