@@ -13,29 +13,32 @@ private:
 	double Sz = 0, Lz = 0, K = 0;
 	double *_ham, *_eig, *_eigvec; // Implicit pointer that faciliates diagonalization
 public:
-	Block(double Sz, double Lz, double K, size_t size): Sz(Sz), Lz(Lz), K(K), size(size) {
-		// We can preallocate this with a number. i.e. Hilbert space size/number of blocks * 1.2
-		// Also need to build something that prevents premature access of eig & eigvec
+	size_t size, f_ind; // Accumulated first index of this Block
+	uptrd ham, eig, eigvec; // Use unique pointers that are auto-managed
+	std::vector<int> einrange, rank; // rank keeps some rank information for faster hashing
+	Block(double Sz, double Lz, double K, size_t size, size_t f_ind_in = 0,
+		std::vector<int> rank_in = std::vector<int>(0)): 
+		Sz(Sz), Lz(Lz), K(K), size(size), f_ind(f_ind_in) {
+		// Need to build something that prevents premature access of eig & eigvec
 		if (size > std::sqrt(SIZE_MAX)) throw std::overflow_error("matrix too large");
 		ham = std::make_unique<double[]>(size*size);
+		rank = std::move(rank_in);
 	};
 	
-	Block(Block&& blk) : Sz(blk.Sz), Lz(blk.Lz), K(blk.K), size(blk.size) {
+	Block(Block&& blk) : Sz(blk.Sz), Lz(blk.Lz), K(blk.K), size(blk.size), f_ind(blk.f_ind) {
 		ham = std::move(blk.ham);
 		eig = std::move(blk.eig);
 		eigvec = std::move(blk.eigvec);
 		_ham = std::move(blk._ham);
 		_eig = std::move(blk._eig);
 		_eigvec = std::move(blk._eigvec);
+		rank = std::move(blk.rank);
 	};
 
 	~Block() {}
 	double get_Sz() {return Sz;};
 	double get_Lz() {return Lz;};
 	double get_K() {return K;};	
-	size_t size;
-	uptrd ham, eig, eigvec; // Use unique pointers that are auto-managed
-	std::vector<int> einrange;
 	void diag_dgees() {
 		_ham = ham.release();
 		_eig = new double[size]{0};
@@ -63,7 +66,8 @@ public:
 		uptrd tmp(*arr);
 		*arr = NULL;
 		return tmp;
-	}		
+	}
+	double get_sz() {return Sz;}		
 };
 
 #endif 

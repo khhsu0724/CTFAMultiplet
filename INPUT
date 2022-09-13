@@ -8,11 +8,12 @@
 	HYB = true
 	NEDOS = 1000 # Number of bins for XAS/RIXS
 	# PBC = Periodic Boundary Condition
+	# BLOCK = block diagonalization
 /
 &CELL
 	Coordination = "Square Planar" # Defaults to no coordination
 	Sites = 1 # x,y,z, Defaults to 1 site
-	Holes = 1 # If this is read then &Atom's will be skipped
+	Holes = 2 # If this is read then &Atom's will be skipped
 /
 &ATOMS
 	# Each line is a site, with atoms and ligands in the site
@@ -21,12 +22,12 @@
 	O  0 0 1 2p
 /
 &PHOTON
-	XAS = true
+	XAS = false
 	RIXS = true
 	pvin = 1 0 0
-	pvout = 0 1 0 
+	pvout = 0 0 1
 	Edge = K
-	Eloss = true
+	Eloss = false
 	# SPIN FLIP IMPLEMENTATION
 &HYB # Fill in information about hybdridization matrix
 /

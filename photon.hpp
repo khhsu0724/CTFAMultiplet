@@ -23,7 +23,9 @@ struct PM {
 
 std::complex<double> proj_pvec(int ml, const vecd& pvec);
 void calc_ham(Hilbert& hilbs, std::vector<double*>& SC, double* FG, double* CF, double const& SO);
-void occupation(Hilbert& hilbs);
+void occupation(Hilbert& hilbs, const std::vector<bindex>& si);
+void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, std::vector<dcomp>& blap, 
+					const PM& pm, bool pvout = false);
 void write_XAS(vecd const& aben, vecd const& intensity, std::string file_dir, bool print = true);
 void XAS(std::string input_dir, std::vector<double*>& SC, double* FG, double* CF, 
 			double SO, bool HYB, int nedos, const PM& pm);

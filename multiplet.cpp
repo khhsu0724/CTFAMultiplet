@@ -316,9 +316,9 @@ void calc_HYB(Hilbert& hilbs, vector<double*>& SC) {
 	double delta = nd * (SC[1][0] - SC[1][2]*2/63 - SC[1][4]*2/63);// This needs to be changed since 
 	int nh = hilbs.is_ex ? hilbs.num_vh+1 : hilbs.num_vh;
 	double U = (SC[1][0] - SC[1][2]*2/63 - SC[1][4]*2/63);
-	delta = 0.7*nh*U-0.45;
-	delta = nh*U;
-	// delta = -4;
+	// delta = 0.7*nh*U-0.3;
+	delta = 0.4*nh*U-0.3;
+
 	cout << "U: " << (SC[1][0] - SC[1][2]*2/63 - SC[1][4]*2/63) << ", holes: " << nh << ", delta: " << delta << endl;
 
 	// cout << "nd: " << nd << ", del: " << delta << endl;

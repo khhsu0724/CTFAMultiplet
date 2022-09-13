@@ -101,19 +101,21 @@ namespace ed {
 	    matfile.close();
 	};
 
-	template <typename T> std::vector<T> printDistinct(std::unique_ptr<T[]>& arr, int n, bool is_print = true) {
-	    std::vector<T> unique_eig;
+	template <typename C, typename T> 
+	std::vector<T> printDistinct(const C & arr, T tmp, int n, bool is_print = true) {
+		// Second argument serves as a away to inform the template type in the container
+	    std::vector<T> unique_val;
 	    for (int i = 0; i < n; i++) {
 	        int j;
 	        for (j = 0; j < i; j++)
 	           if (abs(arr[i] - arr[j]) < 1e-7)
 	               break;
-	        if (i == j) unique_eig.push_back(arr[i]);
+	        if (i == j) unique_val.push_back(arr[i]);
 	    }
-	    std::sort(unique_eig.begin(), unique_eig.end());
-	    if (is_print) for (int i =0; i < unique_eig.size(); ++i)std::cout << unique_eig[i] << " ";
+	    std::sort(unique_val.begin(), unique_val.end());
+	    if (is_print) for (int i =0; i < unique_val.size(); ++i) std::cout << unique_val[i] << " ";
 	    if (is_print) std::cout << std::endl;
-	    return unique_eig;
+	    return unique_val;
 	};
 
 	template <typename T> T trace(T *mat, int n) {
