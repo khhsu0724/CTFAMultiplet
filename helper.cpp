@@ -2,7 +2,7 @@
 
 size_t ed::choose(size_t n, size_t k) {
 	if (k > n) return 0;
-	if (k == 0) return 1;
+	if (!k) return 1;
     return (n*choose(n-1, k-1))/k;
 }
 
@@ -57,31 +57,3 @@ std::vector<int> ed::distribute(int num_h, int num_at) {
 	for (int i = 0; i < mod; ++i) ++dist[i];
 	return dist;
 }
-
-void ed::sph2real(double* sph, double* tet) {
-/** Converts spherical harmonics to real space
-	https://en.wikipedia.org/wiki/Table_of_spherical_harmonics#Real_spherical_harmonics
-	Input: number of arrays, Array of orbital (su,sd), and orbital number
-	Returns: 2*(2l+1) size array for occupancy **/
-
-	// Cast double matrix from real to complex
-	int l = 0;
-	if (l == 1) {
-		// returns x,y,z
-		dcomp trans_mat[] = {{1,0},{0,0},{1,0},
-					   		 {0,1},{0,0},{0,-1},
-					   		 {0,0},{sqrt(2),0},{0,0}};
-
-	} else if (l == 2) {
-		// returns xy,yz,z^2,xz,x^2-y^2
-		dcomp trans_mat[] = {{0,1},{0,0},{0,0},{0,0},{0,1},
-					         {0,0},{0,1},{0,0},{0,1},{0,0},
-					         {0,0},{0,0},{sqrt(2),0},{0,0},{0,0},
-					         {0,0},{1,0},{0,0},{-1,0},{0,0},
-					         {1,0},{0,0},{0,0},{0,0},{1,0}};
-
-	}
-
-	return;
-}
-

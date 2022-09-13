@@ -5,6 +5,7 @@
 
 typedef unsigned long long int ulli;
 typedef unsigned long int uli;
+typedef std::pair<size_t,size_t> bindex;
 typedef std::vector<std::pair<ulli,ulli>> vpulli;
 
 int conv_lchar(char orb);
@@ -99,14 +100,15 @@ public:
 	int num_at = 0, at_per_site = 0;
 	int val_ati = 0, val_ind = 0; // Index/Orbital index of first valence atom
 	int num_ch = 0, num_vh = 0, num_corb = 0, num_vorb = 0; // This is number of orbital*2 (number of electron sites)
+	int max_2sz = 0;
 	bool SO_on = false, CV_on = false, CF_on = false, HYB_on = false;
 	bool is_ex;
 	std::string coord = "none", edge; // Adjacency matrix for atoms, coordination
 	std::vector<Atom> atlist; // atlist is ordered
 	std::vector<Block> hblks;
 	std::vector<int> sites = {1,1,1};
-	using Hashptr = size_t (Hilbert::*)(ulli s);
-	using HBptr = ulli (Hilbert::*)(size_t ind);
+	using Hashptr = bindex (Hilbert::*)(ulli s);
+	using HBptr = ulli (Hilbert::*)(bindex ind);
 	Hashptr hashfunc;
 	HBptr hbfunc;
 
@@ -121,22 +123,23 @@ public:
 	double total_spin(int blk, int state);
 	void fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs);
 	double Fsign(QN* op, ulli state, int opnum);
+	double Fsign(ulli* op, ulli state, int opnum);
 	int orbind(ulli s);
 	int tot_site_num();
 	double pheshift(double trace, int k);
 
 	// Class for input file parsing
-	std::vector<Block> make_block(std::vector<ulli>& hilb_vec); // TODO
 	void make_atlist(std::string edge, const int& tm_per_site, const int& lig_per_site);
 	bool build_coordination(bool nh_read,int& tm_per_site, int& lig_per_site);
 	void read_from_file(std::string file_dir);
 
 	// Nice Collection of Hash Functions
-	void Assign_Hash(double* FG, double* CF, double const& SO);
-	size_t Hash(ulli s) {return (this->*hashfunc)(s);};
-	ulli Hashback(size_t ind) {return (this->*hbfunc)(ind);};
-	size_t norm_Hash(ulli s);
-	ulli norm_Hashback(size_t ind);
+	bindex Hash(ulli s) {return (this->*hashfunc)(s);};
+	ulli Hashback(bindex ind) {return (this->*hbfunc)(ind);};
+	bindex norm_Hash(ulli s);
+	ulli norm_Hashback(bindex ind);
+	bindex sz_Hash(ulli s);
+	ulli sz_Hashback(bindex ind);
 
 	// Need to fix these
 	// Maybe a copy constructor?????
