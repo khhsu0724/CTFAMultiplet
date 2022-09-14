@@ -1,6 +1,5 @@
 #include <fstream>
 #include <regex>
-#include <algorithm>
 #include <cmath>
 #include <bitset>
 #include "hilbert.hpp"
@@ -47,7 +46,7 @@ Hilbert::Hilbert(string file_dir, vector<double*>& SC, double* FG, double* CF, d
 	SO_on = !SO;
 	CF_on = !ed::is_zero_arr(CF,5);
 	CV_on = (is_ex && !ed::is_zero_arr(FG,4));
-	bool BLOCK_DIAG = false;
+	bool BLOCK_DIAG = true;
 	// Assign Hash Function
 	if (BLOCK_DIAG) {
 		hashfunc = &Hilbert::sz_Hash;

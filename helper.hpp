@@ -6,6 +6,8 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <iomanip>
+#include <algorithm>
 #ifndef HELPER
 #define HELPER
 
