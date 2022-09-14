@@ -404,6 +404,7 @@ void RIXS(string input_dir, vector<double*>& SC, double* FG, double* CF, double 
 	for (auto &fsblk : GS.hblks) {
 	for (auto &exblk : EX.hblks) {
 		basis_overlap(GS,EX,bindex(&fsblk-&GS.hblks[0],&exblk-&EX.hblks[0]),blap,pm,true);
+		cout << "FS blk: " << &fsblk-&GS.hblks[0] << ", EX blk: " << &exblk-&EX.hblks[0] << endl;
 		for (size_t fi = 0; fi < fsblk.size; ++fi) {
 			if (pm.eloss && fsblk.eig[fi]-gs_en > elm_max) continue;
 			vector<dcomp> csum(gsi.size()*exen.size(),0);
@@ -473,7 +474,7 @@ void RIXS(string input_dir, vector<double*>& SC, double* FG, double* CF, double 
 						if (exen[e]-fsblk.eig[fi] > -2.4 && exen[e]-fsblk.eig[fi] < -2.3) { // Emission
 							cout << "calculate peak" <<  endl;
 							bindex fvind = bindex(&fsblk-&GS.hblks[0],fi);
-							if (peak_occ_em.size() != 0 && peak_occ_em.back() == fvind) continue;
+							if (!peak_occ_em.empty() && peak_occ_em.back() == fvind) continue;
 							cout << fvind.first << "," << fvind.second << endl;
 							peak_occ_em.push_back(fvind);
 						}
