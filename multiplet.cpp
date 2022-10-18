@@ -178,7 +178,9 @@ vecd HYBmat(Hilbert& hilbs, double del) {
 	// cout << "building hybdrization matrix" << endl;
 	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
 	vecd hybmat(nvo*nvo,0),tmatreal(nvo*nvo,0);
-	double tpd = 1, tpdz = 0.25, tpdxy = 0.225, tpdxz = 0.225, tpdyz = 0.225, tpppi = 0, tppsigma = 0.25, tppzpi = 0; // Temp place holdler
+	double t = 0.8;
+	double tpd = t, tpdz = t*0.45, tpdxy = t*0.45, tpdxz = t*0.45, tpdyz = t*0.45, tpppi = 0, tppsigma = t/3, tppzpi = 0;
+	// double tpd = 1, tpdz = 0.25, tpdxy = 0.225, tpdxz = 0.225, tpdyz = 0.225, tpppi = 0, tppsigma = 0.25, tppzpi = 0; // Temp place holdler
 	// Temporary implementation
 	// Omit tpppi since it will give imaginary number
 	double kx = PI, ky = PI, kz = 0; // one site momentum = 0, p-h transformation k+Q = pi
@@ -263,47 +265,7 @@ vecd HYBmat(Hilbert& hilbs, double del) {
 	// vecd tmatd(nvo*nvo);
 	std::transform(tmat.begin(), tmat.end(), tmatreal.begin(), [](complex<double> c) {return c.real();});
 	// Particle hole transformation???????
-
-	// Temporary implementation
-	// real basis -> angular momentum basis ->  Hole basis
 	return tmatreal;
-
-	// Temporary implementation
-	try {
-		int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
-		hybmat = vecd(nvo*nvo,0);
-		if (coord == "sqpl") { // Square Planar
-			// Fill in matrix according to the order of the input of atoms list
-			if (hilbs.num_at != 3) throw invalid_argument("invalid amount of orbitals");
-			// Fill in hybridization matrix first using tesseral harmonics and then transform to spherical and hole language
-			for (int ai = 0; ai < hilbs.atlist.size(); ++ai) {
-			for (int aj = ai; aj < hilbs.atlist.size(); ++aj) {
-				auto ati = hilbs.atlist[ai];
-				auto atj = hilbs.atlist[aj];
-				if (!ati.is_val || !atj.is_val || (ati.is_lig && atj.is_lig)) continue; // Ligand/Ligand interaction is crystal field
-				cout << "ati: " << ati.atname << ", atj: " << atj.atname << endl;
-				cout << "ati pos: " << ati.atname << ", atj: " << atj.atname << endl;
-				for (size_t i = ati.sind-nco; i <= ati.eind-nco; ++i) {
-				for (size_t j = atj.sind-nco; j <= atj.eind-nco; ++j) {
-					// d orbital order: xy,yz,z^2,xz,x^2-y^2, p orbital order: x,y,z
-					cout << i << ", " << j << endl;
-
-					// This matrix is transformed to hole basis and spherical harmonics
-					
-
-
-					// Fill in matrix elements, add in case for PBC as well
-					// if (i == 10 && j == 10) {
-					// 	hybmat[(i-nco)*nvo+j-nco] = 0.5;
-					// 	cout << (i-nco) << ", " << j-nco << endl;
-					// }
-					// cout << "i: " << i <<  ", j: " << j << endl;
-				}}
-			}}
-			// Put in hand coded matrix here first
-		}  else throw invalid_argument("coordination other than square planar is not yet coded");
-	} catch(const exception &ex) {cout << ex.what() << "\n";}
-	return hybmat;
 }	
 
 void calc_HYB(Hilbert& hilbs, vector<double*>& SC) {
@@ -317,17 +279,11 @@ void calc_HYB(Hilbert& hilbs, vector<double*>& SC) {
 	int nh = hilbs.is_ex ? hilbs.num_vh+1 : hilbs.num_vh;
 	double U = (SC[1][0] - SC[1][2]*2/63 - SC[1][4]*2/63);
 	// delta = 0.7*nh*U-0.3;
-	delta = 0.4*nh*U-0.3;
+	delta = nh*U;
+	delta = 18.85;
 
-	cout << "U: " << (SC[1][0] - SC[1][2]*2/63 - SC[1][4]*2/63) << ", holes: " << nh << ", delta: " << delta << endl;
-
-	// cout << "nd: " << nd << ", del: " << delta << endl;
-	// cout << "atoms: ";
-	// for (auto &at: hilbs.atlist) {
-	// 	cout << at.atname << ", " << at.n << "; ";
-	// }
-
-	cout << endl;
+	cout << "U: " << (SC[1][0]-SC[1][2]*2/63-SC[1][4]*2/63) << ", JH: " << (SC[1][2]/14+SC[1][4]/14);
+	cout << ", holes: " << nh << ", delta: " << delta << endl;
 	vecd hybmat = HYBmat(hilbs,delta);
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
 	// Loop through hyb matrix, TODO: Loop through each site
@@ -355,14 +311,9 @@ void calc_HYB(Hilbert& hilbs, vector<double*>& SC) {
 				atlist_ind++;
 			}
 			vector<ulli> match_entries = hilbs.enum_hspace(incsd,0,ed::count_bits(incsd)-1,0);
-
-			// cout << "i: " << i << ", j: " << j << ", match size: " << match_entries.size()  << endl;
-
 			vpulli entries;
 			for (auto &me : match_entries) {
 				entries.emplace_back(pair<ulli,ulli>(me-lhssd_shift,me-rhssd_shift)); // We can probably fill in the matrix at this point
-				// cout << "            " << bitset<28>(me) << endl;
-				// cout << "sd entries: " << bitset<28>(me-lhssd_shift) << endl << "            " << bitset<28>(me-rhssd_shift) << endl << endl;
 			}
 
 			for (auto &e : entries) {
@@ -370,21 +321,18 @@ void calc_HYB(Hilbert& hilbs, vector<double*>& SC) {
 				else hilbs.fill_hblk(hybmat[i*nvo+j]*hilbs.Fsign(&qnld,e.first,1)*hilbs.Fsign(&qnrd,e.second,1),
 									 e.first,e.second);
 			}
-			// cout << endl;
+
 			// Fill in spin up matrix element
 			match_entries = hilbs.enum_hspace(incsu,0,ed::count_bits(incsu)-1,0);
 			entries.clear();
 			for (auto &me : match_entries) {
 				entries.emplace_back(pair<ulli,ulli>(me-lhssu_shift,me-rhssu_shift));
-				// cout << endl << "            " << bitset<28>(me) << endl;
-				// cout << "su entries: " << bitset<28>(me-lhssu_shift) << endl << "            "  << bitset<28>(me-rhssu_shift) << endl << endl;
 			}
 			for (auto &e : entries) {
 				if (e.first == e.second) hilbs.fill_hblk(hybmat[i*nvo+j],e.first,e.second);
 				else hilbs.fill_hblk(hybmat[i*nvo+j]*hilbs.Fsign(&qnlu,e.first,1)*hilbs.Fsign(&qnru,e.second,1),
 									 e.first,e.second);
 			}
-			// cout << endl;
 		}
 	}
 	return;

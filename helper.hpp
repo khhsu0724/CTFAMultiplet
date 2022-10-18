@@ -8,6 +8,7 @@
 #include <utility>
 #include <iomanip>
 #include <algorithm>
+#include <numeric>
 #ifndef HELPER
 #define HELPER
 
@@ -193,12 +194,15 @@ namespace ed {
 		return;
 	};
 
-	template<typename T> int binary_search(std::vector<T> &svec, T t) {
-		int ind = svec.size()/2 - 1, end = svec.size() - 1;
-		while (abs(svec[ind]-t) > TOL) {
+	template<typename T, typename Fcomp, typename Feq>
+	size_t binary_search(std::vector<T> &svec, T t, Fcomp comp, Feq eq) {
+		size_t ind = svec.size()/2 - 1, end = svec.size() - 1;
+		// std::cout << "search target: " << t << ", vec size: " << svec.size() << std::endl;
+		while (!eq(svec[ind],t)) { //abs(svec[ind]-t) > TOL
+			// std::cout << "ind: " << ind << ", elem: " << svec[ind] << std::endl;
 			if (ind == end) return -1;
-			else if (svec[ind] < t) ind = (ind+end+1)/2;
-			else if (svec[ind] > t) {
+			else if (comp(t,svec[ind])) ind = (ind+end+1)/2;
+			else if (comp(svec[ind],t)) {
 				end = ind;
 				ind /= 2;
 			}
@@ -209,6 +213,16 @@ namespace ed {
 	template<typename T> bool is_zero_arr(T* arr, int s) {
 		for (int i = 0; i < s; ++i) if (abs(arr[i]) > TOL) return false;
 		return true;
+	};
+
+	template<typename T> std::vector<size_t> top_n(std::vector<T> &arr, size_t top) {
+		// Takes in an array and returns top n elements index
+		std::vector<size_t> indices(arr.size());
+		std::iota(indices.begin(), indices.end(),0);
+		std::partial_sort(indices.begin(), indices.begin()+top, indices.end(),
+	                  [&](size_t i, size_t j) {return arr[i] > arr[j];});
+		indices.resize(top);
+		return indices;
 	};
 }
 

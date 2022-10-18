@@ -24,7 +24,7 @@ void tb() {
 		for (int c = 0; c < 5; c++) CF_TB[c] = CF[c] * m;
 		calc_coulomb(input,SC);
 		calc_CF(input,CF_TB);
-		input.hblks[0].diag_dsyev();
+		input.hblks[0].diagonalize();
 		vector<double> unique_eig = ed::printDistinct(input.hblks[0].eig,
 							input.hblks[0].eig[0],input.hblks[0].size,false);
 		auto min_eig = *min_element(unique_eig.begin(), unique_eig.end());
