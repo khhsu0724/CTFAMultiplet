@@ -43,29 +43,23 @@ Hilbert::Hilbert(string file_dir, vector<double*>& SC, double* FG, double* CF, d
 	read_from_file(file_dir);
 	num_vh -= is_ex;
 	num_ch += is_ex;
-	SO_on = !SO;
+	SO_on = SO;
 	CF_on = !ed::is_zero_arr(CF,5);
 	CV_on = (is_ex && !ed::is_zero_arr(FG,4));
-	bool BLOCK_DIAG = true;
-	// Assign Hash Function
-	if (BLOCK_DIAG) {
-		hashfunc = &Hilbert::sz_Hash;
-		hbfunc = &Hilbert::sz_Hashback;
-	} else {
-		hashfunc = &Hilbert::norm_Hash;
-		hbfunc = &Hilbert::norm_Hashback;
-	}
+	bool BLOCK_DIAG = !(edge == "L" && is_ex) || !SO_on;
 	int hv = num_vorb/2, hc = num_corb/2;
-	int max_2csz = hc - abs(hc-num_ch);
 	this->hsize = ed::choose(num_vorb,num_vh) * ed::choose(num_corb,num_ch);
-	this->max_2sz = hv - abs(hv-num_vh) + max_2csz;
 	size_t bfind = 0;
 	if (BLOCK_DIAG) {
-		// Sz ordered blocks
+		// Sz ordered blocks, when spin orbit coupling is not on
+		hashfunc = &Hilbert::sz_Hash;
+		hbfunc = &Hilbert::sz_Hashback;
+		int max_2csz = hc - abs(hc-num_ch);
+		int max_2sz = hv - abs(hv-num_vh) + max_2csz;
 		int core_comb = ed::choose(num_corb,num_ch);
 		hblks.reserve(max_2sz+1);
 		for (int sz = -max_2sz; sz <= max_2sz; sz+=2) {
-			vector<int> rank(core_comb,-1);
+			vector<ulli> rank(core_comb,-1);
 			ulli c = (1 << max_2csz) - 1; // This swaps between core/hole
 			size_t blksize = 0;
 			for (int i = 0; i < core_comb; ++i) {
@@ -79,7 +73,49 @@ Hilbert::Hilbert(string file_dir, vector<double*>& SC, double* FG, double* CF, d
 			hblks.emplace_back(double(sz)/2,0,0,blksize,bfind,rank);
 			bfind += blksize;
 		}
-	} else hblks.emplace_back(0,0,0,this->hsize);
+	} else if (false) {
+		// Jz ordered blocks, should not be used
+		hashfunc = &Hilbert::jz_Hash;
+		hbfunc = &Hilbert::jz_Hashback;
+		int min_2jz = 0, max_2jz = 0;
+		vector<ulli> hspace = enum_hspace();
+		vector<int> jz2_arr(hspace.size(),0);
+		for (auto & h : hspace) {
+			int jz2 = 0;
+			jz2 +=  ed::count_bits(h/(2<<(hc+hv))) - ed::count_bits(h%(2<<(hc+hv)));
+			for (auto & at : atlist) {
+				for (int i = at.sind; i <= at.eind; ++i) {
+					if (h & (1<<i)) jz2 += 2*(i-at.sind-at.l);
+					if (h & (1<<(i+hv+hc))) jz2 += 2*(i-at.sind-at.l);
+				}
+			}
+			jz2_arr[&h-&hspace[0]] = jz2;
+			if (jz2 < min_2jz) min_2jz = jz2;
+			if (jz2 > max_2jz) max_2jz = jz2;
+		}
+		// Calculate block size
+		vector<int> blk_size((max_2jz-min_2jz)/2+1,0);
+		for (int i = 0; i < hspace.size(); ++i) blk_size[(jz2_arr[i]-min_2jz)/2] += 1;
+		// Make Blocks
+		hblks.reserve(blk_size.size());
+		for (int j = min_2jz; j <= max_2jz; j += 2) {
+			hblks.emplace_back(0,double(j)/2,0,blk_size[(j-min_2jz)/2]);
+			bfind += blk_size[(j-min_2jz)/2];
+		}
+		for (int b = 0; b < hblks.size(); ++b) {
+			vector<ulli> rank;
+			for (int i = 0; i < hspace.size(); ++i) {
+				if ((jz2_arr[i]-min_2jz)/2 == b) rank.push_back(hspace[i]);
+			}
+			if (is_ex) std::sort(rank.begin(), rank.end(), std::greater<ulli>());
+			hblks[b].rank = std::move(rank);
+		}		
+	}
+	else {
+		hashfunc = &Hilbert::norm_Hash;
+		hbfunc = &Hilbert::norm_Hashback;
+		hblks.emplace_back(0,0,0,this->hsize);
+	}
 	// DEBUG
 	// vector<ulli> hspace = enum_hspace();
 	// if (is_ex) cout << "excited state" << endl;
@@ -92,6 +128,32 @@ Hilbert::Hilbert(string file_dir, vector<double*>& SC, double* FG, double* CF, d
 	// }
 	// for (auto & at : atlist) cout << at.atname << ", " << at.is_lig << endl;
 	// DEBUG
+}
+
+Hilbert::Hilbert(const Hilbert &hilbs, int vh_mod) {
+	// Copy constructor, vh_mod can be used for dummy hilbert spaces
+	num_vh = hilbs.num_vh + vh_mod;
+	num_ch = hilbs.num_ch;
+	num_vorb = hilbs.num_vorb;
+	num_corb = hilbs.num_corb;
+	SO_on = hilbs.SO_on;
+	CF_on = hilbs.CF_on;
+	CV_on = hilbs.CV_on;
+	HYB_on = hilbs.HYB_on;
+	num_at = hilbs.num_at;
+	at_per_site = hilbs.at_per_site;
+	val_ati = hilbs.val_ati;
+	val_ind = hilbs.val_ind;
+	coord = hilbs.coord;
+	edge = hilbs.edge;
+	atlist = hilbs.atlist;
+	sites = hilbs.sites;
+	if (!vh_mod) cout << "USING COPY CONSTRUCTOR IS NOT ADVISED" << endl;
+	hsize = ed::choose(num_vorb,num_vh) * ed::choose(num_corb,num_ch);
+	hashfunc = &Hilbert::norm_Hash;
+	hbfunc = &Hilbert::norm_Hashback;
+	// TODO: complete copy constructor for no vh_mod
+	return;
 }
 
 vector<ulli> Hilbert::enum_hspace(ulli inc_val, ulli inc_core, int vmod, int cmod) {
@@ -144,7 +206,7 @@ void Hilbert::fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs)
 	bindex rind = Hash(rhs);
 	if (lind.first == rind.first) hblks[lind.first]. \
 		ham[lind.second+hblks[lind.first].size*rind.second] += matelem;
-	else throw out_of_range("invalid matrix element entry");
+	else throw out_of_range("invalid block matrix element entry");
 	return;
 }
 
@@ -160,7 +222,7 @@ double Hilbert::Fsign(QN* op, ulli state, int opnum) {
 	return pow(-1,p);
 }
 
-// Need to test this out in the future
+// TODO: avoid duplication function as above
 double Hilbert::Fsign(ulli* op, ulli state, int opnum) {
 	int p = 0;
 	for (size_t i = 0; i < opnum; ++i) {
@@ -171,7 +233,6 @@ double Hilbert::Fsign(ulli* op, ulli state, int opnum) {
 	}
 	return pow(-1,p);
 }
-// Need to test this out in the future
 
 int Hilbert::orbind(ulli s) {
 	int i = 0;
@@ -184,6 +245,18 @@ int Hilbert::tot_site_num() {
 	int tsn = 1;
 	for (const auto& s : sites) tsn *= s;
 	return tsn; 
+}
+
+vector<double> Hilbert::get_all_eigval() {
+	vector<double> all_eig(hsize,0);
+	for (auto & blk : hblks) {
+		if (blk.eig == nullptr) 
+			throw out_of_range("invalid access of eigval");
+		for (size_t i = 0; i < blk.size; ++i) {
+			all_eig[i+blk.f_ind] = blk.eig[i];
+		}
+	}
+	return all_eig;
 }
 
 // Functions for file parsing
@@ -404,96 +477,7 @@ void Hilbert::read_from_file(string file_dir) {
 // 		return trace/p*(p-ed::choose(orb_avail-occ_num,k))/t_hsize;
 // 	} else return 0;
 // }
-
-// NEED TO FIX THESE
-
-// vector<double> Hilbert::momentum(double* eigvec, bool return_square) {
-// 	// Calculate L,S for specific eigenstate
-// 	vector<double> Lz(hmat_size,0), Lp(hmat_size,0), Lm(hmat_size,0), Sz(hmat_size,0), Sp(hmat_size,0), Sm(hmat_size,0);
-// 	double S2,L2,J2;
-// 	if (occ_num == 0 || occ_num == orb_avail) return vector<double>{0.0,0.0,0.0};
-// 	for (int j = 0; j < hmat_size; ++j) {
-// 		if (abs(eigvec[j]) > 1e-7) {
-// 			string state = state2bit(hmat[j]);
-// 			for (int k = 0; k < orb_avail; ++k) {
-// 				if (state[k] == '1') {
-// 					double ml = (k % (orb_avail/2)) - l;
-// 					Lz[j] += ml * eigvec[j];
-// 					// Calculate L+
-// 					string raise = state;
-// 					if (ml < l && state[k+1] == '0') {
-// 						raise[k] = '0';
-// 						raise[k+1] = '1';
-// 						Lp[sindex(bit2state(raise))] += sqrt((l-ml)*(l+ml+1)) * eigvec[j];
-// 					}
-// 					// Calculate L-
-// 					string lower = state;
-// 					if (ml > -l && state[k-1] == '0') {
-// 						lower[k] = '0';
-// 						lower[k-1] = '1';
-// 						Lm[sindex(bit2state(lower))] += sqrt((l+ml)*(l-ml+1)) * eigvec[j];
-// 					}
-// 					// Calculate Spin
-// 					if (k < (orb_avail/2)) {
-// 						// Calculate Sz
-// 						Sz[j] += 0.5 * eigvec[j];
-// 						// Calculate S-
-// 						int exchange = 0;
-// 						string slower = state;
-// 						if (state[k+orb_avail/2] == '0') {
-// 							for (int e = k; e < k+orb_avail/2; ++e) {
-// 								if (state[e] == '1') ++exchange;
-// 							}
-// 							slower[k] = '0';
-// 							slower[k+orb_avail/2] = '1';
-// 							Sm[sindex(bit2state(slower))] += pow(-1,exchange) * eigvec[j];
-// 						}
-// 					}
-// 					else {
-// 						// Calculate Sz
-// 						Sz[j] += -0.5 * eigvec[j];
-// 						// Calculate S+
-// 						int exchange = 0;
-// 						string sraise = state;
-// 						if (state[k-orb_avail/2] == '0') {
-// 							for (int e = k; e > k-orb_avail/2; --e) {
-// 								if (state[e] == '1') ++exchange;
-// 							}
-// 							sraise[k] = '0';
-// 							sraise[k-orb_avail/2] = '1';
-// 							Sp[sindex(bit2state(sraise))] += pow(-1,exchange) * eigvec[j];
-// 						}
-// 					}
-// 				}
-// 			}
-// 		} 
-// 	}
-// 	S2 = pow(ed::norm(Sz),2) + 0.5 * (pow(ed::norm(Sp),2) + pow(ed::norm(Sm),2));
-// 	L2 = pow(ed::norm(Lz),2) + 0.5 * (pow(ed::norm(Lp),2) + pow(ed::norm(Lm),2));
-// 	J2 = L2 + S2 + 2 * ed::dot(Lz,Sz) + ed::dot(Lm,Sp) + ed::dot(Lp,Sm);
-// 	if (abs(L2) < 1e-7) L2 = 0;
-// 	if (abs(S2) < 1e-7) S2 = 0;
-// 	if (return_square) return vector<double>{J2,L2,S2};
-// 	else {
-// 		double L = (-1+sqrt(1+4*L2))/2;
-// 		double S = (-1+sqrt(1+4*S2))/2;
-// 		double J = (-1+sqrt(1+4*J2))/2;
-// 		return vector<double>{J,L,S};
-// 	}
-// }
-
-// void Hilbert::momentum_check(double* mat, double* eig, double* eigvec) {
-// 	// Check Lz, L2, Sz, S2 for the matrix
-// 	double* L2 = new double[hmat_size]{0};
-// 	double* S2 = new double[hmat_size]{0};
-// 	cout << setw(10) << "eigval" << setw(10) << "J2" << setw(10) << "L2" << setw(10) << "S2" << endl;
-// 	for (int i = 0; i < hmat_size; ++i) {
-// 		double* j_evec = new double[hmat_size]{0};
-// 		for(int j = 0; j < hmat_size; ++j) j_evec[j] = eigvec[i*hmat_size+j];
-// 		vector<double> LS = momentum(j_evec,true);
-// 		cout << setw(10) << eig[i] << setw(10) << LS[0] << setw(10) << LS[1] << setw(10) << LS[2] << endl;
-// 	}
-// }
+// TODO: A function to label quantum number for states
 
 // Here is a nice collection of hash functions
 
@@ -541,7 +525,8 @@ bindex Hilbert::sz_Hash(ulli s) {
 	size_t hc = num_corb/2, hv = num_vorb/2;
 	int nsd = ed::count_bits(s % (1<<(hc+hv)));
 	int nsu = num_vh + num_ch - nsd;
-	size_t blk_ind = (this->max_2sz-nsd+nsu)/2;
+	int max_2sz = int(2*hblks.back().get_sz());
+	size_t blk_ind = (max_2sz-nsd+nsu)/2;
 	for (size_t i = 0; i < hc; ++i)
 		if (s & (1 << i)) cind += ed::choose(i,++cnt_c);
 	for (size_t i = 0; i < hc; ++i)
@@ -557,6 +542,7 @@ bindex Hilbert::sz_Hash(ulli s) {
 
 ulli Hilbert::sz_Hashback(bindex ind) {
 	// Hashback function that uses sz as main QN
+	int max_2sz = int(2*hblks.back().get_sz());
 	Block& blk = hblks[ind.first];
 	auto r = std::find_if(blk.rank.rbegin(), blk.rank.rend(),
 				[&](size_t e){return (e >= 0) && (ind.second >= e);});
@@ -586,3 +572,24 @@ ulli Hilbert::sz_Hashback(bindex ind) {
 	return ed::add_bits(vsd|(vsu<<hv),c,num_vorb,num_corb);
 }
 
+bindex Hilbert::jz_Hash(ulli s) {
+	// Hash function that uses jz as main QN
+	int hv = num_vorb/2, hc = num_corb/2;
+	int min_2jz = int(2*hblks[0].get_jz()), jz2 = 0;
+	jz2 +=  ed::count_bits(s/(2<<(hc+hv))) - ed::count_bits(s%(2<<(hc+hv)));
+	for (auto & at : atlist) {
+		for (int i = at.sind; i <= at.eind; ++i) {
+			if (s & (1<<i)) jz2 += 2*(i-at.sind-at.l);
+			if (s & (1<<(i+hv+hc))) jz2 += 2*(i-at.sind-at.l);
+		}
+	}
+	size_t bind = (jz2-min_2jz)/2;
+	return bindex(bind,ed::binary_search(hblks[bind].rank,s,
+						std::less<ulli>(),std::equal_to<ulli>()));
+}
+
+ulli Hilbert::jz_Hashback(bindex ind) {
+	// Hashback function that uses jz as main QN
+	return hblks[ind.first].rank[ind.second];
+
+}

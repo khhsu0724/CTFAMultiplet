@@ -100,7 +100,6 @@ public:
 	int num_at = 0, at_per_site = 0;
 	int val_ati = 0, val_ind = 0; // Index/Orbital index of first valence atom
 	int num_ch = 0, num_vh = 0, num_corb = 0, num_vorb = 0; // This is number of orbital*2 (number of electron sites)
-	int max_2sz = 0;
 	bool SO_on = false, CV_on = false, CF_on = false, HYB_on = false;
 	bool is_ex;
 	std::string coord = "none", edge; // Adjacency matrix for atoms, coordination
@@ -114,6 +113,7 @@ public:
 
 public:
 	Hilbert() {};
+	Hilbert(const Hilbert &hilbs, int vh_mod = 0);
 	~Hilbert() {};
 	explicit Hilbert(std::string file_dir, std::vector<double*>& SC, double* FG, double* CF
 					, double const& SO, bool HYB, std::string edge, bool is_ex = false);
@@ -127,6 +127,7 @@ public:
 	int orbind(ulli s);
 	int tot_site_num();
 	double pheshift(double trace, int k);
+	std::vector<double> get_all_eigval();
 
 	// Class for input file parsing
 	void make_atlist(std::string edge, const int& tm_per_site, const int& lig_per_site);
@@ -140,6 +141,8 @@ public:
 	ulli norm_Hashback(bindex ind);
 	bindex sz_Hash(ulli s);
 	ulli sz_Hashback(bindex ind);
+	bindex jz_Hash(ulli s);
+	ulli jz_Hashback(bindex ind);
 
 	// Need to fix these
 	// Maybe a copy constructor?????
