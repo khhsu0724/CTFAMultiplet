@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <numeric>
+#include <memory>
 #ifndef HELPER
 #define HELPER
 
@@ -111,7 +112,7 @@ namespace ed {
 	    for (int i = 0; i < n; i++) {
 	        int j;
 	        for (j = 0; j < i; j++)
-	           if (abs(arr[i] - arr[j]) < 1e-7)
+	           if (std::abs(arr[i] - arr[j]) < 1e-7)
 	               break;
 	        if (i == j) unique_val.push_back(arr[i]);
 	    }
@@ -211,7 +212,7 @@ namespace ed {
 	};
 
 	template<typename T> bool is_zero_arr(T* arr, int s) {
-		for (int i = 0; i < s; ++i) if (abs(arr[i]) > TOL) return false;
+		for (int i = 0; i < s; ++i) if (std::abs(arr[i]) > TOL) return false;
 		return true;
 	};
 

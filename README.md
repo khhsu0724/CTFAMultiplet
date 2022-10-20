@@ -1,6 +1,6 @@
 # ED
 Exact Diagonalization Code
-Different compilation method provided below, the code is precompiled for MacOS and can be run through INPUT
+Different compilation method provided below
 
 1. Compile with this command on MAC
 ```console
@@ -23,4 +23,10 @@ g++ -pedantic -L${MKLROOT}/lib -lmkl_scalapack_lp64 -lmkl_cdft_core -lmkl_intel_
 Compile it in NERSC Haswell (-pedantic will give a lot of warnings)
 ```console
 CC -std=c++1y -mkl="parallel" -O3 -fopenmp -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp
+```
+
+Compile it in Sherlock (needs gcc 6.3.0 to avoid compile errors)
+```console
+module load imkl gcc icc boost
+icpc -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -ldl -std=c++1y -O3 -fopenmp -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp -lm
 ```
