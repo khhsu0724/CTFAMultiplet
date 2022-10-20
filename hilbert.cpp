@@ -38,14 +38,15 @@ bool operator!=(const QN& qn1, const QN& qn2) {
 	return true;
 }
 
-Hilbert::Hilbert(string file_dir, vector<double*>& SC, double* FG, double* CF, double const& SO
-				, bool HYB, string edge, bool is_ex): is_ex(is_ex), HYB_on(HYB), edge(edge) {
+Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex): 
+					is_ex(is_ex), edge(edge) {
 	read_from_file(file_dir);
 	num_vh -= is_ex;
 	num_ch += is_ex;
-	SO_on = SO;
-	CF_on = !ed::is_zero_arr(CF,5);
-	CV_on = (is_ex && !ed::is_zero_arr(FG,4));
+	HYB_on = hparam.HYB || hparam.MLdelta;
+	SO_on = hparam.SO;
+	CF_on = !ed::is_zero_arr(hparam.CF,5);
+	CV_on = (is_ex && !ed::is_zero_arr(hparam.FG,4));
 	bool BLOCK_DIAG = !(edge == "L" && is_ex) || !SO_on;
 	int hv = num_vorb/2, hc = num_corb/2;
 	this->hsize = ed::choose(num_vorb,num_vh) * ed::choose(num_corb,num_ch);

@@ -4,13 +4,13 @@
 using namespace std;
 // Includes multiplet interaction
 
-double calc_U(double* gaunt1, double* gaunt2, double* SC, int size) {
+double calc_U(double* gaunt1, double* gaunt2, const double* SC, int size) {
 	double u = 0;
 	for (int i = 0; i < size; ++i) u += gaunt1[i] * gaunt2[i] * SC[i];
 	return u;
 }
 
-void calc_coulomb(Hilbert& hilbs, vector<double*>& SC) {
+void calc_coulomb(Hilbert& hilbs, const vector<double*>& SC) {
 	//Calculate Coulomb Matrix Element
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		int l = hilbs.atlist[i].l;
@@ -69,7 +69,7 @@ void calc_coulomb(Hilbert& hilbs, vector<double*>& SC) {
 	return;
 }
 
-vecd CFmat(int l, double* CF) {
+vecd CFmat(int l, const double* CF) {
 	// Crystal field present when the 2 state has same spin, hole language
 	vecd cfmat;
 	try {
@@ -85,7 +85,7 @@ vecd CFmat(int l, double* CF) {
 	return cfmat;
 }
 
-void calc_CF(Hilbert& hilbs, double* CF) {
+void calc_CF(Hilbert& hilbs, const double* CF) {
 	// Calculate Crystal Field, Charge Transfer Matrix Element
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		int l = hilbs.atlist[i].l;
@@ -108,7 +108,7 @@ void calc_CF(Hilbert& hilbs, double* CF) {
 	}
 }
 
-void calc_SO(Hilbert& hilbs, double lambda) {
+void calc_SO(Hilbert& hilbs, const double lambda) {
 	// Calculate Spin Orbit Coupling Matrix Element
 	if (lambda == 0) return;
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
@@ -136,7 +136,7 @@ void calc_SO(Hilbert& hilbs, double lambda) {
 	}
 }
 
-void calc_CV(Hilbert& hilbs, double* FG) {
+void calc_CV(Hilbert& hilbs, const double* FG) {
 	// Calculate core valence interactions
 	if (!hilbs.is_ex) return;
 	// int ci = 0, vi = 1;
@@ -170,7 +170,7 @@ void calc_CV(Hilbert& hilbs, double* FG) {
 	return;
 }
 
-vecd HYBmat(Hilbert& hilbs, double del) {
+vecd HYBmat(Hilbert& hilbs, const HParam& hparam) {
 	// Calculate Hybridization, charge transfer and crystal field energy
 	// !!!! Need to factor in different sites...how to do this?
 	// Can we identify what type of geomtery algorithmically
@@ -178,7 +178,7 @@ vecd HYBmat(Hilbert& hilbs, double del) {
 	// cout << "building hybdrization matrix" << endl;
 	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
 	vecd hybmat(nvo*nvo,0),tmatreal(nvo*nvo,0);
-	double t = 0.8;
+	double t = hparam.HYB, del = hparam.MLdelta;
 	double tpd = t, tpdz = t*0.45, tpdxy = t*0.45, tpdxz = t*0.45, tpdyz = t*0.45, tpppi = 0, tppsigma = t/3, tppzpi = 0;
 	// double tpd = 1, tpdz = 0.25, tpdxy = 0.225, tpdxz = 0.225, tpdyz = 0.225, tpppi = 0, tppsigma = 0.25, tppzpi = 0; // Temp place holdler
 	// Temporary implementation
@@ -268,23 +268,24 @@ vecd HYBmat(Hilbert& hilbs, double del) {
 	return tmatreal;
 }	
 
-void calc_HYB(Hilbert& hilbs, vector<double*>& SC) {
+void calc_HYB(Hilbert& hilbs, const HParam& hparam) {
 	// Charge Transfer and Hybridization
 	// Temperory implementation for square planar geometry
 	if (hilbs.at_per_site == 1) return;
 	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
 	double nd = 0;
 	for (auto &at : hilbs.atlist) if(!at.is_lig && at.is_val) nd = at.num_h;
-	double delta = nd * (SC[1][0] - SC[1][2]*2/63 - SC[1][4]*2/63);// This needs to be changed since 
+	double delta = nd * (hparam.SC[1][0] - hparam.SC[1][2]*2/63 - hparam.SC[1][4]*2/63);// This needs to be changed since 
 	int nh = hilbs.is_ex ? hilbs.num_vh+1 : hilbs.num_vh;
-	double U = (SC[1][0] - SC[1][2]*2/63 - SC[1][4]*2/63);
+	double U = (hparam.SC[1][0] - hparam.SC[1][2]*2/63 - hparam.SC[1][4]*2/63);
 	// delta = 0.7*nh*U-0.3;
 	delta = nh*U;
-	delta = 18.85;
+	delta = 19.28;
 
-	cout << "U: " << (SC[1][0]-SC[1][2]*2/63-SC[1][4]*2/63) << ", JH: " << (SC[1][2]/14+SC[1][4]/14);
-	cout << ", holes: " << nh << ", delta: " << delta << endl;
-	vecd hybmat = HYBmat(hilbs,delta);
+	cout << "U: " << (hparam.SC[1][0]-hparam.SC[1][2]*2/63-hparam.SC[1][4]*2/63);
+	cout << ", JH: " << (hparam.SC[1][2]/14+hparam.SC[1][4]/14);
+	cout << ", holes: " << nh << ", delta: " << hparam.MLdelta << ", t: " << hparam.HYB << endl;
+	vecd hybmat = HYBmat(hilbs,hparam);
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
 	// Loop through hyb matrix, TODO: Loop through each site
 	for (int i = 0; i < nvo; ++i) {

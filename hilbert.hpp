@@ -8,6 +8,17 @@ typedef unsigned long int uli;
 typedef std::pair<size_t,size_t> bindex;
 typedef std::vector<std::pair<ulli,ulli>> vpulli;
 
+struct HParam {
+	// Hilbert space parameters
+	double nedos = 0, SO = 0, HYB = 0, MLdelta = 0;
+	double SC2[5]{0}, SC1[3]{0}, FG[4]{0}, CF[5]{0};
+	std::vector<double*> SC;
+	HParam() {
+		SC.emplace_back(SC1);
+		SC.emplace_back(SC2);
+	};
+};
+
 int conv_lchar(char orb);
 bool ao_order(int n1, int l1, int n2, int l2);
 
@@ -115,8 +126,8 @@ public:
 	Hilbert() {};
 	Hilbert(const Hilbert &hilbs, int vh_mod = 0);
 	~Hilbert() {};
-	explicit Hilbert(std::string file_dir, std::vector<double*>& SC, double* FG, double* CF
-					, double const& SO, bool HYB, std::string edge, bool is_ex = false);
+	explicit Hilbert(std::string file_dir, const HParam& hparam, 
+						std::string edge, bool is_ex = false);
 	std::vector<ulli> enum_hspace(ulli inc_val = 0, ulli inc_core = 0, int vmod = 0, int cmod = 0);
 	ulli qn2ulli(int snum, QN* qn, bool only_val = false, bool only_core = false);
 	vpulli match(int snum, QN* lhs, QN* rhs);

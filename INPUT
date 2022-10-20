@@ -7,8 +7,9 @@
 	#FG = 7.4332 4.7576 6.3192 2.7072 #F^0,G^1,F^2,G^2
 	#FG = 4.0 4.635 6.18 2.63 #F^0,G^1,F^2,G^23
 	FG = 1.0 0.25 0 0 #F^0,G^1
-	CF = 0 0 1.9 1.9 1.9 #dx2y2, dz2, dxy, dxz, dyz
-	HYB = true
+	CF = 0 0 1.1 1.1 1.1 #dx2y2, dz2, dxy, dxz, dyz
+	HYB = 0.8
+	MLCT = 18.49
 	NEDOS = 1000 # Number of bins for XAS/RIXS
 	# PBC = Periodic Boundary Condition
 	# BLOCK = block diagonalization

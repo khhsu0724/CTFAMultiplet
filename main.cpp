@@ -9,17 +9,20 @@
 using namespace std;
 
 void tb() {
+	// This is pretty out of date
 	ofstream myfile;
     myfile.open ("./tb.txt");
+    HParam hparam;
 	double SC2[5] = {0,0,1*49,0,0.078*441};
 	double SC1[3] = {0,0,0};
 	vector<double*> SC;
 	SC.emplace_back(SC1);
 	SC.emplace_back(SC2);
+	hparam.SC = SC;
 	double CF[5] = {1,1,-2.0/3,-2.0/3,-2.0/3};
-	double FG[4]{0};
+	copy(CF,CF+5,hparam.CF);
 	for (double m = 0.5; m <= 50; m += 0.5) {
-		Hilbert input("./INPUT",SC,FG,CF,0,false,"L",false);
+		Hilbert input("./INPUT",hparam,"L",false);
 		double CF_TB[5]{0};
 		for (int c = 0; c < 5; c++) CF_TB[c] = CF[c] * m;
 		calc_coulomb(input,SC);
@@ -98,8 +101,7 @@ bool read_bool(string line, bool& tgt) {
 	return true;
 }
 
-void read_input(string IDIR, PM& pm, vector<double*> SC, double* FG, 
-				double* CF, double& SO, bool& HYB, double& nedos) {
+void read_input(string IDIR, PM& pm, HParam& hparam) {
 	string line;
 	ifstream input(IDIR);
 	try {
@@ -120,13 +122,14 @@ void read_input(string IDIR, PM& pm, vector<double*> SC, double* FG,
 						if (line[s] != ' ' && line[s] != '	' && line[s] != '=') p.push_back(line[s]);
 						else {
 							transform(p.begin(),p.end(),p.begin(),::toupper);
-							if (p == "SO") skip = read_num(line.substr(s+1,line.size()-1),&SO,1);
-							else if (p == "SC1") skip = read_num(line.substr(s+1,line.size()-1),SC[0],3);
-							else if (p == "SC2") skip = read_num(line.substr(s+1,line.size()-1),SC[1],5);
-							else if (p == "FG") skip = read_num(line.substr(s+1,line.size()-1),FG,4);
-							else if (p == "CF") skip = read_num(line.substr(s+1,line.size()-1),CF,5);
-							else if (p == "HYB") skip = read_bool(line.substr(s+1,line.size()-1),HYB);
-							else if (p == "NEDOS") skip = read_num(line.substr(s+1,line.size()-1),&nedos,1);
+							if (p == "SO") skip = read_num(line.substr(s+1,line.size()-1),&hparam.SO,1);
+							else if (p == "SC1") skip = read_num(line.substr(s+1,line.size()-1),hparam.SC[0],3);
+							else if (p == "SC2") skip = read_num(line.substr(s+1,line.size()-1),hparam.SC[1],5);
+							else if (p == "FG") skip = read_num(line.substr(s+1,line.size()-1),hparam.FG,4);
+							else if (p == "CF") skip = read_num(line.substr(s+1,line.size()-1),hparam.CF,5);
+							else if (p == "HYB") skip = read_num(line.substr(s+1,line.size()-1),&hparam.HYB,1);
+							else if (p == "MLCT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.MLdelta,1);
+							else if (p == "NEDOS") skip = read_num(line.substr(s+1,line.size()-1),&hparam.nedos,1);
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -187,36 +190,29 @@ void read_input(string IDIR, PM& pm, vector<double*> SC, double* FG,
 
 int main(int argc, char** argv){
 	PM pm;
-	double SO = 0, nedos = 0;
-	// Change SC Parameter here to l = 1 & l = 2
-	double SC2[5]{0}, SC1[3]{0}, FG[4]{0}, CF[5]{0};
-	vecd HYB_param; // Use vector since the size  is unknown
-	bool HYB;
-	vector<double*> SC;
-	SC.emplace_back(SC1);
-	SC.emplace_back(SC2);
-
+	HParam hparam; 
 	string IDIR = "./INPUT";
 	if (argc == 2) IDIR = string(argv[1]);
-	read_input(IDIR,pm,SC,FG,CF,SO,HYB,nedos);
+	read_input(IDIR,pm,hparam);
 	if (pm.edge == "K") {
-		if (FG[2] != 0 || FG[3] != 0) throw invalid_argument("invalid FG input");
+		if (hparam.FG[2] != 0 || hparam.FG[3] != 0) 
+			throw invalid_argument("invalid FG input");
 	} else if (pm.edge != "L") throw invalid_argument("invalid edge input");
 	// U = F^0 + 4*F^2 + 36*F^4
 
 	cout << "Input parameters" << endl;
-	cout << "SO: " << SO << "eV" << endl;
+	cout << "SO: " << hparam.SO << "eV" << endl;
 	cout << "SC1: ";
-	for (int i = 0; i < 3; ++i) cout << SC[0][i] << ", ";
+	for (int i = 0; i < 3; ++i) cout << hparam.SC[0][i] << ", ";
 	cout << endl << "SC2: ";
-	for (int i = 0; i < 5; ++i) cout << SC[1][i] << ", ";
+	for (int i = 0; i < 5; ++i) cout << hparam.SC[1][i] << ", ";
 	cout << endl << "FG: ";
-	for (int i = 0; i < 4; ++i) cout << FG[i] << ", ";
+	for (int i = 0; i < 4; ++i) cout << hparam.FG[i] << ", ";
 	cout << endl << "CF: ";
-	for (int i = 0; i < 5; ++i) cout << CF[i] << ", ";
+	for (int i = 0; i < 5; ++i) cout << hparam.CF[i] << ", ";
 	cout << endl;
-	if (HYB) cout << "yes HYB" << endl; 
-	else cout << "no HYB" << endl; 
+	cout << "HYB: " << hparam.HYB << endl; 
+	cout << "delta: " << hparam.MLdelta << endl; 
 	if (pm.RIXS) {
 		if (pm.eloss) cout << "Using energy loss" << endl;
 		else cout << "using omega/omega" << endl;
@@ -229,12 +225,12 @@ int main(int argc, char** argv){
 	cout << endl;
 	
 	// Adjust Slater Condor Parameter
-	SC[0][2] *= 25;
-	SC[1][2] *= 49;
-	SC[1][4] *= 441;
+	hparam.SC[0][2] *= 25;
+	hparam.SC[1][2] *= 49;
+	hparam.SC[1][4] *= 441;
 
-	if (pm.XAS) XAS(IDIR,SC,FG,CF,SO,HYB,nedos,pm);
-	if (pm.RIXS) RIXS(IDIR,SC,FG,CF,SO,HYB,nedos,pm);	
+	if (pm.XAS) XAS(IDIR,pm,hparam);
+	if (pm.RIXS) RIXS(IDIR,pm,hparam);	
 
 	return 0;
 }

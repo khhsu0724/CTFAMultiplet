@@ -1,13 +1,11 @@
 #ifndef DIAGONALIZE
 #define DIAGONALIZE
 #include "helper.hpp"
-#include <memory>
 #include <omp.h>
 #if defined __has_include && __has_include ("mkl.h") 
 #include "mkl.h" // Can we auto-detect if mkl is installed
 #include "mkl_lapacke.h"
 #endif
-
 
 typedef std::unique_ptr<double[]> uptrd;
 
@@ -21,11 +19,11 @@ private:
 	double *_ham, *_eig, *_eigvec; // Implicit pointer that faciliates diagonalization
 public:
 	size_t size, f_ind; // Accumulated first index of this Block
-	uptrd ham, eig, eigvec; // Use unique pointers that are auto-managed
+	uptrd ham, eig, eigvec;
 	std::vector<int> einrange;
 	std::vector<ulli> rank; // rank keeps some rank information for faster hashing
 	Block(double Sz, double Jz, double K, size_t size, size_t f_ind_in = 0,
-		std::vector<ulli> rank_in = std::vector<ulli>(0)): 
+		std::vector<ulli> rank_in = std::vector<ulli>(0)):
 		Sz(Sz), Jz(Jz), K(K), size(size), f_ind(f_ind_in) {
 		// Need to build something that prevents premature access of eig & eigvec
 		if (size > std::sqrt(SIZE_MAX)) throw std::overflow_error("matrix too large");

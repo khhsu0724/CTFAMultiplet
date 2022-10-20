@@ -1,5 +1,6 @@
 #include <vector>
 #include <complex>
+#include <chrono>
 #include "hilbert.hpp"
 #ifndef PHOTON
 #define PHOTON
@@ -21,8 +22,9 @@ struct PM {
 	}
 };
 
+std::string format_duration(std::chrono::milliseconds ms);
 std::complex<double> proj_pvec(int ml, const vecd& pvec);
-void calc_ham(Hilbert& hilbs, std::vector<double*>& SC, double* FG, double* CF, double const& SO);
+void calc_ham(Hilbert& hilbs, const HParam& hparam);
 void occupation(Hilbert& hilbs, const std::vector<bindex>& si);
 std::vector<double> wvfnc_weight(Hilbert& hilbs, const std::vector<bindex>& si, 
 								int ligNum = 3, bool print = false);
@@ -33,11 +35,9 @@ void peak_occupation(Hilbert& hilbs, vecd const& peak_en, vecd const& energy,
 void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, std::vector<dcomp>& blap, 
 					const PM& pm, bool pvout = false);
 void write_XAS(vecd const& aben, vecd const& intensity, std::string file_dir, bool print = true);
-void XAS(std::string input_dir, std::vector<double*>& SC, double* FG, double* CF, 
-			double SO, bool HYB, int nedos, const PM& pm);
+void XAS(std::string input_dir, const PM& pm, const HParam& hparam);
 void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, std::string file_dir, 
 				bool eloss, bool print = true);
-void RIXS(std::string input_dir, std::vector<double*>& SC, double* FG, double* CF, 
-			double SO, bool HYB, int nedos, const PM& pm);
+void RIXS(std::string input_dir, const PM& pm, const HParam& hparam);
 
 #endif
