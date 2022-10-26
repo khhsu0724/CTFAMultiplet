@@ -10,6 +10,8 @@ struct PM {
 	bool RIXS = false;
 	bool PE = false; // Photo Emission
 	bool eloss = true;
+	bool spin_flip = false;
+	int nedos = 0;
 	std::string edge;
 	std::vector<double> pvin, pvout;
 	PM(): XAS(false), RIXS(false), PE(false), eloss(true) {
@@ -22,9 +24,8 @@ struct PM {
 	}
 };
 
-std::string format_duration(std::chrono::milliseconds ms);
+std::string pol_str(const vecd& pvec);
 std::complex<double> proj_pvec(int ml, const vecd& pvec);
-void calc_ham(Hilbert& hilbs, const HParam& hparam);
 void occupation(Hilbert& hilbs, const std::vector<bindex>& si);
 std::vector<double> wvfnc_weight(Hilbert& hilbs, const std::vector<bindex>& si, 
 								int ligNum = 3, bool print = false);
@@ -35,9 +36,9 @@ void peak_occupation(Hilbert& hilbs, vecd const& peak_en, vecd const& energy,
 void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, std::vector<dcomp>& blap, 
 					const PM& pm, bool pvout = false);
 void write_XAS(vecd const& aben, vecd const& intensity, std::string file_dir, bool print = true);
-void XAS(std::string input_dir, const PM& pm, const HParam& hparam);
+void XAS(Hilbert& GS, Hilbert& EX, const PM& pm);
 void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, std::string file_dir, 
 				bool eloss, bool print = true);
-void RIXS(std::string input_dir, const PM& pm, const HParam& hparam);
+void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm);
 
 #endif

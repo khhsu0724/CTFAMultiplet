@@ -129,7 +129,6 @@ void read_input(string IDIR, PM& pm, HParam& hparam) {
 							else if (p == "CF") skip = read_num(line.substr(s+1,line.size()-1),hparam.CF,5);
 							else if (p == "HYB") skip = read_num(line.substr(s+1,line.size()-1),&hparam.HYB,1);
 							else if (p == "MLCT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.MLdelta,1);
-							else if (p == "NEDOS") skip = read_num(line.substr(s+1,line.size()-1),&hparam.nedos,1);
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -166,6 +165,13 @@ void read_input(string IDIR, PM& pm, HParam& hparam) {
 								skip = read_bool(line.substr(s+1,line.size()-1),el);
 								pm.set_eloss(el);
 							}
+							else if (p == "NEDOS") {
+								double nedos;
+								skip = read_num(line.substr(s+1,line.size()-1),&nedos,1);
+								cout << "testing testing: " << nedos << endl;
+								pm.nedos = (int)nedos;
+							}
+							else if (p == "SPINFLIP") skip = read_bool(line.substr(s+1,line.size()-1),pm.spin_flip);
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -180,7 +186,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam) {
 					read_control = false;
 				}
 			}
-		} else throw invalid_argument("Cannot open INPUT file");
+		} else throw invalid_argument("Cannot open " + IDIR + " file");
 	} catch (const exception &ex) {
 		cerr << ex.what() << "\n";
 		exit(0);
@@ -188,7 +194,81 @@ void read_input(string IDIR, PM& pm, HParam& hparam) {
 	return;
 }
 
+void process_hilbert_space(string input_dir, Hilbert& GS, Hilbert& EX, const PM& pm, const HParam& hparam) {
+	// Assembling Hamiltonian and Diagonalizing, returns partition function
+	double beta = 0;
+	cout << "Assembling Hamiltonian..." << endl;
+	auto start = chrono::high_resolution_clock::now();
+	calc_ham(GS,hparam);
+	// Different SC for excited state
+	double SC2[5]{6.054,0,10.7368,0,6.7152};
+	std::copy(hparam.SC[1],hparam.SC[1]+5,SC2);
+	calc_ham(EX,hparam);
+	auto stop = chrono::high_resolution_clock::now();
+	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+	cout << "Run time = " << duration.count() << " ms\n" << endl;
+
+	cout << "Diagonalizing Hamiltonian..." << endl;
+	auto diag_start = chrono::high_resolution_clock::now();
+	// #pragma omp parallel for schedule(static) num_threads(4)
+	cout << "Diagonalizing Ground State" << endl;
+	for (size_t g = 0; g < GS.hblks.size(); g++) {
+		cout << "Number of threads: " << mkl_get_max_threads() << endl;
+		start = chrono::high_resolution_clock::now();
+		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size << endl;
+		GS.hblks[g].diagonalize();
+		for (size_t i = 0; i < pow(GS.hblks[g].size,2); ++i) 
+			if (abs(GS.hblks[g].eigvec[i]) < TOL) GS.hblks[g].eigvec[i] = 0;
+		stop = chrono::high_resolution_clock::now();
+		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+		cout << "Run time = " << duration.count() << " ms\n" << endl;
+	}
+	double gs_en = GS.hblks[0].eig[0];
+	vector<bindex> gsi;
+	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.size; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
+	// Calculate Partition function
+	double Z = 0, emin = -25.0, emax = 25.0, SDegen = 0;
+	for (size_t i = 0; i < GS.hblks.size(); ++i) {
+	for (size_t j = 0; j < GS.hblks[i].size; ++j) {
+		if (abs(GS.hblks[i].eig[j]-gs_en) < TOL) {
+			Z += exp(-beta*GS.hblks[i].eig[j]);
+			if (abs(GS.hblks[i].get_sz()) >= SDegen) SDegen = abs(GS.hblks[i].get_sz());
+			gsi.push_back({i,j});
+		}
+	}}
+	cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
+	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
+	occupation(GS,gsi);
+	cout << "Ground State composition: ";
+	wvfnc_weight(GS,gsi,3,true);
+	cout << endl;
+	// effective_delta(GS,3);
+	// return;
+
+	// #pragma omp parallel for
+	cout << "Diagonalizing Core-Hole State" << endl;
+	for (size_t e = 0; e < EX.hblks.size(); e++) {
+		start = chrono::high_resolution_clock::now();
+		cout << "Number of threads: " << mkl_get_max_threads() << endl;
+		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
+		EX.hblks[e].diagonalize();
+		for (size_t i = 0; i < pow(EX.hblks[e].size,2); ++i) 
+			if (abs(EX.hblks[e].eigvec[i]) < TOL) EX.hblks[e].eigvec[i] = 0;
+		stop = chrono::high_resolution_clock::now();
+		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+		cout << "Run time = " << duration.count() << " ms\n" << endl;
+	}
+	auto diag_stop = chrono::high_resolution_clock::now();
+	duration = chrono::duration_cast<chrono::milliseconds>(diag_stop - diag_start);
+	cout << "Total diagonalize run time = " << duration.count() << " ms\n" << endl;
+	return;
+}
+
 int main(int argc, char** argv){
+	// Reading and Checking input parameters
+	auto run_start = chrono::high_resolution_clock::now();
+	cout << "Reading files..." << endl;
+	auto start = chrono::high_resolution_clock::now();
 	PM pm;
 	HParam hparam; 
 	string IDIR = "./INPUT";
@@ -223,14 +303,56 @@ int main(int argc, char** argv){
 	cout << endl << "pvout: ";
 	for (int i = 0; i < 3; ++i) cout << pm.pvout[i] << ", ";
 	cout << endl;
+
 	
 	// Adjust Slater Condor Parameter
 	hparam.SC[0][2] *= 25;
 	hparam.SC[1][2] *= 49;
 	hparam.SC[1][4] *= 441;
 
-	if (pm.XAS) XAS(IDIR,pm,hparam);
-	if (pm.RIXS) RIXS(IDIR,pm,hparam);	
+	if (!pm.XAS && !pm.RIXS) return 0; // Return if no photon methods
+	// Reading and Checking input parameters
+	Hilbert GS(IDIR,hparam,pm.edge,false);
+	Hilbert EX(IDIR,hparam,pm.edge,true);
+	auto stop = chrono::high_resolution_clock::now();
+	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+	cout << "Run time = " << duration.count() << " ms\n" << endl;
+	process_hilbert_space(IDIR,GS,EX,pm,hparam);
 
+	// Calculate Cross Sections
+	vector<double> pvin = pm.pvin, pvout = pm.pvout;
+	if (pm.XAS) {
+		for (size_t in = 0; in < 3; ++in) {
+			fill(pm.pvin.begin(), pm.pvin.end(), 0);
+			if (pvin[in]) pm.pvin[in] = 1;
+			else continue;
+			cout << "Doing photon polarization: ";
+			for (auto e : pm.pvin) cout << (int)e << " ";
+			cout << endl;
+			XAS(GS,EX,pm);
+		}
+	}
+	if (pm.RIXS) {
+		for (size_t in = 0; in < 3; ++in) {
+			fill(pm.pvin.begin(), pm.pvin.end(), 0);
+			if (pvin[in]) pm.pvin[in] = 1;
+			else continue;
+			for (size_t out = 0; out < 3; ++out) {
+				fill(pm.pvout.begin(), pm.pvout.end(), 0);
+				if (pvout[out]) pm.pvout[out] = 1;
+				else continue;
+				cout << "Doing photon polarization (in): ";
+				for (auto e : pm.pvin) cout << (int)e << " ";
+				cout << "(out): ";
+				for (auto e : pm.pvout) cout << (int)e << " ";
+				cout << endl;
+				RIXS(GS,EX,pm);
+			}
+		}
+	}
+
+	auto run_stop = chrono::high_resolution_clock::now();
+	cout << endl << "Total elapsed time: " << endl;
+	cout << ed::format_duration(chrono::duration_cast<chrono::milliseconds>(run_stop-run_start)) << endl;
 	return 0;
 }

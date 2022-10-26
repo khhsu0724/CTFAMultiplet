@@ -10,7 +10,8 @@ typedef std::vector<std::pair<ulli,ulli>> vpulli;
 
 struct HParam {
 	// Hilbert space parameters
-	double nedos = 0, SO = 0, HYB = 0, MLdelta = 0;
+	double nedos = 0; // PHASE OUT
+	double SO = 0, HYB = 0, MLdelta = 0;
 	double SC2[5]{0}, SC1[3]{0}, FG[4]{0}, CF[5]{0};
 	std::vector<double*> SC;
 	HParam() {

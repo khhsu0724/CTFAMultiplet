@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <numeric>
 #include <memory>
+#include <chrono>
 #ifndef HELPER
 #define HELPER
 
@@ -29,7 +30,7 @@ namespace ed {
 	int count_bits(ulli b);
 	void ctranspose(vecc& mat, size_t m, size_t n);
 	std::vector<int> distribute(int num_h, int num_at);
-	void sph2real(double* sph, double* tet);
+	std::string format_duration(std::chrono::milliseconds ms);
 
 	template <typename T> T dot(std::vector<T> a, std::vector<T> b) {
 		try {
@@ -198,9 +199,7 @@ namespace ed {
 	template<typename T, typename Fcomp, typename Feq>
 	size_t binary_search(std::vector<T> &svec, T t, Fcomp comp, Feq eq) {
 		size_t ind = svec.size()/2 - 1, end = svec.size() - 1;
-		// std::cout << "search target: " << t << ", vec size: " << svec.size() << std::endl;
-		while (!eq(svec[ind],t)) { //abs(svec[ind]-t) > TOL
-			// std::cout << "ind: " << ind << ", elem: " << svec[ind] << std::endl;
+		while (!eq(svec[ind],t)) { //abs(svec[ind]-t) > TOL 
 			if (ind == end) return -1;
 			else if (comp(t,svec[ind])) ind = (ind+end+1)/2;
 			else if (comp(svec[ind],t)) {
