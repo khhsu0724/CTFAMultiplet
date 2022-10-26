@@ -10,6 +10,16 @@ double calc_U(double* gaunt1, double* gaunt2, const double* SC, int size) {
 	return u;
 }
 
+void calc_ham(Hilbert& hilbs, const HParam& hparam) {
+	// Assemble Hamiltonian of the hilbert space
+	calc_coulomb(hilbs,hparam.SC); 
+	if (hilbs.SO_on) calc_SO(hilbs,hparam.SO);
+	if (hilbs.CF_on) calc_CF(hilbs,&hparam.CF[0]);
+	if (hilbs.CV_on) calc_CV(hilbs,&hparam.FG[0]);
+	if (hilbs.HYB_on) calc_HYB(hilbs,hparam);
+	return;
+}
+
 void calc_coulomb(Hilbert& hilbs, const vector<double*>& SC) {
 	//Calculate Coulomb Matrix Element
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {

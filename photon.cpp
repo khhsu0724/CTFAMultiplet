@@ -12,18 +12,11 @@ using namespace std;
 		initializer(omp_priv = decltype(omp_orig)(omp_orig.size()))
 
 // Contains photon based spectroscopy
-string format_duration(chrono::milliseconds ms) {
-    using namespace std::chrono;
-    auto secs = duration_cast<seconds>(ms);
-    ms -= duration_cast<milliseconds>(secs);
-    auto mins = duration_cast<minutes>(secs);
-    secs -= duration_cast<seconds>(mins);
-    auto hour = duration_cast<hours>(mins);
-    mins -= duration_cast<minutes>(hour);
-
-    std::stringstream ss;
-    ss << hour.count() << " Hours : " << mins.count() << " Minutes : " << secs.count() << " Seconds : " << ms.count() << " Milliseconds";
-    return ss.str();
+string pol_str(const vecd& pvec) {
+	if (pvec[0]) return "x";
+	if (pvec[1]) return "y";
+	if (pvec[2]) return "z";
+	return "";
 }
 
 dcomp proj_pvec(int ml, const vecd& pvec) {
@@ -38,16 +31,6 @@ dcomp proj_pvec(int ml, const vecd& pvec) {
 		std::cout << ex.what() << "\n";
 		exit(0);
 	}
-}
-
-void calc_ham(Hilbert& hilbs, const HParam& hparam) {
-	// Calculate Hamiltonian of the hilbert space
-	calc_coulomb(hilbs,hparam.SC); 
-	if (hilbs.SO_on) calc_SO(hilbs,hparam.SO);
-	if (hilbs.CF_on) calc_CF(hilbs,&hparam.CF[0]);
-	if (hilbs.CV_on) calc_CV(hilbs,&hparam.FG[0]);
-	if (hilbs.HYB_on) calc_HYB(hilbs,hparam);
-	return;
 }
 
 void occupation(Hilbert& hilbs, const vector<bindex>& si) {
@@ -136,10 +119,9 @@ vector<double> wvfnc_weight(Hilbert& hilbs, const vector<bindex>& si, int ligNum
 		}
 	}
 	if (print) {
-		cout << fixed << setprecision(5);
 		cout << "Ground State composition";
 		for (size_t i = 0; i < ligNum; ++i) {
-			cout << ", d" << 10-hilbs.num_vh+i << "L: " << dLweight[i];
+			cout << ", d" << 10-hilbs.num_vh+i << "L: " << fixed << setprecision(5) << dLweight[i];
 		}
 		cout << endl;
 	}
@@ -235,13 +217,12 @@ void peak_occupation(Hilbert& hilbs, vecd const& peak_en, vecd const& energy,
 void write_XAS(vecd const& aben, vecd const& intensity, string file_dir, bool print) {
 	std::ofstream xasfile;
 	xasfile.open(file_dir);
-	cout << fixed << setprecision(5);
 	xasfile << setw(15) << "peaks (eV)" << setw(15) << "intensity" << endl;
-	if (print) cout << setw(15) << "peaks" << setw(15) << "intensity" << endl;
+	if (print) cout << fixed << setprecision(5) << setw(15) << "peaks" << setw(15) << "intensity" << endl;
 	for (int i = 0; i < intensity.size(); ++i) {
 		if (intensity[i] < TOL) continue;
 		xasfile << setw(15) << aben[i] << setw(15) << intensity[i] << endl;
-		if (print) cout << setw(15) << aben[i] << setw(15) << intensity[i] << endl;
+		if (print) cout << fixed << setprecision(5) << setw(15) << aben[i] << setw(15) << intensity[i] << endl;
 	}
 	xasfile.close();
 }
@@ -272,49 +253,13 @@ void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, vector<dcomp>& blap,
 	return;
 }
 
-void XAS(string input_dir, const PM& pm, const HParam& hparam) {
+void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	// Note: different diagonalize routine might yield different results, 
 	// if the width of delta function is not small enough.
-	// TODO: in small Hilbert space, parallelize won't yield correct result, rewrite it
-	double beta = 0, nedos = hparam.nedos;//, racah_B = (SC[2]/49) - (5*SC[4]/441);
-	auto xas_start = chrono::high_resolution_clock::now();
+	double beta = 0, nedos = pm.nedos;//, racah_B = (SC[2]/49) - (5*SC[4]/441);
 
-	cout << "Reading files..." << endl;
-	auto start = chrono::high_resolution_clock::now();
-	Hilbert GS(input_dir,hparam,pm.edge,false);
-	Hilbert EX(input_dir,hparam,pm.edge,true);
-	auto stop = chrono::high_resolution_clock::now();
-	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-	cout << "Run time = " << duration.count() << " ms\n" << endl;
-
-	cout << "Assembling Hamiltonian..." << endl;
-	start = chrono::high_resolution_clock::now();
-	calc_ham(GS,hparam);
-	// Different SC for excited state
-	double SC2[5]{6.054,0,10.7368,0,6.7152};
-	std::copy(hparam.SC[1],hparam.SC[1]+5,SC2);
-	// hparam.SC[1] = SC2;
-	calc_ham(EX,hparam);
-	stop = chrono::high_resolution_clock::now();
-	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-	cout << "Run time = " << duration.count() << " ms\n" << endl;
-
-	cout << "Diagonalizing Hamiltonian..." << endl;
-	auto diag_start = chrono::high_resolution_clock::now();
-	// #pragma omp parallel for schedule(static) num_threads(4)
-	cout << "Diagonalizing Ground State" << endl;
-	for (size_t g = 0; g < GS.hblks.size(); g++) {
-		cout << "Number of threads: " << mkl_get_max_threads() << endl;
-		start = chrono::high_resolution_clock::now();
-		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size << endl;
-		GS.hblks[g].diagonalize();
-		for (size_t i = 0; i < pow(GS.hblks[g].size,2); ++i) 
-			if (abs(GS.hblks[g].eigvec[i]) < TOL) GS.hblks[g].eigvec[i] = 0;
-		stop = chrono::high_resolution_clock::now();
-		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-		cout << "Run time = " << duration.count() << " ms\n" << endl;
-	}
-
+	if (GS.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
+	if (EX.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
 	double gs_en = GS.hblks[0].eig[0];
 	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.size; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
 	vector<bindex> gsi; // index for ground state
@@ -328,34 +273,9 @@ void XAS(string input_dir, const PM& pm, const HParam& hparam) {
 			gsi.push_back({i,j});
 		}
 	}}
-	cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
-	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
-	occupation(GS,gsi);
-	cout << "Ground State composition: ";
-	wvfnc_weight(GS,gsi,3,true);
-	cout << endl;
-	// effective_delta(GS,3);
-	// return;
-
-	// #pragma omp parallel for
-	cout << "Diagonalizing Core-Hole State" << endl;
-	for (size_t e = 0; e < EX.hblks.size(); e++) {
-		start = chrono::high_resolution_clock::now();
-		cout << "Number of threads: " << mkl_get_max_threads() << endl;
-		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
-		EX.hblks[e].diagonalize();
-		for (size_t i = 0; i < pow(EX.hblks[e].size,2); ++i) 
-			if (abs(EX.hblks[e].eigvec[i]) < TOL) EX.hblks[e].eigvec[i] = 0;
-		stop = chrono::high_resolution_clock::now();
-		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-		cout << "Run time = " << duration.count() << " ms\n" << endl;
-	}
-	auto diag_stop = chrono::high_resolution_clock::now();
-	duration = chrono::duration_cast<chrono::milliseconds>(diag_stop - diag_start);
-	cout << "Total diagonalize run time = " << duration.count() << " ms\n" << endl;
 
 	cout << "Calculating cross section..." << endl;
-	start = chrono::high_resolution_clock::now();
+	auto start = chrono::high_resolution_clock::now();
 	vector<dcomp> blap;
 	vecd xas_aben(nedos,0), xas_int(nedos,0);
 	for (auto &exblk : EX.hblks) {
@@ -368,7 +288,7 @@ void XAS(string input_dir, const PM& pm, const HParam& hparam) {
 				basis_overlap(GS,EX,bindex(g.first,&exblk-&EX.hblks[0]),blap,pm);
 				last_gs_block = g.first;
 			}
-			#pragma omp parallel for reduction (vec_double_plus:xas_int) schedule(guided)
+			// #pragma omp parallel for reduction (vec_double_plus:xas_int) schedule(guided)
 			for (size_t ei = 0; ei < exblk.size; ++ei) {
 				if (exblk.eig[ei]-gs_en < emin || exblk.eig[ei]-gs_en > emax) continue;
 				dcomp cs = 0;
@@ -390,18 +310,14 @@ void XAS(string input_dir, const PM& pm, const HParam& hparam) {
 			}
 		}
 	}
-	// Calculate peak intensity
+	// Calculate peak intensity, TODO: output peaks?
 	peak_occupation(EX,vecd({4}),xas_aben,xas_int,gs_en,"top");
 
-	stop = chrono::high_resolution_clock::now();
-	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+	auto stop = chrono::high_resolution_clock::now();
+	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n";
 	cout << "Writing results..." << endl << endl;
-	write_XAS(xas_aben,xas_int,"xas_peaks.txt");
-
-	auto xas_stop = chrono::high_resolution_clock::now();
-	cout << endl << "Total elapsed time: " << endl;
-	cout << format_duration(chrono::duration_cast<chrono::milliseconds>(xas_stop-xas_start)) << endl;
+	write_XAS(xas_aben,xas_int,"xas_"+pol_str(pm.pvin)+".txt");
 	return;
 }
 
@@ -432,62 +348,17 @@ void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, string file_d
 	return;
 }
 
-void RIXS(string input_dir, const PM& pm, const HParam& hparam) {
-
-	bool sf = true, nsf = true; // Spin Flip & No Spin Flip
-	double beta = 0, hbar = 6.58e-16, nedos = hparam.nedos;
-	auto xas_start = chrono::high_resolution_clock::now();
+void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
+	double beta = 0, hbar = 6.58e-16, nedos = pm.nedos;
 	// double Racah_B = (SC[2]/49) - (5*SC[4]/441);
 	dcomp igamma(0,1*0.1);
 
-	cout << "Reading files..." << endl;
-	auto start = chrono::high_resolution_clock::now();
-	Hilbert GS(input_dir,hparam,pm.edge,false);
-	Hilbert EX(input_dir,hparam,pm.edge,true);
-	auto stop = chrono::high_resolution_clock::now();
-	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-	cout << "Run time = " << duration.count() << " ms\n" << endl;
-
-	cout << "Assembling Hamiltonian..." << endl;
-	start = chrono::high_resolution_clock::now();
-	calc_ham(GS,hparam);
-	calc_ham(EX,hparam);
-	stop = chrono::high_resolution_clock::now();
-	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-	cout << "Run time = " << duration.count() << " ms\n" << endl;
-
-	cout << "Diagonalizing Hamiltonian..." << endl;
-	auto diag_start = chrono::high_resolution_clock::now();
-	cout << "Diagonalizing Ground State" << endl;
-	for (size_t g = 0; g < GS.hblks.size(); g++) {
-		start = chrono::high_resolution_clock::now();
-		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size << endl;
-		GS.hblks[g].diagonalize();
-		for (size_t i = 0; i < pow(GS.hblks[g].size,2); ++i) 
-			if (abs(GS.hblks[g].eigvec[i]) < TOL) GS.hblks[g].eigvec[i] = 0;
-		stop = chrono::high_resolution_clock::now();
-		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-		cout << "Run time = " << duration.count() << " ms\n" << endl;
-	}
-	cout << "Diagonalizing Core-Hole State" << endl;
-	for (size_t e = 0; e < EX.hblks.size(); e++) {
-		start = chrono::high_resolution_clock::now();
-		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
-		EX.hblks[e].diagonalize();
-		for (size_t i = 0; i < pow(EX.hblks[e].size,2); ++i) 
-			if (abs(EX.hblks[e].eigvec[i]) < TOL) EX.hblks[e].eigvec[i] = 0;
-		stop = chrono::high_resolution_clock::now();
-		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-		cout << "Run time = " << duration.count() << " ms\n" << endl;
-	}
-	auto diag_stop = chrono::high_resolution_clock::now();
-	duration = chrono::duration_cast<chrono::milliseconds>(diag_stop - diag_start);
-	cout << "Total diagonalize run time = " << duration.count() << " ms\n" << endl;
+	if (GS.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
+	if (EX.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
 
 	double gs_en = GS.hblks[0].eig[0];
 	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.size; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
 	vector<bindex> gsi,exi; // index for ground state and excited states
-	// Calculate Partition function
 	double Z = 0, ab_emin = -25.0, ab_emax = 25.0, elm_min, elm_max;
 	if (pm.eloss) { // Energy Loss
 		elm_max = 15;
@@ -523,24 +394,21 @@ void RIXS(string input_dir, const PM& pm, const HParam& hparam) {
 			if (!is_dup) exen.push_back(exblk.eig[ei]);
 		}
 	}
-	sort(exen.begin(),exen.end());
 
-	cout << "ground state degeneracy: " << gsi.size() << ", excited state levels: " << exen.size() << endl;
-	cout << "gsen: " << gs_en << ", exen: ";
-	for (auto & e : exen) cout << e << ", ";
-	cout << endl << "index: ";
-	
+	sort(exen.begin(),exen.end());
 	if (exen.size() > 1) { // Skip this if there are less than 1 excited state
 		for (auto &exblk : EX.hblks) {
+		cout << "binary search EX blk number: " << &exblk-&EX.hblks[0] << endl;
+		#pragma omp parallel for shared(exblk)
 		for (size_t ei = 0; ei < exblk.size; ++ei) {
 			if (exblk.einrange[ei] == -1) continue;
-			exblk.einrange[ei] = ed::binary_search(exen,exblk.eig[ei],std::greater<int>(),
+			exblk.einrange[ei] = ed::binary_search(exen,exblk.eig[ei],std::greater<double>(),
 					[&](double a, double b){return abs(a-b) < TOL;});
 		}}
 	}
 
 	cout << "Calculating cross section..." << endl;
-	start = chrono::high_resolution_clock::now();
+	auto start = chrono::high_resolution_clock::now();
 
 	// Calculate and store <v|D|i>
 	vecd rixs_em(nedos,0),rixs_ab(nedos,0),rixs_loss(nedos,0),rixs_peaks(nedos*nedos,0);
@@ -647,38 +515,15 @@ void RIXS(string input_dir, const PM& pm, const HParam& hparam) {
 						rixs_em[elmind] = exen[e]-fsblk.eig[fi];
 					}
 					rixs_peaks[elmind*nedos+abind] += exp(-beta*gs_en)*pow(abs(csum[g*exen.size()+e]),2);
-
-					// Find occupation of f/v here
-					if (exen[e]-gs_en > -0.5 && exen[e]-gs_en < -0.4) { // Absorptioin
-						if (exen[e]-fsblk.eig[fi] > -2.4 && exen[e]-fsblk.eig[fi] < -2.3) { // Emission
-							cout << "calculate peak" <<  endl;
-							bindex fvind = bindex(&fsblk-&GS.hblks[0],fi);
-							if (!peak_occ_em.empty() && peak_occ_em.back() == fvind) continue;
-							cout << fvind.first << "," << fvind.second << endl;
-							peak_occ_em.push_back(fvind);
-						}
-					} 
-					// Find occupation of f/v here
 				}
 			}
 		}
 	}}
 
-	cout << "ground state number:" << peak_occ_ab.size() << endl;
-	occupation(GS,gsi);
-	cout << "final state number:" << peak_occ_em.size() << endl;
-	occupation(GS,peak_occ_em);
-
-
-	stop = chrono::high_resolution_clock::now();
-	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+	auto stop = chrono::high_resolution_clock::now();
+	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n";
 	cout << "Writing results..." << endl << endl;
-	write_RIXS(rixs_peaks,rixs_ab,rixs_em,"rixs_peaks.txt",pm.eloss);
-
-		auto xas_stop = chrono::high_resolution_clock::now();
-	cout << endl << "Total elapsed time: " << endl;
-	cout << format_duration(chrono::duration_cast<chrono::milliseconds>(xas_stop-xas_start)) << endl;
-
+	write_RIXS(rixs_peaks,rixs_ab,rixs_em,"rixs_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt",pm.eloss);
 	return;
 }

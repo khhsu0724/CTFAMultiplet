@@ -27,6 +27,6 @@ CC -std=c++1y -mkl="parallel" -O3 -fopenmp -o main main.cpp diagonalize.cpp gaun
 
 Compile it in Sherlock (needs gcc 6.3.0 to avoid compile errors)
 ```console
-module load imkl gcc icc boost
+module load imkl icc boost gcc
 icpc -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -ldl -std=c++1y -O3 -fopenmp -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp -lm
 ```

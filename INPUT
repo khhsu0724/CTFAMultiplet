@@ -4,20 +4,19 @@
 	#SC2 = 6.05 0 0.12857 0 0.025 #F_0,2,4 for l = 2
 	#SC2 = 6.103 0 0.2227 0 0.0181 # PhysRevB.55.4257
 	SC2 = 6.0215 0 0.206 0 0.01436
-	#FG = 7.4332 4.7576 6.3192 2.7072 #F^0,G^1,F^2,G^2
+	FG = 7.4332 4.7576 6.3192 2.7072 #F^0,G^1,F^2,G^2
 	#FG = 4.0 4.635 6.18 2.63 #F^0,G^1,F^2,G^23
 	FG = 1.0 0.25 0 0 #F^0,G^1
 	CF = 0 0 1.1 1.1 1.1 #dx2y2, dz2, dxy, dxz, dyz
 	HYB = 0.8
 	MLCT = 18.49
-	NEDOS = 1000 # Number of bins for XAS/RIXS
 	# PBC = Periodic Boundary Condition
 	# BLOCK = block diagonalization
 /
 &CELL
 	Coordination = "Square Planar" # Defaults to no coordination
 	Sites = 1 # x,y,z, Defaults to 1 site
-	Holes = 4 # If this is read then &Atom's will be skipped
+	Holes = 2 # If this is read then &Atom's will be skipped
 /
 &ATOMS
 	# Each line is a site, with atoms and ligands in the site
@@ -27,11 +26,12 @@
 /
 &PHOTON
 	XAS = true
-	RIXS = false
+	RIXS = true
 	pvin = 1 0 0
 	pvout = 0 0 1
 	Edge = K
 	Eloss = false
-	# SPIN FLIP IMPLEMENTATION
+	NEDOS = 1000 # Number of bins for XAS/RIXS
+	spinflip = true # RIXS spin flip
 &HYB # Fill in information about hybdridization matrix
 /
