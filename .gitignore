@@ -35,4 +35,7 @@
 *.txt
 ./XAS_DATA
 ./RIXS_DATA
+./WORK_DIR
+./DATA_DIR
 .DS_Store
+Submit_slurm.ipynb
