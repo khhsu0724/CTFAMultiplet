@@ -13,9 +13,9 @@ using namespace std;
 
 // Contains photon based spectroscopy
 string pol_str(const vecd& pvec) {
-	if (pvec[0]) return "x";
-	if (pvec[1]) return "y";
-	if (pvec[2]) return "z";
+	if (pvec[0]) return "X";
+	if (pvec[1]) return "Y";
+	if (pvec[2]) return "Z";
 	return "";
 }
 
@@ -121,7 +121,11 @@ vector<double> wvfnc_weight(Hilbert& hilbs, const vector<bindex>& si, int ligNum
 	if (print) {
 		cout << "Ground State composition";
 		for (size_t i = 0; i < ligNum; ++i) {
-			cout << ", d" << 10-hilbs.num_vh+i << "L: " << fixed << setprecision(5) << dLweight[i];
+			cout << ", d" << 10-hilbs.num_vh+i;
+			if (i == 1) cout << "L: ";
+			else if (i > 1) cout << "L" << i << ": ";
+			else cout << ": ";
+			cout  << fixed << setprecision(5) << dLweight[i];
 		}
 		cout << endl;
 	}
@@ -317,7 +321,7 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n";
 	cout << "Writing results..." << endl << endl;
-	write_XAS(xas_aben,xas_int,"xas_"+pol_str(pm.pvin)+".txt");
+	write_XAS(xas_aben,xas_int,"XAS_"+pm.edge+"edge_"+pol_str(pm.pvin)+".txt");
 	return;
 }
 
@@ -524,6 +528,6 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n";
 	cout << "Writing results..." << endl << endl;
-	write_RIXS(rixs_peaks,rixs_ab,rixs_em,"rixs_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt",pm.eloss);
+	write_RIXS(rixs_peaks,rixs_ab,rixs_em,"RIX_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt",pm.eloss);
 	return;
 }
