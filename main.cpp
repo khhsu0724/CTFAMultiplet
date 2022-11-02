@@ -168,7 +168,6 @@ void read_input(string IDIR, PM& pm, HParam& hparam) {
 							else if (p == "NEDOS") {
 								double nedos;
 								skip = read_num(line.substr(s+1,line.size()-1),&nedos,1);
-								cout << "testing testing: " << nedos << endl;
 								pm.nedos = (int)nedos;
 							}
 							else if (p == "SPINFLIP") skip = read_bool(line.substr(s+1,line.size()-1),pm.spin_flip);
