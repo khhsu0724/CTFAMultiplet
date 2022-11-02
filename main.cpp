@@ -3,8 +3,17 @@
 #include <stdlib.h>
 #include <bitset>
 #include <regex>
+#include <fstream>
 #include "multiplet.hpp"
 #include "photon.hpp"
+
+#ifdef WINDOWS
+    #include <direct.h>
+    #define GetCurrentDir _getcwd
+#else
+    #include <unistd.h>
+    #define GetCurrentDir getcwd
+ #endif
 
 using namespace std;
 
@@ -101,7 +110,7 @@ bool read_bool(string line, bool& tgt) {
 	return true;
 }
 
-void read_input(string IDIR, PM& pm, HParam& hparam) {
+void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 	string line;
 	ifstream input(IDIR);
 	try {
@@ -129,6 +138,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam) {
 							else if (p == "CF") skip = read_num(line.substr(s+1,line.size()-1),hparam.CF,5);
 							else if (p == "HYB") skip = read_num(line.substr(s+1,line.size()-1),&hparam.HYB,1);
 							else if (p == "MLCT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.MLdelta,1);
+							else if (p == "OVERWRITE") skip = read_bool(line.substr(s+1,line.size()-1),overwrite);
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -191,6 +201,18 @@ void read_input(string IDIR, PM& pm, HParam& hparam) {
 		exit(0);
 	}
 	return;
+}
+
+bool if_photon_file_exist(const string edge, const string work_dir, bool is_XAS, 
+							const vecd& pvin, const vecd& pvout = vecd(3,0)) {
+	string pfname = work_dir;
+	if (is_XAS) pfname += "/XAS_"+edge+"edge_"+pol_str(pvin)+".txt";
+	else pfname += "/RIX_"+edge+"edge_"+pol_str(pvin)+"_"+pol_str(pvout)+".txt";
+	ifstream pfile(pfname.c_str());
+	if (pfile.good()) {
+		cout << "file: " << pfname << " exists, skipping..." << endl;
+	}
+	return pfile.good();
 }
 
 void process_hilbert_space(string input_dir, Hilbert& GS, Hilbert& EX, const PM& pm, const HParam& hparam) {
@@ -264,15 +286,20 @@ void process_hilbert_space(string input_dir, Hilbert& GS, Hilbert& EX, const PM&
 }
 
 int main(int argc, char** argv){
+	char CurrentPath[FILENAME_MAX];
+	if (!GetCurrentDir(CurrentPath, sizeof(CurrentPath))) {return errno;}
+	string work_dir(CurrentPath);
+	cout << "The working directory is: " << work_dir << endl;
 	// Reading and Checking input parameters
 	auto run_start = chrono::high_resolution_clock::now();
 	cout << "Reading files..." << endl;
 	auto start = chrono::high_resolution_clock::now();
 	PM pm;
 	HParam hparam; 
+	bool overwrite = false;
 	string IDIR = "./INPUT";
 	if (argc == 2) IDIR = string(argv[1]);
-	read_input(IDIR,pm,hparam);
+	read_input(IDIR,pm,hparam,overwrite);
 	if (pm.edge == "K") {
 		if (hparam.FG[2] != 0 || hparam.FG[3] != 0) 
 			throw invalid_argument("invalid FG input");
@@ -325,6 +352,7 @@ int main(int argc, char** argv){
 			fill(pm.pvin.begin(), pm.pvin.end(), 0);
 			if (pvin[in]) pm.pvin[in] = 1;
 			else continue;
+			if (if_photon_file_exist(pm.edge,work_dir,true,pvin) && !overwrite) continue;
 			cout << "Doing photon polarization: ";
 			for (auto e : pm.pvin) cout << (int)e << " ";
 			cout << endl;
@@ -340,6 +368,7 @@ int main(int argc, char** argv){
 				fill(pm.pvout.begin(), pm.pvout.end(), 0);
 				if (pvout[out]) pm.pvout[out] = 1;
 				else continue;
+				if (if_photon_file_exist(pm.edge,work_dir,false,pvin,pvout) && !overwrite) continue;
 				cout << "Doing photon polarization (in): ";
 				for (auto e : pm.pvin) cout << (int)e << " ";
 				cout << "(out): ";
