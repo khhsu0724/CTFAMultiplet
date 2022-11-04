@@ -188,8 +188,8 @@ vecd HYBmat(Hilbert& hilbs, const HParam& hparam) {
 	// cout << "building hybdrization matrix" << endl;
 	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
 	vecd hybmat(nvo*nvo,0),tmatreal(nvo*nvo,0);
-	double t = hparam.HYB, del = hparam.MLdelta;
-	double tpd = t, tpdz = t*0.45, tpdxy = t*0.45, tpdxz = t*0.45, tpdyz = t*0.45, tpppi = 0, tppsigma = t/3, tppzpi = 0;
+	double t = hparam.tpd, del = hparam.MLdelta, tpp = hparam.tpp;
+	double tpd = t, tpdz = t*0.25, tpdxy = t*0.45, tpdxz = t*0.45, tpdyz = t*0.45, tpppi = 0*tpp, tppsigma = tpp, tppzpi = 0*tpp;
 	// double tpd = 1, tpdz = 0.25, tpdxy = 0.225, tpdxz = 0.225, tpdyz = 0.225, tpppi = 0, tppsigma = 0.25, tppzpi = 0; // Temp place holdler
 	// Temporary implementation
 	// Omit tpppi since it will give imaginary number
@@ -294,7 +294,7 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam) {
 
 	cout << "U: " << (hparam.SC[1][0]-hparam.SC[1][2]*2/63-hparam.SC[1][4]*2/63);
 	cout << ", JH: " << (hparam.SC[1][2]/14+hparam.SC[1][4]/14);
-	cout << ", holes: " << nh << ", delta: " << hparam.MLdelta << ", t: " << hparam.HYB << endl;
+	cout << ", holes: " << nh << ", delta: " << hparam.MLdelta << ", tpd: " << hparam.tpd << ", tpp: " << hparam.tpp << endl;
 	vecd hybmat = HYBmat(hilbs,hparam);
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
 	// Loop through hyb matrix, TODO: Loop through each site

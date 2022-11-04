@@ -126,18 +126,28 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 				}
 				if (read_control) {
 					string p;
-					bool skip = false;
+					bool skip = false, SC2EX_read = false;
 					for (int s = 0; s < line.size() && !skip; ++s) {
 						if (line[s] != ' ' && line[s] != '	' && line[s] != '=') p.push_back(line[s]);
 						else {
 							transform(p.begin(),p.end(),p.begin(),::toupper);
 							if (p == "SO") skip = read_num(line.substr(s+1,line.size()-1),&hparam.SO,1);
 							else if (p == "SC1") skip = read_num(line.substr(s+1,line.size()-1),hparam.SC[0],3);
-							else if (p == "SC2") skip = read_num(line.substr(s+1,line.size()-1),hparam.SC[1],5);
+							else if (p == "SC2") {
+								skip = read_num(line.substr(s+1,line.size()-1),hparam.SC[1],5);
+								if (!SC2EX_read) read_num(line.substr(s+1,line.size()-1),hparam.SC2EX,5);
+							}
+							else if (p == "SC2EX") {
+								SC2EX_read = true;
+								skip = read_num(line.substr(s+1,line.size()-1),hparam.SC2EX,5);
+							}
 							else if (p == "FG") skip = read_num(line.substr(s+1,line.size()-1),hparam.FG,4);
 							else if (p == "CF") skip = read_num(line.substr(s+1,line.size()-1),hparam.CF,5);
-							else if (p == "HYB") skip = read_num(line.substr(s+1,line.size()-1),&hparam.HYB,1);
+							else if (p == "HYB") skip = read_bool(line.substr(s+1,line.size()-1),hparam.HYB);
+							else if (p == "TPD") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpd,1);
+							else if (p == "TPP") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpp,1);
 							else if (p == "MLCT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.MLdelta,1);
+							else if (p == "BLOCK") skip = read_bool(line.substr(s+1,line.size()-1),hparam.block_diag);
 							else if (p == "OVERWRITE") skip = read_bool(line.substr(s+1,line.size()-1),overwrite);
 							p = "";
 						}
@@ -215,15 +225,14 @@ bool if_photon_file_exist(const string edge, const string work_dir, bool is_XAS,
 	return pfile.good();
 }
 
-void process_hilbert_space(string input_dir, Hilbert& GS, Hilbert& EX, const PM& pm, const HParam& hparam) {
+void process_hilbert_space(string input_dir, Hilbert& GS, Hilbert& EX, const PM& pm, HParam& hparam) {
 	// Assembling Hamiltonian and Diagonalizing, returns partition function
 	double beta = 0;
 	cout << "Assembling Hamiltonian..." << endl;
 	auto start = chrono::high_resolution_clock::now();
 	calc_ham(GS,hparam);
-	// Different SC for excited state
-	double SC2[5]{6.054,0,10.7368,0,6.7152};
-	std::copy(hparam.SC[1],hparam.SC[1]+5,SC2);
+	hparam.SC.pop_back();
+	hparam.SC.push_back(hparam.SC2EX);
 	calc_ham(EX,hparam);
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -257,7 +266,7 @@ void process_hilbert_space(string input_dir, Hilbert& GS, Hilbert& EX, const PM&
 			gsi.push_back({i,j});
 		}
 	}}
-	cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
+	if (hparam.block_diag) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
 	occupation(GS,gsi);
 	cout << "Ground State composition: ";
@@ -310,14 +319,20 @@ int main(int argc, char** argv){
 	cout << "SO: " << hparam.SO << "eV" << endl;
 	cout << "SC1: ";
 	for (int i = 0; i < 3; ++i) cout << hparam.SC[0][i] << ", ";
-	cout << endl << "SC2: ";
+	cout << endl << "SC2 for GS: ";
 	for (int i = 0; i < 5; ++i) cout << hparam.SC[1][i] << ", ";
+	cout << endl << "SC2 for EX: ";
+	for (int i = 0; i < 5; ++i) cout << hparam.SC2EX[i] << ", ";
 	cout << endl << "FG: ";
 	for (int i = 0; i < 4; ++i) cout << hparam.FG[i] << ", ";
 	cout << endl << "CF: ";
 	for (int i = 0; i < 5; ++i) cout << hparam.CF[i] << ", ";
 	cout << endl;
-	cout << "HYB: " << hparam.HYB << endl; 
+	if (hparam.HYB) {
+		cout << "Hybridization turned on: "; 
+		cout << "tpd = " << hparam.tpd; 
+		cout << ", tpp = " << hparam.tpp << endl; 
+	} else cout << "Hybridization turned off" << endl; 
 	cout << "delta: " << hparam.MLdelta << endl; 
 	if (pm.RIXS) {
 		if (pm.eloss) cout << "Using energy loss" << endl;
@@ -335,6 +350,8 @@ int main(int argc, char** argv){
 	hparam.SC[0][2] *= 25;
 	hparam.SC[1][2] *= 49;
 	hparam.SC[1][4] *= 441;
+	hparam.SC2EX[2] *= 49;
+	hparam.SC2EX[4] *= 441;
 
 	if (!pm.XAS && !pm.RIXS) return 0; // Return if no photon methods
 	// Reading and Checking input parameters
