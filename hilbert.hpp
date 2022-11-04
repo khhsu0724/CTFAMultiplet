@@ -11,8 +11,10 @@ typedef std::vector<std::pair<ulli,ulli>> vpulli;
 struct HParam {
 	// Hilbert space parameters
 	double nedos = 0; // PHASE OUT
-	double SO = 0, HYB = 0, MLdelta = 0;
-	double SC2[5]{0}, SC1[3]{0}, FG[4]{0}, CF[5]{0};
+	double SO = 0, MLdelta = 0;
+	double tpd = 0, tpp = 0;
+	double SC2[5]{0}, SC1[3]{0}, FG[4]{0}, CF[5]{0}, SC2EX[5]{0};
+	bool block_diag = true, HYB = true;
 	std::vector<double*> SC;
 	HParam() {
 		SC.emplace_back(SC1);

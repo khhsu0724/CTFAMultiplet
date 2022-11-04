@@ -43,11 +43,12 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 	read_from_file(file_dir);
 	num_vh -= is_ex;
 	num_ch += is_ex;
-	HYB_on = hparam.HYB || hparam.MLdelta;
+	HYB_on = (hparam.tpd || hparam.tpp || hparam.MLdelta) && hparam.HYB;
 	SO_on = hparam.SO;
 	CF_on = !ed::is_zero_arr(hparam.CF,5);
 	CV_on = (is_ex && !ed::is_zero_arr(hparam.FG,4));
-	bool BLOCK_DIAG = !(edge == "L" && is_ex) || !SO_on;
+	bool BLOCK_DIAG = false;
+	if (hparam.block_diag) BLOCK_DIAG = !(edge == "L" && is_ex) || !SO_on;
 	int hv = num_vorb/2, hc = num_corb/2;
 	this->hsize = ed::choose(num_vorb,num_vh) * ed::choose(num_corb,num_ch);
 	size_t bfind = 0;
