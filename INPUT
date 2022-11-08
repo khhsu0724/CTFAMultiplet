@@ -6,11 +6,11 @@
 	#FG = 7.4332 4.7576 6.3192 2.7072 #F^0,G^1,F^2,G^2
 	FG = 1.0 0.25 0 0 #F^0,G^1
 	CF = 0 0 0 0 0  #dx2y2, dz2, dxy, dxz, ./dyz
-	tpd = 1
-	tpp = 0.333333
+	tpd = 1.5
+	tpp = 0.35
 	MLCT = -1
-	OVERWRITE = True # Overwrite photon file in the directory
-	BLOCK = False # block diagonalization
+	OVERWRITE = False # Overwrite photon file in the directory
+	#BLOCK = False # block diagonalization
 	# PBC = Periodic Boundary Condition
 	# SC2 = 6.05 0 0.12857 0 0.025 #F_0,2,4 for l = 2
 	# SC2 = 6.103 0 0.2227 0 0.0181 # PhysRevB.55.4257
@@ -19,7 +19,7 @@
 &CELL
 	Coordination = "Square Planar" # Defaults to no coordination
 	Sites = 1 # x,y,z, Defaults to 1 site
-	Holes = 1 # If this is read then &Atom's will be skipped
+	Holes = 3 # If this is read then &Atom's will be skipped
 /
 &ATOMS
 	# Each line is a site, with atoms and ligands in the site
@@ -30,9 +30,9 @@
 &PHOTON
 	XAS = true
 	RIXS = false
-	pvin = 1 0 0
-	pvout = 0 1 1
-	Edge = L
+	pvin = 1 1 1
+	pvout = 1 1 1
+	Edge = K
 	Eloss = false
 	NEDOS = 1000 # Number of bins for XAS/RIXS
 	spinflip = true # RIXS spin flip
