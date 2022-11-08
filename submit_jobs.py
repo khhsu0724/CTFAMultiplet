@@ -20,7 +20,7 @@ class Input_Param:
 base_dir = os.getcwd()
 data_dir = os.path.join(base_dir, "DATA_DIR")
 input_arr = []
-nh5 = True
+nh5 = False
 nh4 = True
 if (nh5):
     for d in np.arange(0,-2.6,-2.5):
@@ -58,7 +58,7 @@ if (nh4):
             input_arr.append(Input_Param(4,1.9,1+d,17.85+d,t))
 
 kedge = True
-ledge = False
+ledge = True
 for inp in input_arr:
     input_dir = os.path.join(data_dir,"nh="+str(inp.nh),"tenDQ="+f"{inp.tenDQ:.1f}",
     					"del_eff="+f'{inp.del_eff:.1f}',"t="+f'{inp.t:.1f}')
@@ -85,7 +85,7 @@ for inp in input_arr:
             else: fh.writelines("\tFG = 7.4332 4.7576 6.3192 2.7072\n")
             fh.writelines("\tCF = 0 0 "+tenDQ+" "+tenDQ+" "+tenDQ+"\n")
             fh.writelines("\ttpd = "+f'{inp.t:.1f}'+"\n")
-            fh.writelines("\ttpp = 0.25\n")
+            fh.writelines("\ttpp = 0.35\n")
             fh.writelines("\tMLCT = "+str(inp.delta)+"\n")
             fh.writelines("\tOVERWRITE = True\n")
             fh.writelines("/\n")

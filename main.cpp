@@ -369,10 +369,10 @@ int main(int argc, char** argv){
 			fill(pm.pvin.begin(), pm.pvin.end(), 0);
 			if (pvin[in]) pm.pvin[in] = 1;
 			else continue;
-			if (if_photon_file_exist(pm.edge,work_dir,true,pvin) && !overwrite) continue;
 			cout << "Doing photon polarization: ";
 			for (auto e : pm.pvin) cout << (int)e << " ";
 			cout << endl;
+			if (if_photon_file_exist(pm.edge,work_dir,true,pm.pvin) && !overwrite) continue;
 			XAS(GS,EX,pm);
 		}
 	}
@@ -385,12 +385,12 @@ int main(int argc, char** argv){
 				fill(pm.pvout.begin(), pm.pvout.end(), 0);
 				if (pvout[out]) pm.pvout[out] = 1;
 				else continue;
-				if (if_photon_file_exist(pm.edge,work_dir,false,pvin,pvout) && !overwrite) continue;
 				cout << "Doing photon polarization (in): ";
 				for (auto e : pm.pvin) cout << (int)e << " ";
 				cout << "(out): ";
 				for (auto e : pm.pvout) cout << (int)e << " ";
 				cout << endl;
+				if (if_photon_file_exist(pm.edge,work_dir,false,pm.pvin,pm.pvout) && !overwrite) continue;
 				RIXS(GS,EX,pm);
 			}
 		}
