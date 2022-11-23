@@ -123,7 +123,7 @@ void calc_SO(Hilbert& hilbs, const double lambda) {
 	if (lambda == 0) return;
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		int l = hilbs.atlist[i].l;
-		if (l != 1 || hilbs.atlist[i].is_lig) continue;// Only 2p core orbitals get spin orbit coupling for now
+		if (l != 1 || hilbs.atlist[i].is_lig) continue;// Only TM 2p core orbitals get spin orbit coupling for now
 		for (int ml = -l; ml <= l; ++ml) {
 			// longitudinal phonon
 			for (auto spin : {-0.5,0.5}) {
@@ -189,7 +189,8 @@ vecd HYBmat(Hilbert& hilbs, const HParam& hparam) {
 	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
 	vecd hybmat(nvo*nvo,0),tmatreal(nvo*nvo,0);
 	double t = hparam.tpd, del = hparam.MLdelta, tpp = hparam.tpp;
-	double tpd = t, tpdz = t*0.25, tpdxy = t*0.45, tpdxz = t*0.45, tpdyz = t*0.45, tpppi = 0*tpp, tppsigma = tpp, tppzpi = 0*tpp;
+	double sig_pi = 0.45;
+	double tpd = t, tpdz = t*0.25, tpdxy = t*sig_pi, tpdxz = t*sig_pi, tpdyz = t*sig_pi, tpppi = 0*tpp, tppsigma = tpp, tppzpi = 0*tpp;
 	// double tpd = 1, tpdz = 0.25, tpdxy = 0.225, tpdxz = 0.225, tpdyz = 0.225, tpppi = 0, tppsigma = 0.25, tppzpi = 0; // Temp place holdler
 	// Temporary implementation
 	// Omit tpppi since it will give imaginary number

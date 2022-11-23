@@ -12,11 +12,13 @@ struct PM {
 	bool eloss = true;
 	bool spin_flip = false;
 	int nedos = 0;
+	double em_energy = 15;
 	std::string edge;
-	std::vector<double> pvin, pvout;
+	std::vector<double> pvin, pvout, ab_range;
 	PM(): XAS(false), RIXS(false), PE(false), eloss(true) {
 		pvin = vecd(3,0);
 		pvout = vecd(3,0);
+		ab_range = vecd({-20,20});
 	};
 	void set_eloss(bool el) {
 		if (RIXS) eloss = el;
@@ -24,19 +26,33 @@ struct PM {
 	}
 };
 
+struct blapIndex {
+	size_t g;
+	size_t e;
+	dcomp blap;
+	blapIndex(size_t _g, size_t _e, dcomp _blap): g(_g), e(_e), blap(_blap) {};
+};
+
 std::string pol_str(const vecd& pvec);
 std::complex<double> proj_pvec(int ml, const vecd& pvec);
-void occupation(Hilbert& hilbs, const std::vector<bindex>& si);
-std::vector<double> wvfnc_weight(Hilbert& hilbs, const std::vector<bindex>& si, 
+vecd occupation(Hilbert& hilbs, const std::vector<bindex>& si, bool is_print=true);
+vecd wvfnc_weight(Hilbert& hilbs, const std::vector<bindex>& si, 
 								int ligNum = 3, bool print = false);
 double effective_delta(Hilbert& hilbs, int ligNum = 3);
 void state_composition(Hilbert& hilbs, const std::vector<bindex>& si, size_t top = 10);
-void peak_occupation(Hilbert& hilbs, vecd const& peak_en, vecd const& energy, 
-						vecd const& intensity, double ref_en = 0, std::string mode = "list");
-void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, std::vector<dcomp>& blap, 
+void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, std::vector<blapIndex>& blap, 
 					const PM& pm, bool pvout = false);
+// XAS Functions
+void XAS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd const& energy, 
+						vecd const& intensity, std::vector<bindex> const& gsi, double ref_en = 0, 
+						std::string mode = "list", bool ref_gs = false);
 void write_XAS(vecd const& aben, vecd const& intensity, std::string file_dir, bool print = true);
 void XAS(Hilbert& GS, Hilbert& EX, const PM& pm);
+
+// RIXS functions
+void RIXS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd const& ab_en, 
+						vecd const& em_en, vecd const& intensity, std::vector<bindex> const& gsi,
+						PM const& pm, double ref_en = 0, std::string mode = "list", bool ref_gs = false);
 void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, std::string file_dir, 
 				bool eloss, bool print = true);
 void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm);

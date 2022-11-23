@@ -71,3 +71,18 @@ std::string ed::format_duration(std::chrono::milliseconds ms) {
     ss << hour.count() << " Hours : " << mins.count() << " Minutes : " << secs.count() << " Seconds : " << ms.count() << " Milliseconds";
     return ss.str();
 }
+
+void ed::print_progress(double frac, double all) {
+	double progress = frac/all;
+    int barWidth = 40;
+    std::cout << "[";
+    int pos = barWidth * progress;
+    for (int i = 0; i < barWidth; ++i) {
+        if (i < pos) std::cout << "=";
+        else if (i == pos) std::cout << ">";
+        else std::cout << " ";
+    }
+    std::cout << "] " << int(progress * 100.0) << " %\r";
+    std::cout.flush();
+	if (progress == 1) std::cout << std::endl;
+}

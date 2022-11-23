@@ -54,6 +54,7 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 	size_t bfind = 0;
 	if (BLOCK_DIAG) {
 		// Sz ordered blocks, when spin orbit coupling is not on
+		SO_on = false;
 		hashfunc = &Hilbert::sz_Hash;
 		hbfunc = &Hilbert::sz_Hashback;
 		int max_2csz = hc - abs(hc-num_ch);

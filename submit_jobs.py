@@ -20,41 +20,41 @@ class Input_Param:
 base_dir = os.getcwd()
 data_dir = os.path.join(base_dir, "DATA_DIR")
 input_arr = []
-nh5 = False
-nh4 = True
+nh5 = True
+nh4 = False
 if (nh5):
     for d in np.arange(0,-2.6,-2.5):
         # 5h, 10DQ = 1.1, delta_eff = -2/-4.5
-        for t in np.arange(1.0, 1.6, 0.2):
+        for t in np.arange(1.1, 1.7, 0.2):
             input_arr.append(Input_Param(5,1.1,-2+d,18.49+d,t))
         # 5h, 10DQ = 1.3, delta_eff = -2/-4.5
-        for t in np.arange(0.8, 1.4, 0.2):
+        for t in np.arange(1.0, 1.6, 0.2):
             input_arr.append(Input_Param(5,1.3,-2+d,18.69+d,t))
         # 5h, 10DQ = 1.5, delta_eff = -2/-4.5
-        for t in np.arange(0.6, 1.2, 0.2):
+        for t in np.arange(0.8, 1.2, 0.2):
             input_arr.append(Input_Param(5,1.5,-2+d,18.89+d,t))
         # 5h, 10DQ = 1.7, delta_eff = -2/-4.5
-        for t in np.arange(0.5, 1.1, 0.2):
+        for t in np.arange(0.6, 1.2, 0.2):
             input_arr.append(Input_Param(5,1.7,-2+d,19.09+d,t))
         # 5h, 10DQ = 1.9, delta_eff = -2/-4.5
-        for t in np.arange(0.4, 1, 0.2):
+        for t in np.arange(0.5, 1.1, 0.2):
             input_arr.append(Input_Param(5,1.9,-2+d,19.29+d,t))
 if (nh4):
     for d in np.arange(0,3.1,3):
         # 4h, 10DQ = 1.1, delta_eff = 1/4
-        for t in np.arange(1.0, 1.6, 0.2):
+        for t in np.arange(1.1, 1.7, 0.2):
             input_arr.append(Input_Param(4,1.1,1+d,17.1+d,t))
         # 4h, 10DQ = 1.3, delta_eff = 1/4
-        for t in np.arange(0.8, 1.4, 0.2):
+        for t in np.arange(1.0, 1.6, 0.2):
             input_arr.append(Input_Param(4,1.3,1+d,17.283+d,t))
         # 4h, 10DQ = 1.5, delta_eff = 1/4
-        for t in np.arange(0.6, 1.2, 0.2):
+        for t in np.arange(0.8, 1.2, 0.2):
             input_arr.append(Input_Param(4,1.5,1+d,17.41+d,t))
         # 4h, 10DQ = 1.7, delta_eff = 1/4
-        for t in np.arange(0.5, 1.1, 0.2):
+        for t in np.arange(0.6, 1.2, 0.2):
             input_arr.append(Input_Param(4,1.7,1+d,17.654+d,t))
         # 4h, 10DQ = 1.9, delta_eff = 1/4
-        for t in np.arange(0.4, 1, 0.2):
+        for t in np.arange(0.5, 1.1, 0.2):
             input_arr.append(Input_Param(4,1.9,1+d,17.85+d,t))
 
 kedge = True
@@ -85,9 +85,9 @@ for inp in input_arr:
             else: fh.writelines("\tFG = 7.4332 4.7576 6.3192 2.7072\n")
             fh.writelines("\tCF = 0 0 "+tenDQ+" "+tenDQ+" "+tenDQ+"\n")
             fh.writelines("\ttpd = "+f'{inp.t:.1f}'+"\n")
-            fh.writelines("\ttpp = 0.35\n")
+            fh.writelines("\ttpp = 0.3\n")
             fh.writelines("\tMLCT = "+str(inp.delta)+"\n")
-            fh.writelines("\tOVERWRITE = True\n")
+            fh.writelines("\tOVERWRITE = False\n")
             fh.writelines("/\n")
             fh.writelines("&CELL\n")
             fh.writelines("\tCoordination = \"Square Planar\"\n")
@@ -132,3 +132,7 @@ for inp in input_arr:
         os.system('echo \"job id: %s\"'% jobid)
         os.chdir(base_dir)
         time.sleep(1)
+mult = 0
+if (kedge): mult += 1
+if (ledge): mult += 1
+print("Total number of jobs: %s" % len(input_arr)*mult)

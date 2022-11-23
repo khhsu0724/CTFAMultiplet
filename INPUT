@@ -1,15 +1,15 @@
 &CONTROL
 	SO = 10.5 # Spin orbit coupling (eV)
-	SC1 = 1.0 0 0.1 #F_0,2 for l = 1
-	SC2 = 6.0215 0 0.206 0 0.01436
-	#SC2EX = 6.0327 0 0.2191 0 0.0137 # SC2 for excited state, can be optional
-	#FG = 7.4332 4.7576 6.3192 2.7072 #F^0,G^1,F^2,G^2
+    SC1 = 1.0 0 0.1 #F_0,2 for l = 1
+    SC2 = 6.0215 0 0.206 0 0.01436
+    SC2EX = 6.0327 0 0.2191 0 0.0137 # SC2 for excited state, can be optional
+    #FG = 7.4332 4.7576 6.3192 2.7072 #F^0,G^1,F^2,G^2
 	FG = 1.0 0.25 0 0 #F^0,G^1
-	CF = 0 0 0 0 0  #dx2y2, dz2, dxy, dxz, ./dyz
-	tpd = 1.5
-	tpp = 0.35
-	MLCT = -1
-	OVERWRITE = False # Overwrite photon file in the directory
+    CF = 0 0 1.9 1.9 1.9  #dx2y2, dz2, dxy, dxz, ./dyz
+    tpd = 0.7
+    tpp = 0.3
+    MLCT = 20.85
+	OVERWRITE = True # Overwrite photon file in the directory
 	#BLOCK = False # block diagonalization
 	# PBC = Periodic Boundary Condition
 	# SC2 = 6.05 0 0.12857 0 0.025 #F_0,2,4 for l = 2
@@ -19,7 +19,7 @@
 &CELL
 	Coordination = "Square Planar" # Defaults to no coordination
 	Sites = 1 # x,y,z, Defaults to 1 site
-	Holes = 3 # If this is read then &Atom's will be skipped
+	Holes = 4 # If this is read then &Atom's will be skipped
 /
 &ATOMS
 	# Each line is a site, with atoms and ligands in the site
@@ -29,13 +29,15 @@
 /
 &PHOTON
 	XAS = true
-	RIXS = false
-	pvin = 1 1 1
-	pvout = 1 1 1
+	RIXS = true
+	pvin = 1 0 0
+	pvout = 1 0 0
 	Edge = K
 	Eloss = false
-	NEDOS = 1000 # Number of bins for XAS/RIXS
-	spinflip = true # RIXS spin flip
+	NEDOS = 5000 # Number of bins for XAS/RIXS
+    AB = -25 -15
+    EM = 15
+	# spinflip = true # RIXS spin flip
 /
 &HYB # Fill in information about hybdridization matrix
 /
