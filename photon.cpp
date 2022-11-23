@@ -3,6 +3,8 @@
 #include "multiplet.hpp"
 #include "photon.hpp"
 
+#define PRINT_TOL 1E-5
+
 using namespace std;
 #pragma omp declare reduction(vec_double_plus : std::vector<double> : \
 		std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<double>())) \
@@ -33,12 +35,58 @@ dcomp proj_pvec(int ml, const vecd& pvec) {
 	}
 }
 
-void occupation(Hilbert& hilbs, const vector<bindex>& si) {
+void print_square_planar(const vecd& occ, int p = 5) {
+	// Temporary implementation
+	cout << setw(12) << "Num Holes: ";
+	for (size_t n = 0; n < occ.size(); n+=11) {
+		double num_h = 0;
+		for (int i = n; i < n+11; ++i) num_h += occ[i];
+		cout << setprecision(3) << setw(12) << num_h;
+	}
+	cout << endl;
+	cout << setw(12) << "dx2: " << fixed << setprecision(p);
+	for (size_t n = 0; n < occ.size(); n+=11) cout << setw(12) << occ[n];
+	cout << endl;
+	cout << setw(12) << "dz2: " << fixed << setprecision(p);
+	for (size_t n = 1; n < occ.size(); n+=11) cout << setw(12) << occ[n];
+	cout << endl;
+	cout << setw(12) << "dxy: " << fixed << setprecision(p);
+	for (size_t n = 2; n < occ.size(); n+=11) cout << setw(12) << occ[n];
+	cout << endl;
+	cout << setw(12) << "dxz: " << fixed << setprecision(p);
+	for (size_t n = 3; n < occ.size(); n+=11) cout << setw(12) << occ[n];
+	cout << endl;
+	cout << setw(12) << "dyz: " << fixed << setprecision(p);
+	for (size_t n = 4; n < occ.size(); n+=11) cout << setw(12) << occ[n];
+	cout << endl;
+	cout << setw(12) << "pxx: " << fixed << setprecision(p);
+	for (size_t n = 5; n < occ.size(); n+=11) cout << setw(12) << occ[n];
+	cout << endl;
+	cout << setw(12) << "pxy: " << fixed << setprecision(p);
+	for (size_t n = 6; n < occ.size(); n+=11) cout << setw(12) << occ[n];
+	cout << endl;
+	cout << setw(12) << "pxz: " << fixed << setprecision(p);
+	for (size_t n = 7; n < occ.size(); n+=11) cout << setw(12) << occ[n];
+	cout << endl;
+	cout << setw(12) << "pyx: " << fixed << setprecision(p);
+	for (size_t n = 8; n < occ.size(); n+=11) cout << setw(12) << occ[n];
+	cout << endl;
+	cout << setw(12) << "pyy: " << fixed << setprecision(p);
+	for (size_t n = 9; n < occ.size(); n+=11) cout << setw(12) << occ[n];
+	cout << endl;
+	cout << setw(12) << "pyz: " << fixed << setprecision(p);
+	for (size_t n = 10; n < occ.size(); n+=11) cout << setw(12) << occ[n];
+	cout << endl;
+	
+	return;
+}
+
+vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print) {
 	// Calculation occupation of orbitals, only valid when matrix is diagonalized
 	for (auto& blk : hilbs.hblks) if (blk.eigvec == nullptr) throw runtime_error("matrix not diagonalized for occupation");
 	if (hilbs.coord != "sqpl") {
 		cout << "non square planar geometry occupation not coded yet" << endl;
-		return;
+		return vector<double>();
 	}
 
 	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
@@ -84,19 +132,8 @@ void occupation(Hilbert& hilbs, const vector<bindex>& si) {
 	double tot_h = 0;
 	int p = 5;
 	for (auto &h : occ_totc) tot_h += h;
-	cout << "Number of Holes: " << fixed << setprecision(p) << tot_h << endl;
-	cout << "dx2: " << fixed << setprecision(p) << occ_totc[0] << endl;
-	cout << "dz2: " << fixed << setprecision(p) << occ_totc[1] << endl;
-	cout << "dxy: " << fixed << setprecision(p) << occ_totc[2] << endl;
-	cout << "dxz: " << fixed << setprecision(p) << occ_totc[3] << endl;
-	cout << "dyz: " << fixed << setprecision(p) << occ_totc[4] << endl;
-	cout << "pxx: " << fixed << setprecision(p) << occ_totc[5] << endl;
-	cout << "pxy: " << fixed << setprecision(p) << occ_totc[6] << endl;
-	cout << "pxz: " << fixed << setprecision(p) << occ_totc[7] << endl;
-	cout << "pyx: " << fixed << setprecision(p) << occ_totc[8] << endl;
-	cout << "pyy: " << fixed << setprecision(p) << occ_totc[9] << endl;
-	cout << "pyz: " << fixed << setprecision(p) << occ_totc[10] << endl;
-	return;
+	if (is_print) print_square_planar(occ_totc);
+	return occ_totc;
 }
 
 vector<double> wvfnc_weight(Hilbert& hilbs, const vector<bindex>& si, int ligNum, bool print) {
@@ -189,31 +226,80 @@ void state_composition(Hilbert& hilbs, const vector<bindex>& si, size_t top) {
 	return;
 }
 
-void peak_occupation(Hilbert& hilbs, vecd const& peak_en, vecd const& energy, 
-						vecd const& intensity, double ref_en, string mode) {
+void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, vector<blapIndex>& blap, 
+					const PM& pm, bool pvout) {
+	// Calculate basis state overlap base on the indices of the blocks
+	size_t gbi = inds.first, exi = inds.second;
+	blap.clear();
+	blap.reserve(EX.hblks[exi].size*2); // rough guess
+	vecd pvec = pvout ? pm.pvout : pm.pvin;
+	int cl = GS.atlist[0].l, vl = GS.atlist[GS.atlist[0].vind].l;
+	int half_orb = (EX.num_vorb+EX.num_corb)/2;
+	#pragma omp parallel for shared(blap) collapse(2)
+	for (size_t g = 0; g < GS.hblks[gbi].size; g++) {
+		for (size_t e = 0; e < EX.hblks[exi].size; e++) {
+			ulli gs = GS.Hashback(bindex(gbi,g)), exs = EX.Hashback(bindex(exi,e));
+			ulli ch = exs - (gs & exs), vh = gs - (gs & exs);
+			int coi = EX.orbind(ch), voi = GS.atlist[coi].vind;
+			if (!ed::is_pw2(vh) || !GS.atlist[voi].contains(vh)) continue;
+			QN chqn = EX.atlist[coi].fast_qn(ch,half_orb,coi);
+			QN vhqn = GS.atlist[voi].fast_qn(vh,half_orb,voi);
+			if (chqn.spin != vhqn.spin || abs(vhqn.ml-chqn.ml) > 1) continue;
+			dcomp blap_val = gaunt(cl,chqn.ml,vl,vhqn.ml)[1] 
+				* GS.Fsign(&vh,gs,1) * EX.Fsign(&ch,exs,1) * proj_pvec(vhqn.ml-chqn.ml,pvec);
+			if (blap_val != dcomp(0.0,0.0)) {
+				#pragma omp critical
+				{
+					blap.emplace_back(g,e,blap_val);
+				}
+			}
+		}
+	}
+	return;
+}
+
+void XAS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd const& energy, 
+						vecd const& intensity, vector<bindex> const& gsi, double ref_en, 
+						string mode, bool ref_gs) {
 	// Calculate peak occupation using energy
 	// If mode = top, it will use the peak_en as the top n number of peaks
 	// TODO: Range of peak energy
 	vecd peak_en_copy;
-	if (mode == "list") peak_en_copy = peak_en;
+	vector<size_t> indices;
+	if (mode == "list") {
+		peak_en_copy = peak_en;
+		// Find indices for intensity??
+	}
 	else if (mode == "top") {
 		size_t top = (size_t)peak_en[0];
 		vecd intensity_copy = intensity;
-		vector<size_t> indices = ed::top_n(intensity_copy,top);
+		indices = ed::top_n(intensity_copy,top);
 		peak_en_copy.resize(top);
 		for (size_t i = 0; i < top; ++i) peak_en_copy[i] = energy[indices[i]];
 	}
+	vecd occ_gs = ref_gs ? occupation(GS,gsi,false) : vecd(GS.num_vorb/2,0);
 	for (size_t p = 0; p < peak_en_copy.size(); p++) {
 		vector<bindex> peaks;
-		for (auto &blk : hilbs.hblks) {	
+		for (auto &blk : EX.hblks) {	
 			for (size_t i = 0; i < blk.size; ++i) {
-				if (abs(blk.eig[i]-ref_en-peak_en_copy[p]) < 1e-5) 
-					peaks.push_back(bindex(&blk-&hilbs.hblks[0],i));
+				if (abs(blk.eig[i]-ref_en-peak_en_copy[p]) < PRINT_TOL) 
+					peaks.push_back(bindex(&blk-&EX.hblks[0],i));
 			}
 		}
-		cout << "peak " << p << " energy: " << peak_en_copy[p];
-		cout << ", degeneracy: " << peaks.size() << endl;
-		occupation(hilbs,peaks);
+		if (mode == "top" && abs(intensity[indices[p]]) < PRINT_TOL) break;
+		cout << "PEAK " << p+1;
+		if (mode == "top") cout << ", intensity: " << intensity[indices[p]] << endl;
+		else cout << endl;
+		cout << "absorption energy: " << peak_en_copy[p] << ", degeneracy: " << peaks.size() << endl;
+		vecd occ = occupation(EX,peaks,false);
+		if (ref_gs) {
+			cout << "----------------------------Rel to GS--" << endl;
+			vecd occ_rel = occ;
+			for (size_t i = 0; i < occ_rel.size(); ++i) occ_rel[i] -= occ_gs[i];
+			occ.insert(occ.end(),occ_rel.begin(),occ_rel.end());
+		} else cout << "---------------------------------------" << endl;
+		print_square_planar(occ);
+		cout << "---------------------------------------" << endl << endl;
 	}
 	return;
 }
@@ -226,35 +312,12 @@ void write_XAS(vecd const& aben, vecd const& intensity, string file_dir, bool pr
 	for (int i = 0; i < intensity.size(); ++i) {
 		if (intensity[i] < TOL) continue;
 		xasfile << setw(15) << aben[i] << setw(15) << intensity[i] << endl;
-		if (print) cout << fixed << setprecision(5) << setw(15) << aben[i] << setw(15) << intensity[i] << endl;
-	}
-	xasfile.close();
-}
-
-void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, vector<dcomp>& blap, 
-					const PM& pm, bool pvout) {
-	// Calculate basis state overlap base on the indices of the blocks
-	blap.clear();
-	size_t gbi = inds.first, exi = inds.second;
-	blap = vector<dcomp>(GS.hblks[gbi].size*EX.hblks[exi].size,0);
-	vecd pvec = pvout ? pm.pvout : pm.pvin;
-	int cl = GS.atlist[0].l, vl = GS.atlist[GS.atlist[0].vind].l;
-	int half_orb = (EX.num_vorb+EX.num_corb)/2;
-	#pragma omp parallel shared(blap)
-	for (size_t g = 0; g < GS.hblks[gbi].size; g++) {
-		for (size_t e = 0; e < EX.hblks[exi].size; e++) {
-			ulli gs = GS.Hashback(bindex(gbi,g)), exs = EX.Hashback(bindex(exi,e));
-			ulli ch = exs - (gs & exs), vh = gs - (gs & exs);
-			int coi = EX.orbind(ch), voi = GS.atlist[coi].vind;
-			if (!ed::is_pw2(vh) || !GS.atlist[voi].contains(vh)) continue;
-			QN chqn = EX.atlist[coi].fast_qn(ch,half_orb,coi);
-			QN vhqn = GS.atlist[voi].fast_qn(vh,half_orb,voi);
-			if (chqn.spin != vhqn.spin || abs(vhqn.ml-chqn.ml) > 1) continue;
-			blap[g*EX.hblks[exi].size+e] = gaunt(cl,chqn.ml,vl,vhqn.ml)[1] 
-				* GS.Fsign(&vh,gs,1) * EX.Fsign(&ch,exs,1) * proj_pvec(vhqn.ml-chqn.ml,pvec);
+		if (print) {
+			if (intensity[i] < PRINT_TOL) continue;
+			cout << fixed << setprecision(5) << setw(15) << aben[i] << setw(15) << intensity[i] << endl;
 		}
 	}
-	return;
+	xasfile.close();
 }
 
 void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
@@ -268,7 +331,7 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.size; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
 	vector<bindex> gsi; // index for ground state
 	// Calculate Partition function
-	double Z = 0, emin = -25.0, emax = 25.0, SDegen = 0;
+	double Z = 0, emin = pm.ab_range[0], emax = pm.ab_range[1], SDegen = 0;
 	for (size_t i = 0; i < GS.hblks.size(); ++i) {
 	for (size_t j = 0; j < GS.hblks[i].size; ++j) {
 		if (abs(GS.hblks[i].eig[j]-gs_en) < TOL) {
@@ -280,30 +343,28 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 
 	cout << "Calculating cross section..." << endl;
 	auto start = chrono::high_resolution_clock::now();
-	vector<dcomp> blap;
+	vector<blapIndex> blap;
+
 	vecd xas_aben(nedos,0), xas_int(nedos,0);
 	for (auto &exblk : EX.hblks) {
 		size_t last_gs_block = gsi[0].first;
 		basis_overlap(GS,EX,bindex(last_gs_block,&exblk-&EX.hblks[0]),blap,pm);
 		for (auto &g  : gsi) {
 			Block& gsblk = GS.hblks[g.first];
-			cout << "EX blk number: " << &exblk-&EX.hblks[0] << ", ground state number: " << &g-&gsi[0] << endl;
+			ed::print_progress((&exblk-&EX.hblks[0])*gsi.size()+(&g-&gsi[0])+1,EX.hblks.size()*gsi.size());
+			if (!GS.SO_on && !EX.SO_on && gsblk.get_sz() != exblk.get_sz()) continue; // Spin order blocks
 			if (g.first != last_gs_block) {
 				basis_overlap(GS,EX,bindex(g.first,&exblk-&EX.hblks[0]),blap,pm);
 				last_gs_block = g.first;
 			}
-			// #pragma omp parallel for reduction (vec_double_plus:xas_int) schedule(guided)
+			#pragma omp parallel for reduction (vec_double_plus:xas_int) schedule(dynamic)
 			for (size_t ei = 0; ei < exblk.size; ++ei) {
 				if (exblk.eig[ei]-gs_en < emin || exblk.eig[ei]-gs_en > emax) continue;
 				dcomp cs = 0;
-				for (size_t gj = 0; gj < gsblk.size; ++gj) {
-					size_t gsind = g.second*gsblk.size+gj;
-					if (gsblk.eigvec[gsind] == 0) continue;
-					for (size_t ej = 0; ej < exblk.size; ++ej) {
-						size_t exind = ei*exblk.size+ej, blapind = gj*exblk.size+ej;
-						if (exblk.eigvec[exind] == 0 || blap[blapind] == 0.0) continue;
-						cs +=  gsblk.eigvec[gsind] * exblk.eigvec[exind] * blap[blapind];
-					}
+				for (auto & b : blap) {
+					size_t gsind = g.second*gsblk.size+b.g;
+					size_t exind = ei*exblk.size+b.e;
+					cs +=  gsblk.eigvec[gsind] * exblk.eigvec[exind] * b.blap;
 				}
 				if (abs(cs) > TOL) { // Is this arbritrary?????	
 					size_t peak_pos = round((exblk.eig[ei]-gs_en-emin)/((emax-emin)/nedos));
@@ -315,7 +376,7 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 		}
 	}
 	// Calculate peak intensity, TODO: output peaks?
-	peak_occupation(EX,vecd({4}),xas_aben,xas_int,gs_en,"top");
+	XAS_peak_occupation(GS,EX,vecd({4}),xas_aben,xas_int,gsi,gs_en,"top",true);
 
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -325,6 +386,74 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	return;
 }
 
+
+void RIXS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd const& ab_en, 
+						vecd const& em_en, vecd const& intensity, vector<bindex> const& gsi,
+						PM const& pm, double ref_en, string mode, bool ref_gs) {
+	// Returns top n peaks
+	vecd peak_ab_en, peak_em_en;
+	vector<size_t> indices;
+	if (mode == "list") {
+		// input should be in order of: ab/em/ab/em...
+		for (size_t i = 0; i < peak_en.size(); ++i) {
+			peak_ab_en.push_back(peak_en[i]);
+			peak_em_en.push_back(peak_en[i+1]);
+			// Find indices of intensity??
+		}
+	} else if (mode == "top") {
+		size_t top = (size_t)peak_en[0];
+		peak_ab_en.resize(top);
+		peak_em_en.resize(top);
+		vecd intensity_copy = intensity;
+		indices = ed::top_n(intensity_copy,top);
+		for (size_t i = 0; i < top; ++i) {
+			size_t abind = indices[i] % pm.nedos;
+			size_t emind = indices[i] / pm.nedos;
+			peak_ab_en[i] = ab_en[abind];
+			peak_em_en[i] = em_en[emind];
+		}
+	}
+	vecd occ_gs = ref_gs ? occupation(GS,gsi,false) : vecd(GS.num_vorb/2,0);
+	for (size_t p = 0; p < peak_ab_en.size(); p++) {
+		vector<bindex> ab_peaks, em_peaks;
+		// Get absorption peaks
+		for (auto &blk : EX.hblks) {	
+			for (size_t i = 0; i < blk.size; ++i) {
+				if (abs(blk.eig[i]-ref_en-peak_ab_en[p]) < PRINT_TOL) 
+					ab_peaks.push_back(bindex(&blk-&EX.hblks[0],i));
+			}
+		}
+		// Get emission peaks
+		double loss_en = pm.eloss ? peak_em_en[p] : peak_ab_en[p]-peak_em_en[p];
+		for (auto &blk : GS.hblks) {	
+			for (size_t i = 0; i < blk.size; ++i) {
+				if (abs(blk.eig[i]-ref_en-loss_en) < PRINT_TOL) 
+					em_peaks.push_back(bindex(&blk-&GS.hblks[0],i));
+			}
+		}
+		if (mode == "top" && abs(intensity[indices[p]]) < PRINT_TOL) break;
+		cout << "PEAK " << p+1;
+		if (mode == "top") cout << ", intensity: " << intensity[indices[p]] << endl;
+		else cout << endl;
+		cout << "absorption energy: " << peak_ab_en[p] << ", degeneracy: " << ab_peaks.size() << endl;
+		cout << "emission energy: " << peak_em_en[p] << ", degeneracy: " << em_peaks.size() << endl;
+		vecd occ_ex = occupation(EX,ab_peaks,false);
+		vecd occ_fs = occupation(GS,em_peaks,false);
+		occ_ex.insert(occ_ex.end(),occ_fs.begin(),occ_fs.end());
+		cout << "--------------------Abs----------Em----" << endl;
+		print_square_planar(occ_ex);
+		if (ref_gs) {
+			cout << "--------Relative to Ground state-------" << endl;
+			for (size_t i = 0; i < occ_ex.size()/2; ++i) {
+				occ_ex[i] -= occ_gs[i];
+				occ_ex[i+11] -= occ_gs[i];
+			}
+			print_square_planar(occ_ex);
+		}
+		cout << "---------------------------------------" << endl << endl;
+	}
+	return;
+}
 
 void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, string file_dir, bool eloss, bool print) {
 	std::ofstream rixsfile;
@@ -342,6 +471,7 @@ void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, string file_d
 			rixsfile << setw(18) << em[y];
 			rixsfile << setw(18) << peaks[y*ab.size()+x] << endl;
 			if (print) {
+				if (peaks[y*ab.size()+x] < PRINT_TOL) continue;
 				cout << setw(18) << ab[x];
 				cout << setw(18) << em[y];
 				cout << setw(18) << peaks[y*ab.size()+x] << endl;
@@ -363,13 +493,13 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	double gs_en = GS.hblks[0].eig[0];
 	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.size; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
 	vector<bindex> gsi,exi; // index for ground state and excited states
-	double Z = 0, ab_emin = -25.0, ab_emax = 25.0, elm_min, elm_max;
+	double Z = 0, ab_emin = pm.ab_range[0], ab_emax = pm.ab_range[1], elm_min, elm_max;
 	if (pm.eloss) { // Energy Loss
-		elm_max = 15;
+		elm_max = pm.em_energy;
 		elm_min = 0;
 	} else { // Emission Energy
-		elm_max = 15;
-		elm_min = -15;
+		elm_max = ab_emax + pm.em_energy;
+		elm_min = ab_emin - pm.em_energy;
 	}
 	for (size_t i = 0; i < GS.hblks.size(); ++i) {
 	for (size_t j = 0; j < GS.hblks[i].size; ++j) {
@@ -402,7 +532,6 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	sort(exen.begin(),exen.end());
 	if (exen.size() > 1) { // Skip this if there are less than 1 excited state
 		for (auto &exblk : EX.hblks) {
-		cout << "binary search EX blk number: " << &exblk-&EX.hblks[0] << endl;
 		#pragma omp parallel for shared(exblk)
 		for (size_t ei = 0; ei < exblk.size; ++ei) {
 			if (exblk.einrange[ei] == -1) continue;
@@ -417,7 +546,8 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	// Calculate and store <v|D|i>
 	vecd rixs_em(nedos,0),rixs_ab(nedos,0),rixs_loss(nedos,0),rixs_peaks(nedos*nedos,0);
 	for (int i = 0; i < nedos; ++i) rixs_ab[i] = ab_emin + i*(ab_emax-ab_emin)/nedos;
-	vector<dcomp> blap, rixskern(gsi.size()*EX.hsize,0);
+	vector<dcomp> rixskern(gsi.size()*EX.hsize,0);
+	vector<blapIndex> blap;
 	vector<bindex> peak_occ_ab, peak_occ_em; // Calculate peak occupation
 	cout << "Calculating <v|D|i>" << endl;
 	for (auto &exblk : EX.hblks) {
@@ -425,23 +555,20 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 		basis_overlap(GS,EX,bindex(last_gs_block,&exblk-&EX.hblks[0]),blap,pm);
 		for (auto &g : gsi) {
 			Block& gsblk = GS.hblks[g.first];
-			cout << "EX blk number: " << &exblk-&EX.hblks[0] << ", ground state number: " << &g-&gsi[0] << endl;
+			ed::print_progress((&exblk-&EX.hblks[0])*gsi.size()+(&g-&gsi[0])+1,EX.hblks.size()*gsi.size());
+			if (!GS.SO_on && !EX.SO_on && gsblk.get_sz() != exblk.get_sz()) continue;
 			if (g.first != last_gs_block) {
 				basis_overlap(GS,EX,bindex(g.first,&exblk-&EX.hblks[0]),blap,pm);
 				last_gs_block = g.first;
 			}	
-			#pragma omp parallel for reduction (vec_dcomp_plus:rixskern) schedule(guided)
+			#pragma omp parallel for reduction (vec_dcomp_plus:rixskern) schedule(dynamic)
 			for (size_t ei = 0; ei < exblk.size; ++ei) {
 				if (exblk.eig[ei]-gs_en < ab_emin || exblk.eig[ei]-gs_en > ab_emax) continue;
 				dcomp csvi = 0;
-				for (size_t gj = 0; gj < gsblk.size; ++gj) {
-					size_t gsind = g.second*gsblk.size+gj;
-					if (gsblk.eigvec[gsind] == 0) continue;
-					for (size_t ej = 0; ej < exblk.size; ++ej) {
-						size_t exind = ei*exblk.size+ej, blapind = gj*exblk.size+ej;
-						if (exblk.eigvec[exind] == 0 || blap[blapind] == 0.0) continue;
-						csvi +=  gsblk.eigvec[gsind] * exblk.eigvec[exind] * blap[blapind];
-					}
+				for (auto & b : blap) {
+					size_t gsind = g.second*gsblk.size+b.g;
+					size_t exind = ei*exblk.size+b.e;
+					csvi +=  gsblk.eigvec[gsind] * exblk.eigvec[exind] * b.blap;
 				}
 				if (abs(csvi) > TOL) rixskern[(&g-&gsi[0])*EX.hsize+ei+exblk.f_ind] += csvi;
 			}
@@ -449,36 +576,40 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	}
 
 	// Loop through final states, calculate <f|D|v><v|D|i>, add to spectra
-	cout << "Calculating <f|D|v><v|D|i>" << endl;
-	int gscnt = 0;
-	bool is_gs = false;
+	cout << endl << "Calculating <f|D|v><v|D|i>" << endl;
 	for (auto &fsblk : GS.hblks) {
-	for (auto &exblk : EX.hblks) {					
-		if (exblk.get_sz() != fsblk.get_sz()) {;} // Spin flip
-		basis_overlap(GS,EX,bindex(&fsblk-&GS.hblks[0],&exblk-&EX.hblks[0]),blap,pm,true);
+	for (auto &exblk : EX.hblks) {	
+		if (!GS.SO_on && !EX.SO_on && fsblk.get_sz() != exblk.get_sz()) continue; // Spin order blocks
 		cout << "FS blk: " << &fsblk-&GS.hblks[0] << ", EX blk: " << &exblk-&EX.hblks[0] << endl;
+		basis_overlap(GS,EX,bindex(&fsblk-&GS.hblks[0],&exblk-&EX.hblks[0]),blap,pm,true);
 		for (size_t fi = 0; fi < fsblk.size; ++fi) {
-			if (pm.eloss && fsblk.eig[fi]-gs_en > elm_max) continue;
+			ed::print_progress((double)fi+1,(double)fsblk.size);
+			if (pm.eloss) {if (fsblk.eig[fi]-gs_en > elm_max) continue;}
 			vector<dcomp> csum(gsi.size()*exen.size(),0);
-			if (abs(fsblk.eig[fi]-gs_en) < TOL) {
-				is_gs = true;
-				gscnt++;
-			} else is_gs = false;
-			#pragma omp parallel for reduction (vec_dcomp_plus:csum) schedule(guided)
+			bool is_gs = abs(fsblk.eig[fi]-gs_en) < TOL;
+			size_t gsind;
+			if (is_gs) gsind = distance(gsi.begin(), find(gsi.begin(), gsi.end(), bindex(&fsblk-&GS.hblks[0],fi)));
+			#pragma omp parallel for reduction (vec_dcomp_plus:csum) schedule(dynamic)
 			for (size_t ei = 0; ei < exblk.size; ++ei) {
-				if (pm.eloss) {if (exblk.eig[ei]-gs_en < ab_emin || exblk.eig[ei]-gs_en > ab_emax) continue;}
-				else {if (exblk.eig[ei]-fsblk.eig[fi] > elm_max || exblk.eig[ei]-fsblk.eig[fi] < elm_min) continue;}
+				if (exblk.einrange[ei] == -1) continue; // Not in absorption range
+				if (!pm.eloss) {if (exblk.eig[ei]-fsblk.eig[fi] > elm_max || exblk.eig[ei]-fsblk.eig[fi] < elm_min) continue;}
+				// Breaks if no ground state connects with intermediate state
+				bool skip_ei = true;
+				for (size_t gi = 0; gi < gsi.size(); ++gi) {
+					if (abs(rixskern[gi*EX.hsize+ei+exblk.f_ind]) > TOL) {
+						skip_ei = false;
+						break;
+					}
+				}
+				if (skip_ei) continue;
+				// Calculate Cross Section
 				dcomp csvf = 0;
-				if (is_gs && pm.pvin == pm.pvout) csvf = rixskern[(gscnt-1)*EX.hsize+ei+exblk.f_ind];
+				if (is_gs && pm.pvin == pm.pvout) csvf = rixskern[gsind*EX.hsize+ei+exblk.f_ind];
 				else {
-					for (size_t fj = 0; fj < fsblk.size; ++fj) {
-						size_t fsind = fi*fsblk.size+fj;
-						if (fsblk.eigvec[fsind] == 0.0) continue;
-						for (size_t ej = 0; ej < exblk.size; ++ej) {
-							size_t exind = ei*exblk.size+ej, blapind = fj*exblk.size+ej;
-							if (exblk.eigvec[exind] == 0.0 || blap[blapind] == 0.0) continue;
-							csvf +=  fsblk.eigvec[fsind] * exblk.eigvec[exind] * blap[blapind];
-						}
+					for (size_t b = 0; b < blap.size(); ++b) {
+						size_t fsind = fi*fsblk.size+blap[b].g;
+						size_t exind = ei*exblk.size+blap[b].e;
+						csvf +=  fsblk.eigvec[fsind] * exblk.eigvec[exind] * blap[b].blap;
 					}
 				}
 				if (abs(csvf) < TOL) continue;
@@ -509,11 +640,12 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 				for (size_t e = 0; e < exen.size(); e++) {
 					dcomp cs(0,0);
 					if (abs(csum[g*exen.size()+e]) < TOL) continue;
-					int elmind, abind = round((exen[e]-gs_en-ab_emin)/(ab_emax-ab_emin)*nedos);
+					int abind = round((exen[e]-gs_en-ab_emin)/(ab_emax-ab_emin)*nedos);
+					int elmind;
 					rixs_ab[abind] = exen[e]-gs_en;
 					if (pm.eloss) {
 						elmind = round((fsblk.eig[fi]-gs_en)/elm_max*nedos);
-						rixs_em[elmind] = fsblk.eig[fi]-gs_en; //exen[e]-fsblk.eig[fi];
+						rixs_em[elmind] = fsblk.eig[fi]-gs_en;
 					} else {
 						elmind = round((exen[e]-fsblk.eig[fi]-elm_min)/(elm_max-elm_min)*nedos);
 						rixs_em[elmind] = exen[e]-fsblk.eig[fi];
@@ -523,11 +655,12 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 			}
 		}
 	}}
+	RIXS_peak_occupation(GS,EX,vecd({6}),rixs_ab,rixs_em,rixs_peaks,gsi,pm,gs_en,"top",true);
 
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n";
 	cout << "Writing results..." << endl << endl;
-	write_RIXS(rixs_peaks,rixs_ab,rixs_em,"RIX_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt",pm.eloss);
+	write_RIXS(rixs_peaks,rixs_ab,rixs_em,"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt",pm.eloss,true);
 	return;
 }

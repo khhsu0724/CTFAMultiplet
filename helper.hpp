@@ -31,6 +31,7 @@ namespace ed {
 	void ctranspose(vecc& mat, size_t m, size_t n);
 	std::vector<int> distribute(int num_h, int num_at);
 	std::string format_duration(std::chrono::milliseconds ms);
+	void print_progress(double frac, double all);
 
 	template <typename T> T dot(std::vector<T> a, std::vector<T> b) {
 		try {

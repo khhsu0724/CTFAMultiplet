@@ -15,6 +15,25 @@
     #define GetCurrentDir getcwd
  #endif
 
+// STACK TRACE DEBUG
+#include <execinfo.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
+void handler(int sig) {
+  void *array[10];
+  size_t size;
+
+  // get void*'s for all entries on the stack
+  size = backtrace(array, 10);
+
+  // print out all the frames to stderr
+  fprintf(stderr, "Error: signal %d:\n", sig);
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  exit(1);
+}
+// STACK TRACE DEBUG
+
 using namespace std;
 
 void tb() {
@@ -158,6 +177,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 					string p;
 					bool skip = false;
 					double pvtmp[3]{0};
+					double abrange_temp[2]{0};
 					for (int s = 0; s < line.size() && !skip; ++s) {
 						if (line[s] != ' ' && line[s] != '	' && line[s] != '=') p.push_back(line[s]);
 						else {
@@ -191,6 +211,11 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 								pm.nedos = (int)nedos;
 							}
 							else if (p == "SPINFLIP") skip = read_bool(line.substr(s+1,line.size()-1),pm.spin_flip);
+							else if (p == "AB") {
+								skip = read_num(line.substr(s+1,line.size()-1),abrange_temp,2);
+								for (int i = 0; i < 2; ++i) pm.ab_range[i] = abrange_temp[i];
+							}
+							else if (p == "EM") skip = read_num(line.substr(s+1,line.size()-1),&pm.em_energy,1);
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -213,14 +238,16 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 	return;
 }
 
-bool if_photon_file_exist(const string edge, const string work_dir, bool is_XAS, 
+bool if_photon_file_exist(const string edge, const string work_dir, bool is_XAS, bool overwrite,
 							const vecd& pvin, const vecd& pvout = vecd(3,0)) {
 	string pfname = work_dir;
 	if (is_XAS) pfname += "/XAS_"+edge+"edge_"+pol_str(pvin)+".txt";
 	else pfname += "/RIX_"+edge+"edge_"+pol_str(pvin)+"_"+pol_str(pvout)+".txt";
 	ifstream pfile(pfname.c_str());
 	if (pfile.good()) {
-		cout << "file: " << pfname << " exists, skipping..." << endl;
+		cout << "file: " << pfname << " exists";
+		if (overwrite) cout << ", overwritting..." << endl;
+		else cout << ", skipping..." << endl;
 	}
 	return pfile.good();
 }
@@ -247,8 +274,8 @@ void process_hilbert_space(string input_dir, Hilbert& GS, Hilbert& EX, const PM&
 		start = chrono::high_resolution_clock::now();
 		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size << endl;
 		GS.hblks[g].diagonalize();
-		for (size_t i = 0; i < pow(GS.hblks[g].size,2); ++i) 
-			if (abs(GS.hblks[g].eigvec[i]) < TOL) GS.hblks[g].eigvec[i] = 0;
+		// for (size_t i = 0; i < pow(GS.hblks[g].size,2); ++i) 
+		// 	if (abs(GS.hblks[g].eigvec[i]) < TOL) GS.hblks[g].eigvec[i] = 0;
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -282,8 +309,8 @@ void process_hilbert_space(string input_dir, Hilbert& GS, Hilbert& EX, const PM&
 		cout << "Number of threads: " << mkl_get_max_threads() << endl;
 		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
 		EX.hblks[e].diagonalize();
-		for (size_t i = 0; i < pow(EX.hblks[e].size,2); ++i) 
-			if (abs(EX.hblks[e].eigvec[i]) < TOL) EX.hblks[e].eigvec[i] = 0;
+		// for (size_t i = 0; i < pow(EX.hblks[e].size,2); ++i) 
+		// 	if (abs(EX.hblks[e].eigvec[i]) < TOL) EX.hblks[e].eigvec[i] = 0;
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -295,6 +322,7 @@ void process_hilbert_space(string input_dir, Hilbert& GS, Hilbert& EX, const PM&
 }
 
 int main(int argc, char** argv){
+	signal(SIGSEGV, handler);
 	char CurrentPath[FILENAME_MAX];
 	if (!GetCurrentDir(CurrentPath, sizeof(CurrentPath))) {return errno;}
 	string work_dir(CurrentPath);
@@ -344,7 +372,10 @@ int main(int argc, char** argv){
 	cout << endl << "pvout: ";
 	for (int i = 0; i < 3; ++i) cout << pm.pvout[i] << ", ";
 	cout << endl;
-
+	cout << "absorption range: ";
+	for (int i = 0; i < 2; ++i) cout << pm.ab_range[i] << ", ";
+	cout << endl;
+	cout << "emission range: " << pm.em_energy << endl;
 	
 	// Adjust Slater Condor Parameter
 	hparam.SC[0][2] *= 25;
@@ -372,7 +403,7 @@ int main(int argc, char** argv){
 			cout << "Doing photon polarization: ";
 			for (auto e : pm.pvin) cout << (int)e << " ";
 			cout << endl;
-			if (if_photon_file_exist(pm.edge,work_dir,true,pm.pvin) && !overwrite) continue;
+			if (if_photon_file_exist(pm.edge,work_dir,true,overwrite,pm.pvin) && !overwrite) continue;
 			XAS(GS,EX,pm);
 		}
 	}
@@ -390,7 +421,7 @@ int main(int argc, char** argv){
 				cout << "(out): ";
 				for (auto e : pm.pvout) cout << (int)e << " ";
 				cout << endl;
-				if (if_photon_file_exist(pm.edge,work_dir,false,pm.pvin,pm.pvout) && !overwrite) continue;
+				if (if_photon_file_exist(pm.edge,work_dir,false,overwrite,pm.pvin,pm.pvout) && !overwrite) continue;
 				RIXS(GS,EX,pm);
 			}
 		}
