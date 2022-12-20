@@ -3,7 +3,7 @@
 #include "multiplet.hpp"
 #include "photon.hpp"
 
-#define PRINT_TOL 1E-5
+#define PRINT_TOL 1E-4
 
 using namespace std;
 #pragma omp declare reduction(vec_double_plus : std::vector<double> : \
@@ -169,31 +169,35 @@ vector<double> wvfnc_weight(Hilbert& hilbs, const vector<bindex>& si, int ligNum
 	return dLweight;
 }
 
-double effective_delta(Hilbert& hilbs, int ligNum) {
+double effective_delta(Hilbert& hilbs, int ligNum, bool is_print) {
 	// Check effective delta, needs t = 0
 	double d, dL;
 	vector<bool> firstLh(ligNum,true);
-	vector<double> distinct = ed::printDistinct(hilbs.get_all_eigval(),0.0,hilbs.hsize);
+	vector<double> distinct = ed::printDistinct(hilbs.get_all_eigval(false),0.0,hilbs.hsize,is_print);
 	for (size_t e = 0; e < distinct.size(); ++e) {
 		vector<bindex> gei;
 		for (size_t i = 0; i < hilbs.hblks.size(); ++i) {
-		for (size_t j = 0; j < hilbs.hblks[i].size; ++j) {
-			if (abs(hilbs.hblks[i].eig[j]-distinct[e]) < TOL) {
-				gei.push_back({i,j});
+			if (hilbs.hblks[i].eig == nullptr) continue;
+			for (size_t j = 0; j < hilbs.hblks[i].size; ++j) {
+				if (abs(hilbs.hblks[i].eig[j]-distinct[e]) < TOL) {
+					gei.push_back({i,j});
+				}
 			}
-		}}
+		}
 		vector<double> dLweight = wvfnc_weight(hilbs,gei,ligNum,false);
 		for (size_t i = 0; i < ligNum; ++i) {
 			if (abs(dLweight[i]-1) < TOL && firstLh[i]) {
 				if (i == 0) d = distinct[e];
 				if (i == 1) dL = distinct[e];
 				firstLh[i] = false;
-				cout << "Energy: " << distinct[e] << ", degeneracy: " << gei.size() << endl;
-				wvfnc_weight(hilbs,gei,ligNum,true);
+				if (is_print) {
+					cout << "Energy: " << distinct[e] << ", degeneracy: " << gei.size() << endl;
+					wvfnc_weight(hilbs,gei,ligNum,true);
+				}
 			}
 		}
 	}
-	cout << "Effective delta: " << dL - d << endl;
+	if (is_print) cout << "Effective delta: " << dL - d << endl;
 	return dL - d;
 }
 
@@ -376,7 +380,7 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 		}
 	}
 	// Calculate peak intensity, TODO: output peaks?
-	XAS_peak_occupation(GS,EX,vecd({4}),xas_aben,xas_int,gsi,gs_en,"top",true);
+	XAS_peak_occupation(GS,EX,vecd({10}),xas_aben,xas_int,gsi,gs_en,"top",true);
 
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);

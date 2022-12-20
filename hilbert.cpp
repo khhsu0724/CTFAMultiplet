@@ -250,13 +250,15 @@ int Hilbert::tot_site_num() {
 	return tsn; 
 }
 
-vector<double> Hilbert::get_all_eigval() {
+vector<double> Hilbert::get_all_eigval(bool is_err) {
 	vector<double> all_eig(hsize,0);
 	for (auto & blk : hblks) {
-		if (blk.eig == nullptr) 
-			throw out_of_range("invalid access of eigval");
-		for (size_t i = 0; i < blk.size; ++i) {
-			all_eig[i+blk.f_ind] = blk.eig[i];
+		if (blk.eig == nullptr) {
+			if (is_err) throw out_of_range("invalid access of eigval");
+		} else {
+			for (size_t i = 0; i < blk.size; ++i) {
+				all_eig[i+blk.f_ind] = blk.eig[i];
+			}
 		}
 	}
 	return all_eig;

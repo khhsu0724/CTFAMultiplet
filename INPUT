@@ -5,10 +5,10 @@
     SC2EX = 6.0327 0 0.2191 0 0.0137 # SC2 for excited state, can be optional
     #FG = 7.4332 4.7576 6.3192 2.7072 #F^0,G^1,F^2,G^2
 	FG = 1.0 0.25 0 0 #F^0,G^1
-    CF = 0 0 1.9 1.9 1.9  #dx2y2, dz2, dxy, dxz, ./dyz
-    tpd = 0.7
-    tpp = 0.3
-    MLCT = 20.85
+    CF = 0 -1.4 1.4 0.7 0.7 #dx2y2, dz2, dxy, dxz, dyz
+    tpd = 1.4
+    tpp = 0.5
+	MLCT = -3 # Effective Delta = -4.5
 	OVERWRITE = True # Overwrite photon file in the directory
 	#BLOCK = False # block diagonalization
 	# PBC = Periodic Boundary Condition
@@ -19,7 +19,7 @@
 &CELL
 	Coordination = "Square Planar" # Defaults to no coordination
 	Sites = 1 # x,y,z, Defaults to 1 site
-	Holes = 4 # If this is read then &Atom's will be skipped
+	Holes = 5 # If this is read then &Atom's will be skipped
 /
 &ATOMS
 	# Each line is a site, with atoms and ligands in the site
@@ -28,14 +28,14 @@
 	O  0 0 1 2p
 /
 &PHOTON
-	XAS = true
-	RIXS = true
-	pvin = 1 0 0
+	XAS = true	
+	RIXS = false
+	pvin = 1 1 1
 	pvout = 1 0 0
 	Edge = K
 	Eloss = false
-	NEDOS = 5000 # Number of bins for XAS/RIXS
-    AB = -25 -15
+	NEDOS = 2000 # Number of bins for XAS/RIXS
+    AB = -25 25
     EM = 15
 	# spinflip = true # RIXS spin flip
 /
