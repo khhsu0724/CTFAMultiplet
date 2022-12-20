@@ -38,7 +38,7 @@ std::complex<double> proj_pvec(int ml, const vecd& pvec);
 vecd occupation(Hilbert& hilbs, const std::vector<bindex>& si, bool is_print=true);
 vecd wvfnc_weight(Hilbert& hilbs, const std::vector<bindex>& si, 
 								int ligNum = 3, bool print = false);
-double effective_delta(Hilbert& hilbs, int ligNum = 3);
+double effective_delta(Hilbert& hilbs, int ligNum = 3, bool is_print = false);
 void state_composition(Hilbert& hilbs, const std::vector<bindex>& si, size_t top = 10);
 void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, std::vector<blapIndex>& blap, 
 					const PM& pm, bool pvout = false);

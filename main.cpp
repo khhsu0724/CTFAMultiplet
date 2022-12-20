@@ -166,6 +166,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 							else if (p == "TPD") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpd,1);
 							else if (p == "TPP") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpp,1);
 							else if (p == "MLCT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.MLdelta,1);
+							else if (p == "EFFDEL") skip = read_bool(line.substr(s+1,line.size()-1),hparam.effective_delta);
 							else if (p == "BLOCK") skip = read_bool(line.substr(s+1,line.size()-1),hparam.block_diag);
 							else if (p == "OVERWRITE") skip = read_bool(line.substr(s+1,line.size()-1),overwrite);
 							p = "";
@@ -242,7 +243,7 @@ bool if_photon_file_exist(const string edge, const string work_dir, bool is_XAS,
 							const vecd& pvin, const vecd& pvout = vecd(3,0)) {
 	string pfname = work_dir;
 	if (is_XAS) pfname += "/XAS_"+edge+"edge_"+pol_str(pvin)+".txt";
-	else pfname += "/RIX_"+edge+"edge_"+pol_str(pvin)+"_"+pol_str(pvout)+".txt";
+	else pfname += "/RIXS_"+edge+"edge_"+pol_str(pvin)+"_"+pol_str(pvout)+".txt";
 	ifstream pfile(pfname.c_str());
 	if (pfile.good()) {
 		cout << "file: " << pfname << " exists";
@@ -252,7 +253,19 @@ bool if_photon_file_exist(const string edge, const string work_dir, bool is_XAS,
 	return pfile.good();
 }
 
-void process_hilbert_space(string input_dir, Hilbert& GS, Hilbert& EX, const PM& pm, HParam& hparam) {
+double calculate_effective_delta(const string& input_dir, HParam& hparam, const PM& pm) {
+	double inp_tpd = hparam.tpd, inp_tpp = hparam.tpp;
+	hparam.tpd = 0;
+	hparam.tpp = 0;
+	Hilbert GS(input_dir,hparam,pm.edge,false);
+	calc_ham(GS,hparam);
+	for (size_t g = 0; g < (GS.hblks.size()+1)/2; g++) GS.hblks[g].diagonalize();
+	hparam.tpd = inp_tpd;
+	hparam.tpp = inp_tpp;
+	return effective_delta(GS,3);
+}
+
+void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam) {
 	// Assembling Hamiltonian and Diagonalizing, returns partition function
 	double beta = 0;
 	cout << "Assembling Hamiltonian..." << endl;
@@ -274,8 +287,6 @@ void process_hilbert_space(string input_dir, Hilbert& GS, Hilbert& EX, const PM&
 		start = chrono::high_resolution_clock::now();
 		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size << endl;
 		GS.hblks[g].diagonalize();
-		// for (size_t i = 0; i < pow(GS.hblks[g].size,2); ++i) 
-		// 	if (abs(GS.hblks[g].eigvec[i]) < TOL) GS.hblks[g].eigvec[i] = 0;
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -296,11 +307,8 @@ void process_hilbert_space(string input_dir, Hilbert& GS, Hilbert& EX, const PM&
 	if (hparam.block_diag) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
 	occupation(GS,gsi);
-	cout << "Ground State composition: ";
 	wvfnc_weight(GS,gsi,3,true);
 	cout << endl;
-	// effective_delta(GS,3);
-	// return;
 
 	// #pragma omp parallel for
 	cout << "Diagonalizing Core-Hole State" << endl;
@@ -309,12 +317,26 @@ void process_hilbert_space(string input_dir, Hilbert& GS, Hilbert& EX, const PM&
 		cout << "Number of threads: " << mkl_get_max_threads() << endl;
 		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
 		EX.hblks[e].diagonalize();
-		// for (size_t i = 0; i < pow(EX.hblks[e].size,2); ++i) 
-		// 	if (abs(EX.hblks[e].eigvec[i]) < TOL) EX.hblks[e].eigvec[i] = 0;
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
 	}
+	double ex_min_en = EX.hblks[0].eig[0];
+	vector<bindex> exmin_ind;
+	for (auto &exb : EX.hblks) for (size_t i = 0; i < exb.size; ++i) if (exb.eig[i] <= ex_min_en) ex_min_en = exb.eig[i];
+	if (hparam.block_diag) {
+		SDegen = 0;
+		for (size_t i = 0; i < EX.hblks.size(); ++i) {
+		for (size_t j = 0; j < EX.hblks[i].size; ++j) {
+			if (abs(EX.hblks[i].eig[j]-ex_min_en) < TOL) {
+				if (abs(EX.hblks[i].get_sz()) >= SDegen) SDegen = abs(EX.hblks[i].get_sz());
+				exmin_ind.push_back({i,j});
+			}
+		}}
+	}
+	cout << "Calculating Occupation (with degeneracy): " << exmin_ind.size() << endl;
+	occupation(EX,exmin_ind);
+	wvfnc_weight(EX,exmin_ind,3,true);
 	auto diag_stop = chrono::high_resolution_clock::now();
 	duration = chrono::duration_cast<chrono::milliseconds>(diag_stop - diag_start);
 	cout << "Total diagonalize run time = " << duration.count() << " ms\n" << endl;
@@ -361,7 +383,31 @@ int main(int argc, char** argv){
 		cout << "tpd = " << hparam.tpd; 
 		cout << ", tpp = " << hparam.tpp << endl; 
 	} else cout << "Hybridization turned off" << endl; 
-	cout << "delta: " << hparam.MLdelta << endl; 
+
+	// Adjust Slater Condor Parameter
+	hparam.SC[0][2] *= 25;
+	hparam.SC[1][2] *= 49;
+	hparam.SC[1][4] *= 441;
+	hparam.SC2EX[2] *= 49;
+	hparam.SC2EX[4] *= 441;
+	cout << "Ground State Udd: " << (hparam.SC2[0]-hparam.SC2[2]*2/63-hparam.SC2[4]*2/63);
+	cout << ", JH: " << (hparam.SC2[2]/14+hparam.SC2[4]/14) << endl;
+	cout << "Core-Hole State Udd: " << (hparam.SC2EX[0]-hparam.SC2EX[2]*2/63-hparam.SC2EX[4]*2/63);
+	cout << ", JH: " << (hparam.SC2EX[2]/14+hparam.SC2EX[4]/14);
+	cout << ", Udp: " << (hparam.FG[0] - hparam.FG[1]/15 - hparam.FG[3]*3/70) << endl;
+
+	// Calculate Delta or Effective Delta
+	if (hparam.effective_delta) {
+		cout << "effective delta: " << hparam.MLdelta << endl; 
+		double del = calculate_effective_delta(IDIR,hparam,pm);
+		hparam.MLdelta = 2*hparam.MLdelta - del;
+		cout << "calculated delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
+	} else {
+		cout << "delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
+		double del = calculate_effective_delta(IDIR,hparam,pm);
+		cout << "Calculated effective delta: " << del << endl;
+	}
+
 	if (pm.RIXS) {
 		if (pm.eloss) cout << "Using energy loss" << endl;
 		else cout << "using omega/omega" << endl;
@@ -376,13 +422,6 @@ int main(int argc, char** argv){
 	for (int i = 0; i < 2; ++i) cout << pm.ab_range[i] << ", ";
 	cout << endl;
 	cout << "emission range: " << pm.em_energy << endl;
-	
-	// Adjust Slater Condor Parameter
-	hparam.SC[0][2] *= 25;
-	hparam.SC[1][2] *= 49;
-	hparam.SC[1][4] *= 441;
-	hparam.SC2EX[2] *= 49;
-	hparam.SC2EX[4] *= 441;
 
 	if (!pm.XAS && !pm.RIXS) return 0; // Return if no photon methods
 	// Reading and Checking input parameters
@@ -390,8 +429,9 @@ int main(int argc, char** argv){
 	Hilbert EX(IDIR,hparam,pm.edge,true);
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+	cout << "Number of Holes: " << GS.num_vh << endl;
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
-	process_hilbert_space(IDIR,GS,EX,pm,hparam);
+	process_hilbert_space(GS,EX,hparam);
 
 	// Calculate Cross Sections
 	vector<double> pvin = pm.pvin, pvout = pm.pvout;

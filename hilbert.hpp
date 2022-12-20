@@ -14,12 +14,13 @@ struct HParam {
 	double SO = 0, MLdelta = 0;
 	double tpd = 0, tpp = 0;
 	double SC2[5]{0}, SC1[3]{0}, FG[4]{0}, CF[5]{0}, SC2EX[5]{0};
-	bool block_diag = true, HYB = true;
+	bool block_diag = true, HYB = true, effective_delta = true;
 	std::vector<double*> SC;
 	HParam() {
 		SC.emplace_back(SC1);
 		SC.emplace_back(SC2);
 	};
+	// Copy constructor??
 };
 
 int conv_lchar(char orb);
@@ -141,7 +142,7 @@ public:
 	int orbind(ulli s);
 	int tot_site_num();
 	double pheshift(double trace, int k);
-	std::vector<double> get_all_eigval();
+	std::vector<double> get_all_eigval(bool is_err = true);
 
 	// Class for input file parsing
 	void make_atlist(std::string edge, const int& tm_per_site, const int& lig_per_site);
