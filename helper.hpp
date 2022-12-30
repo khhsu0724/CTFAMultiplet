@@ -16,10 +16,13 @@
 
 #define TOL 1E-7
 #define PI 3.141592653589793238462643383279502884L
-typedef unsigned long long int ulli;
 typedef std::complex<double> dcomp;
 typedef std::vector<double> vecd;
 typedef std::vector<std::complex<double>> vecc;
+typedef unsigned long long int ulli;
+typedef unsigned long int uli;
+typedef std::pair<size_t,size_t> bindex;
+typedef std::vector<std::pair<ulli,ulli>> vpulli;
 
 namespace ed {
 	bool is_pw2(int x);

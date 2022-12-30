@@ -35,73 +35,11 @@ dcomp proj_pvec(int ml, const vecd& pvec) {
 	}
 }
 
-void print_square_planar(const vecd& occ, int p = 5) {
-	// Temporary implementation
-	cout << setw(12) << "Num Holes: ";
-	for (size_t n = 0; n < occ.size(); n+=11) {
-		double num_h = 0;
-		for (int i = n; i < n+11; ++i) num_h += occ[i];
-		cout << setprecision(3) << setw(12) << num_h;
-	}
-	cout << endl;
-	cout << setw(12) << "dx2: " << fixed << setprecision(p);
-	for (size_t n = 0; n < occ.size(); n+=11) cout << setw(12) << occ[n];
-	cout << endl;
-	cout << setw(12) << "dz2: " << fixed << setprecision(p);
-	for (size_t n = 1; n < occ.size(); n+=11) cout << setw(12) << occ[n];
-	cout << endl;
-	cout << setw(12) << "dxy: " << fixed << setprecision(p);
-	for (size_t n = 2; n < occ.size(); n+=11) cout << setw(12) << occ[n];
-	cout << endl;
-	cout << setw(12) << "dxz: " << fixed << setprecision(p);
-	for (size_t n = 3; n < occ.size(); n+=11) cout << setw(12) << occ[n];
-	cout << endl;
-	cout << setw(12) << "dyz: " << fixed << setprecision(p);
-	for (size_t n = 4; n < occ.size(); n+=11) cout << setw(12) << occ[n];
-	cout << endl;
-	cout << setw(12) << "pxx: " << fixed << setprecision(p);
-	for (size_t n = 5; n < occ.size(); n+=11) cout << setw(12) << occ[n];
-	cout << endl;
-	cout << setw(12) << "pxy: " << fixed << setprecision(p);
-	for (size_t n = 6; n < occ.size(); n+=11) cout << setw(12) << occ[n];
-	cout << endl;
-	cout << setw(12) << "pxz: " << fixed << setprecision(p);
-	for (size_t n = 7; n < occ.size(); n+=11) cout << setw(12) << occ[n];
-	cout << endl;
-	cout << setw(12) << "pyx: " << fixed << setprecision(p);
-	for (size_t n = 8; n < occ.size(); n+=11) cout << setw(12) << occ[n];
-	cout << endl;
-	cout << setw(12) << "pyy: " << fixed << setprecision(p);
-	for (size_t n = 9; n < occ.size(); n+=11) cout << setw(12) << occ[n];
-	cout << endl;
-	cout << setw(12) << "pyz: " << fixed << setprecision(p);
-	for (size_t n = 10; n < occ.size(); n+=11) cout << setw(12) << occ[n];
-	cout << endl;
-	
-	return;
-}
-
 vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print) {
 	// Calculation occupation of orbitals, only valid when matrix is diagonalized
 	for (auto& blk : hilbs.hblks) if (blk.eigvec == nullptr) throw runtime_error("matrix not diagonalized for occupation");
-	if (hilbs.coord != "sqpl") {
-		cout << "non square planar geometry occupation not coded yet" << endl;
-		return vector<double>();
-	}
-
-	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
-	vecc U(nvo*nvo,0);
-	U[0*nvo+0] = U[0*nvo+4] = {1/sqrt(2),0};
-	U[1*nvo+2] = {1,0};
-	U[2*nvo+0] = {0,1/sqrt(2)};
-	U[2*nvo+4] = {0,-1/sqrt(2)};
-	U[3*nvo+1] = {1/sqrt(2),0};
-	U[3*nvo+3] = {-1/sqrt(2),0};
-	U[4*nvo+1] = U[4*nvo+3] = {0,1/sqrt(2)};
-	U[5*nvo+5] = U[5*nvo+7] = U[8*nvo+8] = U[8*nvo+10] = {1/sqrt(2),0};
-	U[6*nvo+5] = U[9*nvo+8] = {0,1/sqrt(2)};
-	U[6*nvo+7] = U[9*nvo+10] = {0,-1/sqrt(2)};
-	U[7*nvo+6] = U[10*nvo+9] = {1,0};
+	int nvo = hilbs.cluster->vo_persite, nco = hilbs.cluster->co_persite;
+	vecc U = hilbs.cluster->get_seph2real_mat();
 	vector<double> occ_totc(nvo,0);
 	Hilbert minus_1vh(hilbs,-1);
 	for (auto &s  : si) {
@@ -128,11 +66,9 @@ vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print) {
 			for (auto &w : wvfnc) occ_totc[c] += abs(pow(w,2))/si.size();
 		}
 	}
-
 	double tot_h = 0;
-	int p = 5;
 	for (auto &h : occ_totc) tot_h += h;
-	if (is_print) print_square_planar(occ_totc);
+	if (is_print) hilbs.cluster->print_eigstate(occ_totc);
 	return occ_totc;
 }
 
@@ -302,7 +238,7 @@ void XAS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd con
 			for (size_t i = 0; i < occ_rel.size(); ++i) occ_rel[i] -= occ_gs[i];
 			occ.insert(occ.end(),occ_rel.begin(),occ_rel.end());
 		} else cout << "---------------------------------------" << endl;
-		print_square_planar(occ);
+		EX.cluster->print_eigstate(occ);
 		cout << "---------------------------------------" << endl << endl;
 	}
 	return;
@@ -445,14 +381,14 @@ void RIXS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd co
 		vecd occ_fs = occupation(GS,em_peaks,false);
 		occ_ex.insert(occ_ex.end(),occ_fs.begin(),occ_fs.end());
 		cout << "--------------------Abs----------Em----" << endl;
-		print_square_planar(occ_ex);
+		EX.cluster->print_eigstate(occ_ex);
 		if (ref_gs) {
 			cout << "--------Relative to Ground state-------" << endl;
 			for (size_t i = 0; i < occ_ex.size()/2; ++i) {
 				occ_ex[i] -= occ_gs[i];
 				occ_ex[i+11] -= occ_gs[i];
 			}
-			print_square_planar(occ_ex);
+			EX.cluster->print_eigstate(occ_ex);
 		}
 		cout << "---------------------------------------" << endl << endl;
 	}

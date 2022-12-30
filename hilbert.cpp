@@ -6,38 +6,6 @@
 
 using namespace std;
 
-int conv_lchar(char orb) {
-	try {
-		if (orb == 's') return 0;
-		else if (orb == 'p') return 1;
-		else if (orb == 'd') return 2;
-		else if (orb == 'f') return 3;
-		else throw invalid_argument("invalid orbital");
-	} catch(const exception &ex) {
-		cerr << ex.what() << "\n";
-		exit(0);
-	}
-}
-
-bool ao_order(int n1, int l1, int n2, int l2) {
-	// Check if n1,l1 is a higher/equal orbital than n2,l2
-	if (n1+l1 > n2+l2) return true;
-	else if (n1+l1 < n2+l2) return false;
-	else return (n1 >= n2);
-}
-
-bool operator<(const QN& qn1, const QN& qn2) {
-	// State further to the "right" is smaller
-	if (qn1.order != qn2.order) return qn1.order < qn2.order;
-	if (qn1.spin != qn2.spin) return qn1.spin < qn2.spin;
-	else return qn1.ml > qn2.ml;
-}
-
-bool operator!=(const QN& qn1, const QN& qn2) {
-	if (qn1.spin == qn2.spin && qn1.ml == qn2.ml && qn1.order == qn2.order) return false;
-	return true;
-}
-
 Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex): 
 					is_ex(is_ex), edge(edge) {
 	read_from_file(file_dir);
@@ -51,6 +19,7 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 	if (hparam.block_diag) BLOCK_DIAG = !(edge == "L" && is_ex) || !SO_on;
 	int hv = num_vorb/2, hc = num_corb/2;
 	this->hsize = ed::choose(num_vorb,num_vh) * ed::choose(num_corb,num_ch);
+	if (num_vh > num_vorb) throw invalid_argument("too many holes from input");
 	size_t bfind = 0;
 	if (BLOCK_DIAG) {
 		// Sz ordered blocks, when spin orbit coupling is not on
@@ -153,6 +122,8 @@ Hilbert::Hilbert(const Hilbert &hilbs, int vh_mod) {
 	sites = hilbs.sites;
 	if (!vh_mod) cout << "USING COPY CONSTRUCTOR IS NOT ADVISED" << endl;
 	hsize = ed::choose(num_vorb,num_vh) * ed::choose(num_corb,num_ch);
+	assign_cluster(coord);
+	// This is not great, we should be able to specify Hash function?
 	hashfunc = &Hilbert::norm_Hash;
 	hbfunc = &Hilbert::norm_Hashback;
 	// TODO: complete copy constructor for no vh_mod
@@ -265,43 +236,15 @@ vector<double> Hilbert::get_all_eigval(bool is_err) {
 }
 
 // Functions for file parsing
-bool Hilbert::build_coordination(bool nh_read, int& tm_per_site, int& lig_per_site) {
-	// This function builds information on atom relative 
-	// positions and what sites they are on
-	if (coord == "none") {
-		tm_per_site = 1;
-		if (edge == "K") throw invalid_argument("TM K edge unavailable");
-	}
-	else if (coord == "sqpl") {
-		tm_per_site = 1;
-		lig_per_site = 2;
-	}
-	this->at_per_site = tm_per_site + lig_per_site;
-	if (nh_read) make_atlist(edge,tm_per_site,lig_per_site);
-	return true;
-}
-
-void Hilbert::make_atlist(string edge, const int& tm_per_site, const int& lig_per_site) {
-	int num_sites = tot_site_num(), atind = 0, siteind = 0;
-	vector<int> dist = ed::distribute(num_vh,num_sites);
-	for (int x = 0; x < this->sites[0]; ++x) {
-	for (int y = 0; y < this->sites[1]; ++y) {
-	for (int z = 0; z < this->sites[2]; ++z) {
-		vector<int> site = {x,y,z};
-		for (size_t tm = 0; tm < tm_per_site; ++tm) {
-			if (edge == "L") atlist.emplace(atlist.begin(),Atom("2p",atind,3,2,0,site));
-			atlist.emplace_back(Atom("3d",atind,3,2,dist[siteind],site));
-			atind++;
-		}
-		for (size_t lig = 0; lig < lig_per_site; ++lig) {
-			if (edge == "K") atlist.emplace(atlist.begin(),Atom("1s",atind,2,1,0,site));
-			atlist.emplace_back(Atom("2p",atind,2,1,0,site));
-			atind++;
-		}
-		siteind++;
-	}}}
-	this->num_at = atind;
-	return;
+void Hilbert::assign_cluster(string input) {
+	transform(input.begin(),input.end(),input.begin(),::toupper);
+	if (input == "" || input == "NONE" || input == "ION") {
+		coord = "ion";
+		cluster = new Ion(edge);
+	} else if (input == "SQUARE PLANAR" || input == "SQPL") {
+		coord = "sqpl"; 
+		cluster = new SquarePlanar(edge);
+	} else throw invalid_argument("unavailable coordination");
 }
 
 void Hilbert::read_from_file(string file_dir) {
@@ -309,14 +252,12 @@ void Hilbert::read_from_file(string file_dir) {
 	ifstream input_file(file_dir);
 	try {
 		if (input_file.is_open()) {
-			bool read_cell = false, read_atoms = false, coord_built = false, nh_read = false;
+			bool read_cell = false, nh_read = false;
 			int atind = 0, cpsize = 0, tm_per_site = 0, lig_per_site = 0;
 			while (getline(input_file,line)) {
 				if (line[0] == '#') continue;
 				if (line[0] == '/') {
-					if (read_cell) coord_built = build_coordination(nh_read,tm_per_site,lig_per_site);
 					read_cell = false;
-					read_atoms = false;
 					continue;
 				}
 				if (read_cell) {
@@ -334,10 +275,7 @@ void Hilbert::read_from_file(string file_dir) {
 								 	if (ep != string::npos) input = input.substr(sp,ep-sp);
 								 	else throw invalid_argument("No end quote");
 								} else throw invalid_argument("Quotation needed for argument");
-								transform(input.begin(),input.end(),input.begin(),::toupper);
-								if (input == "SQUARE PLANAR" || input == "SQPL") coord = "sqpl";
-								else if (input == "" || input == "NONE") coord = "none";
-								else throw invalid_argument("unavailable coordination");
+								assign_cluster(input);
  								skip = true;
 							}
 							else if (p == "SITES") {
@@ -373,78 +311,27 @@ void Hilbert::read_from_file(string file_dir) {
 							}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
 						}
 					}
-					// call build coord and make sure sites & coordination are both read
 				}
-				if (read_atoms) {
-					//gets how many line, edge determine what orbitals are included
-					if (nh_read)  continue;
-					if (!coord_built) throw invalid_argument("&Cell missing or needs to precede &Atoms");
-					string at;
-					Atom atin;
-					int entry = 0;
-					bool skipline = false;
-					atind++;
-					for (int s = 0; s < line.size(); ++s) {
-						if (line[s] == '#') {
-							atind--;
-							skipline = true;
-							break;
-						}
-						if (line[s] != ' ' && line[s] != '	') {
-							at.push_back(line[s]);
-							if (s == line.size()-1) {
-								atin.add_orb(at,atind-1);
-								atlist.emplace_back(atin);
-								if (!atin.is_val) rotate(atlist.begin(),atlist.end()-1,atlist.end());
-							}
-						}
-						else {
-							if (at != "") {
-								entry++;
-								if (regex_match(at,regex(".*[a-zA-Z]+.*"))) {
-									if (entry == 1) {
-										num_at++;
-										atin.atname = at;
-									} else {
-										atin.add_orb(at,atind-1);
-										atlist.emplace_back(atin);
-										if (!atin.is_val) rotate(atlist.begin(),atlist.end()-1,atlist.end());
-									}
-								} else atin.kp.emplace_back(stod(at));
-							}
-							at = "";
-						}
-					}
-					if (atin.kp.size() != 3 && !skipline) throw invalid_argument("Invalid atom position");
-				}
-				if (line == "&CELL") {
-					read_cell = true;
-					read_atoms = false;
-				}
-				else if (line == "&ATOMS") {
-					read_atoms = true;
-					read_cell = false;
-				}
+				if (line == "&CELL") read_cell = true;
 			}
 			input_file.close();
+			if (!nh_read) throw invalid_argument("Number of holes needed for input");
+			if (cluster == NULL) assign_cluster("");
+			this->at_per_site = cluster->at_per_site();
+			this->num_at = cluster->at_per_site() * tot_site_num();
+			cluster->make_atlist(atlist,num_vh,sites,tot_site_num());
 			int ind = 0;
 			for (size_t i = 0; i < atlist.size(); ++i) {
 				atlist[i].sind = ind;
 				atlist[i].eind = ind + (2*atlist[i].l+1)-1;
 				ind = atlist[i].eind + 1;
-				if (atlist[i].is_val) {
-					if (!nh_read) num_vh += atlist[i].num_h;
-					num_vorb += 2*(2*atlist[i].l+1);
-				} else {
-					if (!nh_read) num_ch += atlist[i].num_h;
+				if (atlist[i].is_val) num_vorb += 2*(2*atlist[i].l+1);
+				else {
 					num_corb += 2*(2*atlist[i].l+1);
 					val_ind = atlist[i].eind + 1;
 					val_ati = i + 1;
 				}
-				// size_t j = 0;
-				// for (j = 0; j < i; ++j) if(ed::veccmp(atlist[i].kp,atlist[j].kp)) break;
 			}
-			if (num_vh > num_vorb) throw invalid_argument("too many holes from input");
 			for (auto &at : atlist) {
 				for (size_t i = at.sind; i <= at.eind; i++) at.check += (1 << i | 1 << (i+num_corb/2+num_vorb/2));
 			}

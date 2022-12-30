@@ -175,120 +175,16 @@ void calc_CV(Hilbert& hilbs, const double* FG) {
 					hilbs.fill_hblk(meG*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second);
 			}
 		}}}}
-		// !!!!!!Shift for particle hole symmetry
 	}
 	return;
 }
 
-vecd HYBmat(Hilbert& hilbs, const HParam& hparam) {
-	// Calculate Hybridization, charge transfer and crystal field energy
-	// !!!! Need to factor in different sites...how to do this?
-	// Can we identify what type of geomtery algorithmically
-	string coord = hilbs.coord;
-	// cout << "building hybdrization matrix" << endl;
-	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
-	vecd hybmat(nvo*nvo,0),tmatreal(nvo*nvo,0);
-	double t = hparam.tpd, del = hparam.MLdelta, tpp = hparam.tpp;
-	double sig_pi = -0.5;
-	double tpd = t, tpdz = 0.25*t, tpdxy = t*sig_pi/4, tpdxz = t*sig_pi, tpdyz = t*sig_pi, tpppi = 0*tpp, tppsigma = tpp, tppzpi = 0*tpp;
-	// double tpd = 1, tpdz = 0.25, tpdxy = 0.225, tpdxz = 0.225, tpdyz = 0.225, tpppi = 0, tppsigma = 0.25, tppzpi = 0; // Temp place holdler
-	// Temporary implementation
-	// Omit tpppi since it will give imaginary number
-	double kx = PI, ky = PI, kz = 0; // one site momentum = 0, p-h transformation k+Q = pi
-	double t0 = tpdz/sqrt(2), t1x = tpdxz/sqrt(2), t1y = tpdyz/sqrt(2), t2p = 0.5*(tpd+tpdxy), t2m = 0.5*(tpd-tpdxy);
-	double sx = 2*sin(kx/2), sy = 2*sin(ky/2), cx = 2*cos(kx/2), cy = 2*cos(ky/2), tpsigma = tppsigma; // = 2*tppsigma???
-	cx = cy = 2;
-	hybmat[5*nvo+0] = hybmat[0*nvo+5] = t2m*cx;//-0.5*(tpd+tpdxy)*2;
-	hybmat[7*nvo+0] = hybmat[0*nvo+7] = t2p*cx;//-0.5*(tpd-tpdxy)*2;
-	hybmat[8*nvo+0] = hybmat[0*nvo+8] = -t2m*cy;//-0.5*(-tpd+tpdxy)*2;
-	hybmat[10*nvo+0] = hybmat[0*nvo+10] = t2p*cy;//-0.5*(-tpd-tpdxy)*2;
-	hybmat[6*nvo+1] = hybmat[1*nvo+6] = -t1x*cx;//tpdxz/sqrt(2)*2;
-	hybmat[9*nvo+1] = hybmat[1*nvo+9] = t1y*cy;//tpdyz/sqrt(2)*2;
-	hybmat[5*nvo+2] = hybmat[2*nvo+5] = t0*cx;//-tpdz/sqrt(2)*2;
-	hybmat[7*nvo+2] = hybmat[2*nvo+7] = t0*cx;//-tpdz/sqrt(2)*2;
-	hybmat[8*nvo+2] = hybmat[2*nvo+8] = t0*cy;// -tpdz/sqrt(2)*2;
-	hybmat[10*nvo+2] = hybmat[2*nvo+10] = -t0*cy; //-tpdz/sqrt(2)*2;
-	hybmat[6*nvo+3] = hybmat[3*nvo+6] = t1x*cx; //-tpdxz/sqrt(2)*2;
-	hybmat[9*nvo+3] = hybmat[3*nvo+9] = t1y*cy; //-tpdyz/sqrt(2)*2;
-	hybmat[5*nvo+4] = hybmat[4*nvo+5] = t2p*cx; //-0.5*(tpd-tpdxy)*2;
-	hybmat[7*nvo+4] = hybmat[4*nvo+7] = t2m*cx; //-0.5*(tpd+tpdxy)*2;
-	hybmat[8*nvo+4] = hybmat[4*nvo+8] = -t2p*cy; //-0.5*(-tpd-tpdxy)*2;
-	hybmat[10*nvo+4] = hybmat[4*nvo+10] = t2m*cy; //-0.5*(-tpd+tpdxy)*2;
-	hybmat[10*nvo+5] = hybmat[5*nvo+10] = tpsigma*cx*cy;
-	hybmat[8*nvo+7] = hybmat[7*nvo+8] = -tpsigma*cx*cy;
-	hybmat[5*nvo+5] = hybmat[6*nvo+6] = hybmat[7*nvo+7] = hybmat[8*nvo+8] = hybmat[9*nvo+9] = hybmat[10*nvo+10] = del;
-	
-	//
-	// Temporary implementation
-	// tpd = 1.0, tpdz = 1, tpdxy = 0.5, tpdxz = 1, tpdyz = 1, tpppi = 0.1, tppsigma = 1, tppzpi = 10;
-	// sx = 2, sy = 2, cx = 0, cy = 0, tpsigma = tppsigma; // = 2*tppsigma???
-	vecc tmat(nvo*nvo,0);
-	tmat[0*nvo+5] = {0,-tpd*sx};
-	tmat[5*nvo+0] = -tmat[0*nvo+5];
-	tmat[0*nvo+9] = {0,tpd*sy};
-	tmat[9*nvo+0] =  -tmat[0*nvo+9];
-	tmat[1*nvo+5] = {0,-tpdz*sx};
-	tmat[5*nvo+1] = -tmat[1*nvo+5];
-	tmat[1*nvo+9] = {0,-tpdz*sy};
-	tmat[9*nvo+1] =  -tmat[1*nvo+9];
-	tmat[2*nvo+6] = {0,tpdxy*sx};
-	tmat[6*nvo+2] = -tmat[2*nvo+6];
-	tmat[2*nvo+8] = {0,tpdxy*sy};
-	tmat[8*nvo+2] =  -tmat[2*nvo+8];
-	tmat[3*nvo+7] = {0,tpdxz*sx};
-	tmat[7*nvo+3] =  -tmat[3*nvo+7];
-	tmat[4*nvo+10] = {0,tpdyz*sy};
-	tmat[10*nvo+4] =  -tmat[4*nvo+10];
-	tmat[5*nvo+5] = tmat[6*nvo+6] = tmat[7*nvo+7] = tmat[8*nvo+8] = tmat[9*nvo+9] = tmat[10*nvo+10] = del;
-	tmat[5*nvo+8] = tmat[8*nvo+5] = {-tpppi*cx*cy,0};
-	tmat[5*nvo+9] = tmat[9*nvo+5] = {-tppsigma*sx*sy,0};
-	tmat[6*nvo+8] = tmat[8*nvo+6] = {-tppsigma*sx*sy,0};
-	tmat[6*nvo+9] = tmat[9*nvo+6] = {-tpppi*cx*cy,0};
-	tmat[7*nvo+10] = tmat[10*nvo+7] = {tppzpi*cx*cy,0};
-
-	vecc U(nvo*nvo,0);
-	U[0*nvo+0] = U[0*nvo+4] = {1/sqrt(2),0};
-	U[1*nvo+2] = {1,0};
-	U[2*nvo+0] = {0,1/sqrt(2)};
-	U[2*nvo+4] = {0,-1/sqrt(2)};
-	U[3*nvo+1] = {1/sqrt(2),0};
-	U[3*nvo+3] = {-1/sqrt(2),0};
-	U[4*nvo+1] = U[4*nvo+3] = {0,1/sqrt(2)};
-	U[5*nvo+5] = U[5*nvo+7] = U[8*nvo+8] = U[8*nvo+10] = {1/sqrt(2),0};
-	U[6*nvo+5] = U[9*nvo+8] = {0,1/sqrt(2)};
-	U[6*nvo+7] = U[9*nvo+10] = {0,-1/sqrt(2)};
-	U[7*nvo+6] = U[10*nvo+9] = {1,0};
-
-	// std::transform(hybmat.begin(), hybmat.end(), tmat.begin(), [](double d) {return complex<double>(d,0);});
-	tmat = ed::matmult(tmat,U,nvo);
-	ed::ctranspose(U,nvo,nvo);
-	tmat = ed::matmult(U,tmat,nvo);
-
-	// Eliminate i in matrix
-	vecc a(nvo*nvo,0);
-	for(int i = 0; i < 5; i++) a[i*nvo+i] = {1,0};
-	for(int i = 5; i < 8; i++) a[i*nvo+i] = {0,1};
-	for(int i = 8; i < 11; i++) a[i*nvo+i] = {1,0};
-	tmat = ed::matmult(tmat,a,nvo);
-	ed::ctranspose(a,nvo,nvo);
-	tmat = ed::matmult(a,tmat,nvo);
-	// ed::write_vec(tmat,11,11,"hyb.txt");
-	// vecd tmatd(nvo*nvo);
-	std::transform(tmat.begin(), tmat.end(), tmatreal.begin(), [](complex<double> c) {return c.real();});
-	// Particle hole transformation???????
-	return tmatreal;
-}	
-
 void calc_HYB(Hilbert& hilbs, const HParam& hparam) {
 	// Charge Transfer and Hybridization
-	// Temperory implementation for square planar geometry
-	if (hilbs.at_per_site == 1) return;
+	if (hilbs.cluster->no_HYB) return;
+	else hilbs.cluster->set_hyb_params(hparam);
 	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
-	double nd = 0;
-	for (auto &at : hilbs.atlist) if(!at.is_lig && at.is_val) nd = at.num_h;
-	double delta = nd * (hparam.SC[1][0] - hparam.SC[1][2]*2/63 - hparam.SC[1][4]*2/63);// This needs to be changed since 
-	int nh = hilbs.is_ex ? hilbs.num_vh+1 : hilbs.num_vh;
-	vecd hybmat = HYBmat(hilbs,hparam);
+	vecd hybmat = hilbs.cluster->get_tmat_real();
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
 	// Loop through hyb matrix, TODO: Loop through each site
 	for (int i = 0; i < nvo; ++i) {
@@ -325,7 +221,6 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam) {
 				else hilbs.fill_hblk(hybmat[i*nvo+j]*hilbs.Fsign(&qnld,e.first,1)*hilbs.Fsign(&qnrd,e.second,1),
 									 e.first,e.second);
 			}
-
 			// Fill in spin up matrix element
 			match_entries = hilbs.enum_hspace(incsu,0,ed::count_bits(incsu)-1,0);
 			entries.clear();
