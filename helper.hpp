@@ -23,9 +23,10 @@ typedef unsigned long long int ulli;
 typedef unsigned long int uli;
 typedef std::pair<size_t,size_t> bindex;
 typedef std::vector<std::pair<ulli,ulli>> vpulli;
+#define BIG1 ulli(1)
 
 namespace ed {
-	bool is_pw2(int x);
+	bool is_pw2(ulli x);
 	size_t choose(size_t n, size_t k);
 	ulli next_perm(ulli v);
 	void enum_states(std::vector<ulli>& states, ulli n, ulli k, ulli inc = 0, ulli s = 0);

@@ -55,7 +55,7 @@ vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print) {
 					// Operate on spin up and spin down
 					for (int sud = nco; sud <= 2*nco+nvo; sud += nco+nvo) {
 						ulli op_state = hilbs.Hashback(bindex(s.first,j)), op;
-						if (1 << (ci+sud) & op_state) op = 1<<(ci+sud);
+						if (BIG1 << (ci+sud) & op_state) op = BIG1<<(ci+sud);
 						else continue;
 						bindex ind = minus_1vh.Hash(op_state-op);
 						int fsgn = hilbs.Fsign(&op,op_state,1);
@@ -85,8 +85,8 @@ vector<double> wvfnc_weight(Hilbert& hilbs, const vector<bindex>& si, int ligNum
 			int Lcnt = 0;
 			// This needs to account geometry
 			for (size_t j = 5; j < 11; ++j) {
-				if ((1<<(j+hilbs.num_corb/2)) & state) Lcnt++;
-				if ((1<<(j+hilbs.num_corb+hilbs.num_vorb/2)) & state) Lcnt++;
+				if ((BIG1<<(j+hilbs.num_corb/2)) & state) Lcnt++;
+				if ((BIG1<<(j+hilbs.num_corb+hilbs.num_vorb/2)) & state) Lcnt++;
 			}
 			if (Lcnt < ligNum) dLweight[Lcnt] += pow(blk.eigvec[s.second*blk.size+i],2)/si.size();
 		}

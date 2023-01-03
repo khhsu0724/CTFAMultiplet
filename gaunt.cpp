@@ -113,7 +113,7 @@ double* gaunt(int l1, int ml1, int l2, int ml2) {
 	// Input: quantumn numbers, Output: pointer to the Gaunt coefficient value array
 	try {
 		// catch error if ml1 > l1 or ml2 > l2
-		if (ml1 > l1 || ml2 > l2) throw invalid_argument("ml > l, invalid quantum number");
+		if (abs(ml1) > l1 || abs(ml2) > l2) throw invalid_argument("ml > l, invalid quantum number");
 		double *g = new double[l1+l2+1]{0};
 		if (l1 == 2 && l2 == 2) return dd_coeff.at({ml1,ml2}).g;
 		else if (l1 == 1 && l2 == 1) return pp_coeff.at({ml1,ml2}).g;

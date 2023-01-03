@@ -105,7 +105,7 @@ struct Atom {
 	QN fast_qn(ulli s, int half_orb, int order = 0) {
 		// Fast qn if 's' represents one hole
 		QN qn;
-		int i = (int)log2(s);
+		int i = __builtin_ctzll(s); // Should be the same as log2
 		if (i < half_orb) qn = QN(l-i+sind,-0.5,order);
 		else qn = QN(l-i+half_orb+sind,0.5,order);
 		return qn;
@@ -113,11 +113,11 @@ struct Atom {
 	QN get_qn(ulli s, int half_orb, int order = 0) {
 		QN qn(0,0,order);
 		for (int i = sind; i <= eind; ++i) {
-			if (s & 1<<i) {
+			if (s & BIG1<<i) {
 				qn.ml += l - i + sind;
 				qn.spin -= 0.5;
 			}
-			if (s & 1<<(i+half_orb)) {
+			if (s & BIG1<<(i+half_orb)) {
 				qn.ml += l - i + sind;
 				qn.spin += 0.5;
 			}
