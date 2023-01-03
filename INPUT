@@ -17,7 +17,8 @@
 	# FG = 4.0 4.635 6.18 2.63 #F^0,G^1,F^2,G^3
 /
 &CELL
-	Coordination = "Square Planar" # Defaults to no coordination
+	#Coordination = "Square Planar" # Defaults to no coordination
+	Coordination = "Octahedral"
 	Sites = 1 # x,y,z, Defaults to 1 site
 	Holes = 3 # If this is read then &Atom's will be skipped
 /

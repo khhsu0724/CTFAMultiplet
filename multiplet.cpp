@@ -191,9 +191,9 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam) {
 		for (int j = 0; j < nvo; ++j) {
 			if (abs(hybmat[i*nvo+j]) < TOL) continue;
 			// Fill in spin down matrix element
-			ulli lhssd = 1 << i, rhssd = 1 << j, incsd = (rhssd|lhssd);
+			ulli lhssd = BIG1 << i, rhssd = BIG1 << j, incsd = (rhssd|lhssd);
 			ulli lhssd_shift = (incsd-lhssd) << nco, rhssd_shift = (incsd-rhssd) << nco;	
-			ulli lhssu = 1 << (i+nvo), rhssu = 1 << (j+nvo), incsu = (rhssu|lhssu);
+			ulli lhssu = BIG1 << (i+nvo), rhssu = BIG1 << (j+nvo), incsu = (rhssu|lhssu);
 			ulli lhssu_shift = (incsu-lhssu) << (2*nco), rhssu_shift = (incsu-rhssu) << (2*nco);
 			QN qnlu, qnru, qnld, qnrd;
 			int atlist_ind = 0;

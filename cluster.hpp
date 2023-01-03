@@ -41,6 +41,7 @@ public:
 				atind++;
 			}
 		}}}
+		return;
 	};
 	int at_per_site() {return lig_per_site + tm_per_site;};
 	vecd get_tmat_real();
@@ -93,6 +94,21 @@ public:
 	void print_eigstate(const vecd& occ, int p = 5);
 private:
 	double sig_pi = -0.5;
+};
+
+class Octahedral : public Cluster {
+public:
+	double tpd = 0, tpp = 0, del = 0;
+	Octahedral(std::string edge);
+	void set_hyb_params(const HParam& hparam);
+	vecc get_seph2real_mat();
+	vecc get_operator_mat();
+	vecc get_tmat();
+	void print_eigstate(const vecd& occ, int p = 5);
+private:
+	double tpd_sig_pi = -0.5;
+	double tpp_sig_pi_1 = 0;
+	double tpp_sig_pi_2 = 0;
 };
 
 #endif

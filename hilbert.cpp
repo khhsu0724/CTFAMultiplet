@@ -32,10 +32,10 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 		hblks.reserve(max_2sz+1);
 		for (int sz = -max_2sz; sz <= max_2sz; sz+=2) {
 			vector<ulli> rank(core_comb,-1);
-			ulli c = (1 << max_2csz) - 1; // This swaps between core/hole
+			ulli c = (BIG1 << max_2csz) - 1; // This swaps between core/hole
 			size_t blksize = 0;
 			for (int i = 0; i < core_comb; ++i) {
-				int vsd = (-sz+max_2sz)/2 - ed::count_bits(c%(1<<hc));
+				int vsd = (-sz+max_2sz)/2 - ed::count_bits(c%(BIG1<<hc));
 				int vsu = (sz+max_2sz)/2 - ed::count_bits(c>>hc);
 				c = ed::next_perm(c);
 				if (vsd < 0 || vsu < 0) continue;
@@ -54,11 +54,11 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 		vector<int> jz2_arr(hspace.size(),0);
 		for (auto & h : hspace) {
 			int jz2 = 0;
-			jz2 +=  ed::count_bits(h/(2<<(hc+hv))) - ed::count_bits(h%(2<<(hc+hv)));
+			jz2 +=  ed::count_bits(h/(BIG1<<(hc+hv+1))) - ed::count_bits(h%(BIG1<<(hc+hv+1)));
 			for (auto & at : atlist) {
 				for (int i = at.sind; i <= at.eind; ++i) {
-					if (h & (1<<i)) jz2 += 2*(i-at.sind-at.l);
-					if (h & (1<<(i+hv+hc))) jz2 += 2*(i-at.sind-at.l);
+					if (h & (BIG1<<i)) jz2 += 2*(i-at.sind-at.l);
+					if (h & (BIG1<<(i+hv+hc))) jz2 += 2*(i-at.sind-at.l);
 				}
 			}
 			jz2_arr[&h-&hspace[0]] = jz2;
@@ -95,7 +95,7 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 	// for (auto & h : hspace) {
 	// 	auto i = Hash(h);
 	// 	Hashback(i);
-	// 	cout << h << ", " << bitset<26>(h) << ", Hash: " << i.first << ", " << i.second << ", Hashback: " << Hashback(Hash(h)) << endl;
+	// 	cout << h << ", " << bitset<34>(h) << ", Hash: " << i.first << ", " << i.second << ", Hashback: " << Hashback(Hash(h)) << endl;
 	// 	if (h != Hashback(Hash(h))) cout << "error hashing" << endl;
 	// }
 	// for (auto & at : atlist) cout << at.atname << ", " << at.is_lig << endl;
@@ -149,7 +149,7 @@ inline ulli Hilbert::qn2ulli(int snum, QN* qn, bool only_val, bool only_core) {
 		Atom *qnat = &atlist[qn[i].order];
 		if (qnat->l - qn[i].ml < 0) cerr << "quantum number larger than site's ml\n";
 		int ind = qnat->sind - shift + (qnat->l - qn[i].ml) + (qn[i].spin+0.5)*num_orb/2;
-		s += 1 << ind;
+		s += BIG1 << ind;
 	}
 	return s;
 }
@@ -244,6 +244,9 @@ void Hilbert::assign_cluster(string input) {
 	} else if (input == "SQUARE PLANAR" || input == "SQPL") {
 		coord = "sqpl"; 
 		cluster = new SquarePlanar(edge);
+	} else if (input == "OCTAHEDRAL" || input == "OCT") {
+		coord = "oct"; 
+		cluster = new Octahedral(edge);
 	} else throw invalid_argument("unavailable coordination");
 }
 
@@ -333,7 +336,9 @@ void Hilbert::read_from_file(string file_dir) {
 				}
 			}
 			for (auto &at : atlist) {
-				for (size_t i = at.sind; i <= at.eind; i++) at.check += (1 << i | 1 << (i+num_corb/2+num_vorb/2));
+				for (size_t i = at.sind; i <= at.eind; i++) {
+					at.check += (BIG1 << i | BIG1 << (i+num_corb/2+num_vorb/2));
+				}
 			}
 			ind = 0;
 			while(!atlist[ind].is_val) {
@@ -350,7 +355,7 @@ void Hilbert::read_from_file(string file_dir) {
 			// 	if (at.is_val) cout << ", is valence";
 			// 	cout << ", sites: ";
 			// 	for (auto s:at.site) cout << s << ",";
-			// 	cout << "check: " << at.check << endl << endl;
+			// 	cout << " check: " << bitset<34>(at.check) << endl << endl;
 			// }
 			// cout << "num_ch: " << num_ch << ", num_vh: " << num_vh << ", num_corb: " << num_corb << ", num_vorb: " << num_vorb << endl;
 			// DEBUG
@@ -379,13 +384,13 @@ bindex Hilbert::norm_Hash(ulli s) {
 	size_t cnt_c = 0, cnt_v = 0;
 	size_t hc = num_corb/2, hv = num_vorb/2;
 	for (size_t i = 0; i < hc; ++i)
-		if (s & (1 << i)) cind += ed::choose(i,++cnt_c);
+		if (s & (BIG1 << i)) cind += ed::choose(i,++cnt_c);
 	for (size_t i = 0; i < hc; ++i)
-		if (s & (1 << (i+hc+hv))) cind += ed::choose(i+hc,++cnt_c);
+		if (s & (BIG1 << (i+hc+hv))) cind += ed::choose(i+hc,++cnt_c);
 	for (size_t i = 0; i < hv; ++i)
-		if (s & (1 << (i+hc))) vind += ed::choose(i,++cnt_v);
+		if (s & (BIG1 << (i+hc))) vind += ed::choose(i,++cnt_v);
 	for (size_t i = 0; i < hv; ++i)
-		if (s & (1 << (i+num_corb+hv))) vind += ed::choose(i+hv,++cnt_v);
+		if (s & (BIG1 << (i+num_corb+hv))) vind += ed::choose(i+hv,++cnt_v);
 	return bindex(0, vind+cind*ed::choose(num_vorb,num_vh));
 }
 
@@ -397,13 +402,13 @@ ulli Hilbert::norm_Hashback(bindex ind) {
 	ulli c = 0, v = 0;
 	for (size_t i = num_vorb; i --> 0;) {
 		if (vind >= ed::choose(i,vh)) {
-			v |= (1 << i);
+			v |= (BIG1 << i);
 			vind -= ed::choose(i,vh--);
 		}
 	}
 	for (size_t i = num_corb; i --> 0;) {
 		if (cind >= ed::choose(i,ch)) {
-			c |= (1 << i);
+			c |= (BIG1 << i);
 			cind -= ed::choose(i,ch--);
 		}
 	}
@@ -415,20 +420,20 @@ bindex Hilbert::sz_Hash(ulli s) {
 	size_t cind = 0, vsdind = 0, vsuind = 0;
 	size_t cnt_c = 0, cnt_v = 0;
 	size_t hc = num_corb/2, hv = num_vorb/2;
-	int nsd = ed::count_bits(s % (1<<(hc+hv)));
+	int nsd = ed::count_bits(s % (BIG1 << (hc+hv)));
 	int nsu = num_vh + num_ch - nsd;
 	int max_2sz = int(2*hblks.back().get_sz());
 	size_t blk_ind = (max_2sz-nsd+nsu)/2;
 	for (size_t i = 0; i < hc; ++i)
-		if (s & (1 << i)) cind += ed::choose(i,++cnt_c);
+		if (s & (BIG1 << i)) cind += ed::choose(i,++cnt_c);
 	for (size_t i = 0; i < hc; ++i)
-		if (s & (1 << (i+hc+hv))) cind += ed::choose(i+hc,++cnt_c);
+		if (s & (BIG1 << (i+hc+hv))) cind += ed::choose(i+hc,++cnt_c);
 	for (size_t i = 0; i < hv; ++i)
-		if (s & (1 << (i+hc))) vsdind += ed::choose(i,++cnt_v);
+		if (s & (BIG1 << (i+hc))) vsdind += ed::choose(i,++cnt_v);
 	size_t vsdchoose = ed::choose(hv,cnt_v);
 	cnt_v = 0;
 	for (size_t i = 0; i < hv; ++i)
-		if (s & (1 << (i+num_corb+hv))) vsuind += ed::choose(i,++cnt_v);
+		if (s & (BIG1 << (i+num_corb+hv))) vsuind += ed::choose(i,++cnt_v);
 	return bindex(blk_ind,hblks[blk_ind].rank[cind]+vsdind+vsuind*vsdchoose);
 }
 
@@ -444,20 +449,20 @@ ulli Hilbert::sz_Hashback(bindex ind) {
 	ulli c = 0, vsd = 0, vsu = 0;
 	for (size_t i = num_corb; i --> 0;) {
 		if (cind >= ed::choose(i,ch)) {
-			c |= (1 << i);
+			c |= (BIG1 << i);
 			cind -= ed::choose(i,ch--);
 		}
 	}	
-	size_t nvhsd = (num_vh+num_ch+max_2sz)/2-ind.first-ed::count_bits(c%(1<<(num_corb/2)));
+	size_t nvhsd = (num_vh+num_ch+max_2sz)/2-ind.first-ed::count_bits(c%(BIG1<<(num_corb/2)));
 	size_t nvhsu = num_vh - nvhsd, vsdchoose = ed::choose(hv,nvhsd);
 	size_t vsdind = vind % vsdchoose, vsuind = vind / vsdchoose;
 	for (size_t i = hv; i --> 0;) {
 		if (vsdind >= ed::choose(i,nvhsd)) {
-			vsd |= (1 << i);
+			vsd |= (BIG1 << i);
 			vsdind -= ed::choose(i,nvhsd--);
 		}
 		if (vsuind >= ed::choose(i,nvhsu)) {
-			vsu |= (1 << i);
+			vsu |= (BIG1 << i);
 			vsuind -= ed::choose(i,nvhsu--);
 		}
 	}
@@ -468,11 +473,11 @@ bindex Hilbert::jz_Hash(ulli s) {
 	// Hash function that uses jz as main QN
 	int hv = num_vorb/2, hc = num_corb/2;
 	int min_2jz = int(2*hblks[0].get_jz()), jz2 = 0;
-	jz2 +=  ed::count_bits(s/(2<<(hc+hv))) - ed::count_bits(s%(2<<(hc+hv)));
+	jz2 +=  ed::count_bits(s/(BIG1<<(hc+hv+1))) - ed::count_bits(s%(BIG1<<(hc+hv+1)));
 	for (auto & at : atlist) {
 		for (int i = at.sind; i <= at.eind; ++i) {
-			if (s & (1<<i)) jz2 += 2*(i-at.sind-at.l);
-			if (s & (1<<(i+hv+hc))) jz2 += 2*(i-at.sind-at.l);
+			if (s & (BIG1<<i)) jz2 += 2*(i-at.sind-at.l);
+			if (s & (BIG1<<(i+hv+hc))) jz2 += 2*(i-at.sind-at.l);
 		}
 	}
 	size_t bind = (jz2-min_2jz)/2;
