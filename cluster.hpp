@@ -5,26 +5,25 @@
 // Includes information about the cluster (Geometry, Hybridization)
 class Cluster {
 public:
-	int vo_persite, co_persite;
+	int vo_persite = 0, co_persite = 0;
+	int lig_per_site = 0, tm_per_site = 0;
 	bool no_HYB;
 	std::string edge;
-	virtual void set_hyb_params(const HParam& hparam) {return;}
-	// Converts spherical harmonics to real space basis
+	virtual void set_hyb_params(const HParam& hparam) {return;};
+	// Converts spherical harmonics to real space basis, per site
 	virtual vecc get_seph2real_mat() = 0;
 	// Redefine operators to bring hybridization matrix into real matrix
 	virtual vecc get_operator_mat() {return vecc(0);};
 	virtual vecc get_tmat() {return vecc(0);};
 	virtual void print_eigstate(const vecd& occ, int p = 5) = 0;
-
 // Shared Implementation
 public: 
 	Cluster(std::string _edge): edge(_edge) {};
 	~Cluster() {};
 	void make_atlist(std::vector<Atom>& atlist, int num_vh, 
-						const std::vector<int>& sites, int num_sites) {
+						const std::vector<int>& sites) {
 		std::vector<int> nh_per_tm = ed::distribute(num_vh,tm_per_site);
 		int atind = 0;
-		// Push Core Atoms
 		atlist.reserve(at_per_site()*num_sites);
 		for (int x = 0; x < sites[0]; ++x) {
 		for (int y = 0; y < sites[1]; ++y) {
@@ -44,9 +43,12 @@ public:
 		return;
 	};
 	int at_per_site() {return lig_per_site + tm_per_site;};
+	void set_print_site(bool print_site_occ) {this->print_all_sites = print_site_occ;};
+	void set_num_sites(int _num_sites) {this->num_sites = _num_sites;};
 	vecd get_tmat_real();
 protected:
-	int lig_per_site = 0, tm_per_site = 0, w = 12;
+	int w = 12, num_sites = 1;
+	bool print_all_sites = true; // If false program will print per_site
 	void print_state_header(const vecd& occ);
 	void print_state_orbs(const vecd& occ, const std::vector<std::string>& names, int p);
 	bool check_tmat_all_real(const vecc& tmatreal);
@@ -93,7 +95,7 @@ public:
 	vecc get_tmat();
 	void print_eigstate(const vecd& occ, int p = 5);
 private:
-	double sig_pi = -0.5;
+	double sig_pi = 0.5;
 };
 
 class Octahedral : public Cluster {
@@ -106,7 +108,7 @@ public:
 	vecc get_tmat();
 	void print_eigstate(const vecd& occ, int p = 5);
 private:
-	double tpd_sig_pi = -0.5;
+	double tpd_sig_pi = 0.4; // This needed to be checked
 	double tpp_sig_pi_1 = 0;
 	double tpp_sig_pi_2 = 0;
 };

@@ -15,6 +15,7 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 	SO_on = hparam.SO;
 	CF_on = !ed::is_zero_arr(hparam.CF,5);
 	CV_on = (is_ex && !ed::is_zero_arr(hparam.FG,4));
+	cluster->set_print_site(hparam.print_site_occ);
 	bool BLOCK_DIAG = false;
 	if (hparam.block_diag) BLOCK_DIAG = !(edge == "L" && is_ex) || !SO_on;
 	int hv = num_vorb/2, hc = num_corb/2;
@@ -98,6 +99,7 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 	// 	cout << h << ", " << bitset<34>(h) << ", Hash: " << i.first << ", " << i.second << ", Hashback: " << Hashback(Hash(h)) << endl;
 	// 	if (h != Hashback(Hash(h))) cout << "error hashing" << endl;
 	// }
+	// cout << "ATOMS: " << endl;
 	// for (auto & at : atlist) cout << at.atname << ", " << at.is_lig << endl;
 	// DEBUG
 }
@@ -127,6 +129,32 @@ Hilbert::Hilbert(const Hilbert &hilbs, int vh_mod) {
 	hashfunc = &Hilbert::norm_Hash;
 	hbfunc = &Hilbert::norm_Hashback;
 	// TODO: complete copy constructor for no vh_mod
+
+	// DEBUG
+	// cout << "COPY CONSTRUCTOR" << endl;
+	// for (auto & at : atlist) {
+	// 	cout << "atom ind: " << at.atind << ", val_n: " << at.val_n << ", val_l: " << at.val_l <<  ", n: " << at.n << ", l: " << at.l << ", num hole: " << at.num_h << endl;
+	// 	cout << "atom sind: " << at.sind << ", eind: " << at.eind << ", vind: " << at.vind << ", cind: " << at.cind;
+	// 	if (at.is_lig) cout << ", is ligand";
+	// 	if (at.is_val) cout << ", is valence";
+	// 	cout << ", sites: ";
+	// 	for (auto s:at.site) cout << s << ",";
+	// 	cout << " check: " << bitset<34>(at.check) << endl << endl;
+	// }
+	// cout << "num_ch: " << num_ch << ", num_vh: " << num_vh << ", num_corb: " << num_corb << ", num_vorb: " << num_vorb << endl;
+	
+	// vector<ulli> hspace = enum_hspace();
+	// if (is_ex) cout << "excited state" << endl;
+	// else cout << "groud state" << endl;
+	// for (auto & h : hspace) {
+	// 	auto i = Hash(h);
+	// 	Hashback(i);
+	// 	cout << setw(10) << h << ", " << bitset<34>(h) << ", Hash: " << i.first << ", " << i.second << ", Hashback: " << Hashback(Hash(h)) << endl;
+	// 	if (h != Hashback(Hash(h))) cout << "error hashing" << endl;
+	// }
+	// cout << "ATOMS: " << endl;
+	// for (auto & at : atlist) cout << at.atname << ", " << at.is_lig << endl;
+	// DEBUG
 	return;
 }
 
@@ -223,15 +251,18 @@ int Hilbert::tot_site_num() {
 
 vector<double> Hilbert::get_all_eigval(bool is_err) {
 	vector<double> all_eig(hsize,0);
+	int last_ind = 0;
 	for (auto & blk : hblks) {
 		if (blk.eig == nullptr) {
 			if (is_err) throw out_of_range("invalid access of eigval");
 		} else {
-			for (size_t i = 0; i < blk.size; ++i) {
-				all_eig[i+blk.f_ind] = blk.eig[i];
+			for (size_t i = 0; i < blk.nev; ++i) {
+				all_eig[last_ind] = blk.eig[i];
+				last_ind++;
 			}
 		}
 	}
+	all_eig.resize(last_ind);
 	return all_eig;
 }
 
@@ -255,7 +286,8 @@ void Hilbert::read_from_file(string file_dir) {
 	ifstream input_file(file_dir);
 	try {
 		if (input_file.is_open()) {
-			bool read_cell = false, nh_read = false;
+			bool read_cell = false;
+			int nh_read = 0;
 			int atind = 0, cpsize = 0, tm_per_site = 0, lig_per_site = 0;
 			while (getline(input_file,line)) {
 				if (line[0] == '#') continue;
@@ -296,8 +328,10 @@ void Hilbert::read_from_file(string file_dir) {
 							    for (size_t i = 0; i < site_vec.size(); ++i) sites[i] = site_vec[i];
 								skip = true;
 							}                    
-							else if (p == "HOLES") {
-								nh_read = true;
+							else if (p == "HOLES" || p == "TOT_HOLES" || p == "HOLES_PER_SITE") {
+								if (nh_read) cout << "WARNING: Number of holes already read, overwritting" << endl;
+								if (p == "HOLES_PER_SITE") nh_read = 2;
+								else nh_read = 1;
 								size_t eqpos = line.find('=');
 								string input = line.substr(eqpos+1,line.find('#')-eqpos-1);
 								eqpos = input.find_first_not_of(' ');
@@ -319,10 +353,12 @@ void Hilbert::read_from_file(string file_dir) {
 			}
 			input_file.close();
 			if (!nh_read) throw invalid_argument("Number of holes needed for input");
+			else if (nh_read == 2) num_vh *= tot_site_num();
 			if (cluster == NULL) assign_cluster("");
 			this->at_per_site = cluster->at_per_site();
 			this->num_at = cluster->at_per_site() * tot_site_num();
-			cluster->make_atlist(atlist,num_vh,sites,tot_site_num());
+			cluster->set_num_sites(tot_site_num());
+			cluster->make_atlist(atlist,num_vh,sites);
 			int ind = 0;
 			for (size_t i = 0; i < atlist.size(); ++i) {
 				atlist[i].sind = ind;
@@ -335,6 +371,10 @@ void Hilbert::read_from_file(string file_dir) {
 					val_ati = i + 1;
 				}
 			}
+			// TEMPORARY SAFE GAURD 
+			if (num_corb+num_vorb > 64) 
+				throw invalid_argument("Cannot have more than 32 orbitals for now");
+			// TEMPORARY SAFE GAURD 
 			for (auto &at : atlist) {
 				for (size_t i = at.sind; i <= at.eind; i++) {
 					at.check += (BIG1 << i | BIG1 << (i+num_corb/2+num_vorb/2));

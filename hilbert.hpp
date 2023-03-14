@@ -31,7 +31,6 @@ public:
 	std::vector<ulli> enum_hspace(ulli inc_val = 0, ulli inc_core = 0, int vmod = 0, int cmod = 0);
 	ulli qn2ulli(int snum, QN* qn, bool only_val = false, bool only_core = false);
 	vpulli match(int snum, QN* lhs, QN* rhs);
-	double total_spin(int blk, int state);
 	void fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs);
 	double Fsign(QN* op, ulli state, int opnum);
 	double Fsign(ulli* op, ulli state, int opnum);
@@ -40,7 +39,7 @@ public:
 	double pheshift(double trace, int k);
 	std::vector<double> get_all_eigval(bool is_err = true);
 
-	// Functions for input file parsing
+	// Functions for input file parsing and initialize
 	void assign_cluster(std::string input);
 	void read_from_file(std::string file_dir);
 
@@ -53,6 +52,10 @@ public:
 	ulli sz_Hashback(bindex ind);
 	bindex jz_Hash(ulli s);
 	ulli jz_Hashback(bindex ind);
+	bindex ksz_Hash(ulli s);
+	ulli ksz_Hashback(bindex ind);
+	bindex k_Hash(ulli s);
+	ulli k_Hashback(bindex ind);
 
 	// Need to fix these
 	// Maybe a copy constructor?????
