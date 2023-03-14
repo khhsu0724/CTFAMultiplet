@@ -11,18 +11,25 @@ using namespace std;
 
 #ifdef __INTEL_MKL__
 
+void ed_dsymv(double *_mat, double *_vec_in, double *_vec_out, size_t n) {
+	MKL_INT N = n, lda = N, inc = 1;
+	double alpha = 1, beta = 0;
+	dsymv("U",&N,&alpha,_mat,&lda,_vec_in,&inc,&beta,_vec_out,&inc);
+	return;
+}
+
 void ed_dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n) {
-// 	double *eigImag = new double[n]{0};
-// 	int info = 0, sdim = 0, lwork = 6*n;
-// 	int *bwork;
-// 	double *work = new double[lwork]{0};
-// 	int (*select)(const double*,const double*);
-// 	dgees_('V','N',select,&n,_mat,&n,&sdim,_eigReal,eigImag,
-// 			_eigvec,&n,work,&lwork,bwork,&info);
-// 	try {
-// 		if (info!=0) throw runtime_error( "Error: dgees returned error code ");
-// 	} catch(const exception &ex) {std::cout << ex.what() << "\n";}
-// 	delete [] work;
+	double *eigImag = new double[n]{0};
+	MKL_INT N = n, info = 0, sdim = 0, lwork = 6*n;
+	MKL_INT *bwork;
+	double *work = new double[lwork]{0};
+	MKL_INT (*select)(const double*,const double*);
+	dgees_("Vectors","N",select,&N,_mat,&N,&sdim,_eigReal,eigImag,
+			_eigvec,&N,work,&lwork,bwork,&info);
+	try {
+		if (info!=0) throw runtime_error( "Error: dgees returned error code ");
+	} catch(const exception &ex) {std::cout << ex.what() << "\n";}
+	delete [] work;
 	return;
 }
 
@@ -62,16 +69,28 @@ void ed_dsyevr(double* _mat, double *_eigvec, double* _eigval, size_t n) {
 	} catch(const exception &ex) {std::cout << ex.what() << "\n";}
 	delete [] work;
 	delete [] iwork;
+	delete [] isuppz;
 	return;
 }
 
 #else
+extern "C" {
+	extern void dsymv_(char*,int*,double*,double*,int*,double*,double*,int*);
+}
+
 extern "C" {
 	extern void dgees_(char*,char*,int(*)(double*,double*),size_t*,double*,size_t*,
 						int*,double*,double*,double*,size_t*,double*,int*,int*,int*);
 }
 extern "C" {
 	extern void dsyev_(char*,char*,size_t*,double*,size_t*,double*,double*,int*,int*);
+}
+
+void ed_dsymv(double *_mat, double *_vec_in, double *_vec_out, size_t n) {
+	int inc = 1;
+	double alpha = 1, beta = 0;
+	dsymv("U",&n,&alpha,_mat,&n,_vec_in,&inc,&beta,_vec_out,&inc);
+	return;
 }
 
 void ed_dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n) {
@@ -111,4 +130,3 @@ void ed_dsyev(double* _mat, double* _eigval, size_t n) {
 void ed_dsyevr(double* _mat, double *_eigvec, double* _eigval, size_t n) {return;}
 
 #endif
-

@@ -111,6 +111,16 @@ namespace ed {
 	    matfile.close();
 	};
 
+	template <typename DT> void write_vec_neat(std::vector<DT> vec, size_t x, size_t y, std::string file_dir) {
+		std::ofstream matfile;
+	    matfile.open (file_dir);
+		for (int j = 0; j < y; ++j)
+	    	for (int i = 0; i < x; ++i)
+	    		if (abs(vec.at(i+x*j)) > TOL)
+		    		matfile << "[" << i << "," << j << "]: " << vec.at(i+x*j) << "\n";
+	    matfile.close();
+	};
+
 	template <typename C, typename T> 
 	std::vector<T> printDistinct(const C & arr, T tmp, int n, bool is_print = true) {
 		// Second argument serves as a away to inform the template type in the container
@@ -228,6 +238,32 @@ namespace ed {
 	                  [&](size_t i, size_t j) {return arr[i] > arr[j];});
 		indices.resize(top);
 		return indices;
+	};
+
+	template<typename T> std::vector<T> make_blk_mat(const std::vector<T>& a, 
+		 int acopy = 1, const std::vector<T> b = {}, int bcopy = 1) {
+		// Make Block diagonal matrix with a & b (with acopy of a and bcopy of b)
+		// | a 0 |
+		// | 0 b |
+		size_t asize = std::sqrt(a.size()), bsize = std::sqrt(b.size());
+		size_t blk_size = asize*acopy+bsize*bcopy;
+		std::vector<T> blk_mat(blk_size*blk_size,0);
+		for (size_t ac = 0; ac < acopy; ++ac) {
+			for (size_t i = 0; i < asize; ++i) {
+				for (size_t j = 0; j < asize; ++j) {
+					blk_mat[(i+ac*asize)*blk_size+j+ac*asize] = a[i*asize+j];
+				}
+			}
+		}
+		size_t apad = acopy*asize;
+		for (size_t bc = 0; bc < bcopy; ++bc) {
+			for (size_t i = 0; i < bsize; ++i) {
+				for (size_t j = 0; j < bsize; ++j) {
+					blk_mat[(i+bc*bsize+apad)*blk_size+j+bc*bsize+apad] = b[i*bsize+j];
+				}
+			}
+		}
+		return blk_mat;
 	};
 }
 
