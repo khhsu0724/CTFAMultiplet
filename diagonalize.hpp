@@ -50,7 +50,7 @@ void ed_dsarpack(Real* _mat, Real *_eigvec, Real* _eigval, size_t n, size_t _nev
 
 	a_int iparam[11], ipntr[11];
 	iparam[0] = 1;      // ishift
-	iparam[2] = 3 * N; // on input: maxit; on output: actual iteration
+	iparam[2] = 3*N; // 3*N on input: maxit; on output: actual iteration
 	iparam[3] = 1;      // NB, only 1 allowed
 	iparam[6] = 1;      // mode
 
@@ -83,12 +83,13 @@ void ed_dsarpack(Real* _mat, Real *_eigvec, Real* _eigval, size_t n, size_t _nev
 	return;
 }
 #else
-void ed_dsarpack(Real* _mat, Real *_eigvec, Real* _eigval, size_t n, size_t _nev) {
+template <typename Real> 
+void ed_dsarpack(Real* _mat, Real *_eigvec, Real* _eigval, size_t n, size_t& nev) {
 	std::cerr << "Arpack not available, switching to mkl/lapack" << std::endl;
-	self.nev = size;
-	ed_dsyevr(_ham,_eigvec,_eig,size);
+	nev = n;
+	ed_dsyevr(_mat,_eigvec,_eigval,n);
 	return;
-}
+};
 #endif
 
 class Block {
