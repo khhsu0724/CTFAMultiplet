@@ -2,6 +2,7 @@
 import os
 import numpy as np
 import time
+import itertools
 # Quick job submission, using python3
 # Variables: number of holes, tenDQ, del_eff, t, K/L edge
 def mkdir_p(dir):
@@ -10,16 +11,21 @@ def mkdir_p(dir):
         os.makedirs(dir)
 
 class Input_Param:
-    def __init__(self,nh, tenDQ, del_eff, delta, t):
+    def __init__(self, iden, nh, cfield, del_eff, tpd, tpp):
+        self.iden = iden
         self.nh = nh
-        self.tenDQ = tenDQ
+        self.cfield = cfield
         self.del_eff = del_eff
-        self.delta = delta
-        self.t = t
+        self.tpd = tpd
+        self.tpp = tpp
+
+def generate_input():
+    # Returns Array of Input Param
         
 base_dir = os.getcwd()
 data_dir = os.path.join(base_dir, "DATA_DIR")
 input_arr = []
+
 nh5 = True
 nh4 = False
 if (nh5):

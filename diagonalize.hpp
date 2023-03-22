@@ -17,7 +17,10 @@
 #include <arpack/arpack.hpp>
 #endif
 #endif
-
+// For sherlock...
+#if defined __has_include && __has_include (<arpack-ng/arpack.hpp>) 
+#include <arpack-ng/arpack.hpp>
+#endif
 
 typedef std::unique_ptr<double[]> uptrd;
 
@@ -85,7 +88,7 @@ void ed_dsarpack(Real* _mat, Real *_eigvec, Real* _eigval, size_t n, size_t _nev
 #else
 template <typename Real> 
 void ed_dsarpack(Real* _mat, Real *_eigvec, Real* _eigval, size_t n, size_t& nev) {
-	std::cerr << "Arpack not available, switching to mkl/lapack" << std::endl;
+	std::cout << "Arpack not available, switching to mkl/lapack" << std::endl;
 	nev = n;
 	ed_dsyevr(_mat,_eigvec,_eigval,n);
 	return;
@@ -127,13 +130,13 @@ public:
 	double get_k() {return K;};	
 	void malloc_ham() {ham = std::make_unique<double[]>(size*size);};
 	void diagonalize(int option = 2, size_t nev_in = 20) {
-		// Options: 1. DGEES 2. DSYEV (Shifted QR) 3. DSYEVR 4. ARPACK (Lanczos)
+		// Options: 1. DGEES 2. DSYEVR (MRRR) 3. DSYEV (Shifted QR) 
+		// 4. ARPACK (Lanczos)
 		_ham = ham.release(); // Release for diagonalize
 		if (option == 4 && nev_in < size) {
 			nev = nev_in;
 		} else nev = size;
 		if (option == 3) {
-			// MRRR Algorithm
 			_eig = new double[size]{0};
 			ed_dsyev(_ham,_eig,size);
 			eigvec = return_uptr(&_ham);

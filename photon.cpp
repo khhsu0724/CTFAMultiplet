@@ -637,7 +637,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 				if (!pm.eloss) {if (exblk.eig[ei]-fsblk.eig[fi] > elm_max || exblk.eig[ei]-fsblk.eig[fi] < elm_min) continue;}
 				// Breaks if no ground state connects with intermediate state
 				bool skip_ei = true;
-				for (size_t gi = 0; gi < gsi.size(); ++gi) {
+				for (size_t gi = 0; gi < gsi.size();++gi) {
 					if (abs(rixskern[gi*EX.hsize+ei+exblk.f_ind]) > TOL) {
 						skip_ei = false;
 						break;

@@ -51,19 +51,20 @@ void Cluster::print_state_orbs(const vecd& occ, const vector<string>& names, int
 
 vecd Cluster::get_tmat_real() {
 	// Swap spherical harmonics basis
-	vecd tmatreal(vo_persite*vo_persite,0);
 	vecc tmat = get_tmat();
 	vecc U = get_seph2real_mat();
-	tmat = ed::matmult(tmat,U,vo_persite);
-	ed::ctranspose(U,vo_persite,vo_persite);
+    tmat = ed::matmult(tmat,U,vo_persite);
+	U = ed::ctranspose(U,vo_persite,vo_persite);
 	tmat = ed::matmult(U,tmat,vo_persite);
 	// Swap operator basis
 	vecc a = get_operator_mat();
 	tmat = ed::matmult(tmat,a,vo_persite);
-	ed::ctranspose(a,vo_persite,vo_persite);
+	a = ed::ctranspose(a,vo_persite,vo_persite);
 	tmat = ed::matmult(a,tmat,vo_persite);
 	if (!check_tmat_all_real(tmat))
 		cerr << "WARNING: hybridization matrix contains imaginary elemenets" << endl;
+
+	vecd tmatreal(vo_persite*vo_persite,0);
 	std::transform(tmat.begin(), tmat.end(), tmatreal.begin(), 
 						[](complex<double> c) {return c.real();});
 	return tmatreal;

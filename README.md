@@ -2,7 +2,7 @@
 Exact Diagonalization Code
 Different compilation method provided below
 To see stack trace error, compile with -rdynamic
-Arpack & MKL installation is recommended, arpack will use -lblas if MKL is not present
+Arpack & MKL installation is recommended, arpack will use blas if MKL is not present
 
 1. Compile with this command on MAC
 ```console
@@ -33,8 +33,14 @@ Compile it in NERSC Haswell (-pedantic will give a lot of warnings)
 CC -std=c++1y -mkl="parallel" -O3 -fopenmp -ffast-math -march=native -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp cluster.cpp
 ```
 
-Compile it in Sherlock (needs gcc 6.3.0 to avoid compile errors)
+Compile it in Sherlock
+Compile with MKL
 ```console
-module load imkl icc boost gcc
+module load imkl icc boost gcc/6.3.0
 icpc -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -ldl -std=c++1y -O3 -fopenmp -ffast-math -march=native -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp cluster.cpp -lm
+```
+Compile with Arpack
+```console
+module load arpack icc boost gcc/8.1.0
+icpc -llapack -lpthread -ldl -larpack -std=c++1y -m64 -O3 -fopenmp -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp cluster.cpp -lm -lgfortran
 ```

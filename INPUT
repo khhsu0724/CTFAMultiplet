@@ -6,9 +6,10 @@
     FG = 7.92123 4.6264 6.176 2.632 #F^0,G^1,F^2,G^2
     #FG = 1.0 0.25 0 0 #F^0,G^1
     CF = 0 0 1 1 1 #dx2y2, dz2, dxy, dxz, dyz
-    tpd = 0.9 # The bonding in z direction is weaker due to Jahn Teller *0.8
-    tpp = 0.3
-    MLCT = 6 #EFFDEL = False
+    tpd = 2 # The bonding in z direction is weaker due to Jahn Teller *0.8
+    tpp = 1
+    MLCT = 2 
+    EFFDEL = False
     DIAG = 4
     #BLOCK = False
     OVERWRITE = True # Overwrite photon file in the directory
@@ -18,14 +19,14 @@
     Coordination = "Square Planar" # Defaults to no coordination
     #Coordination = "OCTAHEDRAL"
     Sites = 1 # x,y,z, Defaults to 1 site
-    Holes = 4 # If this is read then &Atom's will be skipped
+    Holes = 2 # If this is read then &Atom's will be skipped
 /
 &PHOTON
     XAS = true
     RIXS = false
     pvin = 1 1 1
     pvout = 1 1 1
-    Edge = L3
+    Edge = L
     Eloss = false
     NEDOS = 2000 # Number of bins for XAS/RIXS
     AB = -25 25
