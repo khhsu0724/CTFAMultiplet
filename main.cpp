@@ -269,9 +269,8 @@ double calculate_effective_delta(const string& input_dir, HParam& hparam, const 
 		return 0;
 	}
 	calc_ham(GS,hparam);
-	// Arpack, maybe scale nev according to effective delta?
 	for (size_t g = 0; g < (GS.hblks.size()+1)/2; g++) {
-		if (GS.hblks[g].size < 4e4) GS.hblks[g].diagonalize(2);
+		if (GS.hblks[g].size < 1e4) GS.hblks[g].diagonalize(2);
 		else GS.hblks[g].diagonalize(hparam.diag_option,abs(hparam.MLdelta)*30);
 	}
 	hparam.tpd = inp_tpd;
@@ -294,16 +293,17 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	auto diag_start = chrono::high_resolution_clock::now();
 	cout << "Diagonalizing Ground State" << endl;
 	for (size_t g = 0; g < GS.hblks.size(); g++) {
-		#ifdef __INTEL_MKL__
-		cout << "Number of threads: " << mkl_get_max_threads() << endl;
-		#endif
+		// #ifdef __INTEL_MKL__
+		// cout << "Number of threads: " << mkl_get_max_threads() << endl;
+		// #endif
 		start = chrono::high_resolution_clock::now();
 		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size << endl;
 		if (pm.RIXS) {
 			if (GS.hblks[g].size < 1e4) GS.hblks[g].diagonalize(2);
 			else GS.hblks[g].diagonalize(hparam.diag_option,sqrt(GS.hblks[g].size)*10); // Might underestimate
 		} else {
-			int gs_nev = 20 * GS.tot_site_num() / GS.hblks.size();
+			int gs_nev = 10 * GS.tot_site_num();
+			cout << "gs nev: " << gs_nev << endl;
 			GS.hblks[g].diagonalize(hparam.diag_option,gs_nev);
 		}
 		stop = chrono::high_resolution_clock::now();
@@ -329,7 +329,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	if (hparam.block_diag) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
 	occupation(GS,gsi);
-	wvfnc_weight(GS,gsi,2,true);
+	wvfnc_weight(GS,gsi,2);
 	cout << endl;
 
 	// Assemble Core Hole Hamiltonian
@@ -340,6 +340,9 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	calc_ham(EX,hparam);
 	stop = chrono::high_resolution_clock::now();
 	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+
+	ed::write_mat(EX.hblks[0].ham,EX.hblks[0].size,EX.hblks[0].size,"./exmat.txt");
+	cout << "size: " << EX.hblks[0].size << endl;
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
 
 	cout << "Diagonalizing Core-Hole Hamiltonian" << endl;
@@ -347,9 +350,9 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	for (size_t e = 0; e < EX.hblks.size(); e++) {
 		start = chrono::high_resolution_clock::now();
 		size_t ex_nev = EX.hblks[e].size;
-		#ifdef __INTEL_MKL__
-		cout << "Number of threads: " << mkl_get_max_threads() << endl;
-		#endif
+		// #ifdef __INTEL_MKL__
+		// cout << "Number of threads: " << mkl_get_max_threads() << endl;
+		// #endif
 		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
 		if (pm.edge == "K") {
 			ex_nev = std::max((size_t)200,(size_t)sqrt(EX.hblks[e].size)*5);	
@@ -359,7 +362,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 			EX.hblks[e].diagonalize(2); // Full L edge probably needs full Diagonalization
 		} else if (pm.edge == "L3") {
 			ex_nev = std::max((size_t)400,(size_t)sqrt(EX.hblks[e].size)*20);
-			if (EX.hblks[e].size < 1e4) EX.hblks[e].diagonalize(2); // Small matrix use dsyev
+			if (EX.hblks[e].size < 9e3) EX.hblks[e].diagonalize(2); // Small matrix use dsyev
 			else EX.hblks[e].diagonalize(hparam.diag_option,ex_nev);
 		}
 		cout << "ex nev: " << ex_nev << endl;
@@ -369,7 +372,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	}
 	diag_stop = chrono::high_resolution_clock::now();
 	diag_duration += chrono::duration_cast<chrono::milliseconds>(diag_stop - diag_start);
-
+	
 	double ex_min_en = EX.hblks[0].eig[0];
 	vector<bindex> exmin_ind;
 	for (auto &exb : EX.hblks) for (size_t i = 0; i < exb.nev; ++i) if (exb.eig[i] <= ex_min_en) ex_min_en = exb.eig[i];
@@ -384,13 +387,13 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 		}}
 	}
 	// cout << "Band Gap: " << ex_min_en - gs_en << "eV" << endl;
-	auto all_eig = EX.get_all_eigval(true);
-	ed::printDistinct(all_eig,0.0,all_eig.size(),true);
+	// auto all_eig = EX.get_all_eigval(true);
+	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
 
 	if (hparam.block_diag && EX.edge == "K") cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << exmin_ind.size() << endl;
 	occupation(EX,exmin_ind);
-	wvfnc_weight(EX,exmin_ind,2,true);
+	wvfnc_weight(EX,exmin_ind,2);
 	
 	cout << endl << "Total diagonalize run time: " << ed::format_duration(diag_duration) << endl << endl;
 	return;

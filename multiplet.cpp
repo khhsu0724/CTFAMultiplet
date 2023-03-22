@@ -188,6 +188,7 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam) {
 	int nco = hilbs.cluster->co_persite * hilbs.tot_site_num();
 	// HYBRIDIZATION is momentum dependent, need to rewrite code here
 	vecd hybmat = ed::make_blk_mat(hilbs.cluster->get_tmat_real(),hilbs.tot_site_num());
+	ed::write_vec(hybmat,nvo,nvo,"./hybmat.txt");
 	// int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
 	// vecd hybmat = hilbs.cluster->get_tmat_real();
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information

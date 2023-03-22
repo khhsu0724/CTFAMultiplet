@@ -37,16 +37,15 @@ int ed::count_bits(ulli b) {
 	return c;
 }
 
-void ed::ctranspose(vecc& mat, size_t m, size_t n) {
+vecc ed::ctranspose(const vecc& mat, size_t m, size_t n) {
 	// Conjugate Transpose of a matrix
-	vecc trans(m*n);
+	vecc trans(m*n,0);
 	for (size_t i = 0; i < n; i++) {
 		for (size_t j = 0; j < m; j++) {
-			trans[j*n+i] = std::conj(mat[i*m+j]);
+			trans.at(j*n+i) = std::conj(mat.at(i*m+j));
 		}
 	}
-	mat = std::move(trans);
-	return;
+	return trans;
 }
 
 

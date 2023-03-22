@@ -32,7 +32,7 @@ namespace ed {
 	void enum_states(std::vector<ulli>& states, ulli n, ulli k, ulli inc = 0, ulli s = 0);
 	ulli add_bits(ulli b1, ulli b2, int b1size, int b2size);
 	int count_bits(ulli b);
-	void ctranspose(vecc& mat, size_t m, size_t n);
+	vecc ctranspose(const vecc& mat, size_t m, size_t n);
 	std::vector<int> distribute(int num_h, int num_at);
 	std::string format_duration(std::chrono::milliseconds ms);
 	void print_progress(double frac, double all);
@@ -170,22 +170,22 @@ namespace ed {
 		return true;
 	};
 
-	template<typename T> std::vector<T> matmult(std::vector<T> v1, std::vector<T> v2, int size) {
+	template<typename T> std::vector<T> matmult(const std::vector<T>& v1, const std::vector<T>& v2, int size) {
 		if (v1.size() != size*size || v2.size() != size*size) {
 			std::invalid_argument("invalid input matrices for multiplication");
 		}
-		std::vector<T> vmult(size*size,0);
+		std::vector<T> mult(size*size,0);
 		for (size_t i = 0; i < size; ++i) {
 			for (size_t j = 0; j < size; ++j) {
 				for(size_t m = 0; m < size; ++m) {
-					vmult[i*size+j] += v1[i*size+m] * v2[m*size+j];
+					mult.at(i*size+j) += v1.at(i*size+m) * v2.at(m*size+j);
 				}
 			}
 		}
-		return vmult;
+		return mult;
 	};
 
-	template<typename T> std::vector<T> matmultvec(std::vector<T> mat, std::vector<T> vec, int size) {
+	template<typename T> std::vector<T> matmultvec(const std::vector<T>& mat, const std::vector<T>& vec, int size) {
 		// Matrix multiply a vector
 		if (mat.size() != size*size || vec.size() != size) {
 			std::invalid_argument("invalid input matrices for multiplication");
@@ -193,22 +193,21 @@ namespace ed {
 		std::vector<T> vmult(size,0);
 		for (size_t i = 0; i < size; ++i) {
 			for (size_t j = 0; j < size; ++j) {
-				vmult[i] += mat[i*size+j] * vec[j];
+				vmult.at(i) += mat.at(i*size+j) * vec.at(j);
 			}
 		}
 		return vmult;
 	};
 
 
-	template<typename T> void transpose(std::vector<T>& mat, int m, int n) {
-		std::vector<T> trans(m*n);
+	template<typename T> std::vector<T> transpose(const std::vector<T>& mat, int m, int n) {
+		std::vector<T> trans(m*n,T::value_type());
 		for (size_t i = 0; i < n; i++) {
 			for (size_t j = 0; j < m; j++) {
-				trans[j*n+i] = mat[i*m+j];
+				trans.at(j*n+i) = mat.at(i*m+j);
 			}
 		}
-		mat = std::move(trans);
-		return;
+		return trans;
 	};
 
 	template<typename T, typename Fcomp, typename Feq>

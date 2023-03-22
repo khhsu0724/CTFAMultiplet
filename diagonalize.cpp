@@ -34,7 +34,7 @@ void ed_dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n) {
 }
 
 void ed_dsyev(double* _mat, double* _eigval, size_t n) {
-	MKL_INT N = n, lda = N, info, lwork;
+	MKL_INT N = n, info, lwork;
 	double wkopt;
 	double* work;
 	lwork = -1;
@@ -65,7 +65,7 @@ void ed_dsyevr(double* _mat, double *_eigvec, double* _eigval, size_t n) {
 	dsyevr("Vectors","All","Upper",&N,_mat,&N,&vl,&vu,&il,&iu,&abstol,&N,
 			_eigval,_eigvec,&N,isuppz,work,&lwork,iwork,&liwork,&info);
 	try {
-		if (info!=0) throw runtime_error( "Error: dsyev returned error code ");
+		if (info!=0) throw runtime_error( "Error: dsyevr returned error code ");
 	} catch(const exception &ex) {std::cout << ex.what() << "\n";}
 	delete [] work;
 	delete [] iwork;
@@ -74,8 +74,10 @@ void ed_dsyevr(double* _mat, double *_eigvec, double* _eigval, size_t n) {
 }
 
 #else
+// For sherlock, if we want to use arpack we can write in openblas routine?
 extern "C" {
-	extern void dsymv_(char*,int*,double*,double*,int*,double*,double*,int*);
+	extern void dsymv_(char*,int*,double*,double*,int*,double*,int*,
+						double*,double*,int*);
 }
 
 extern "C" {
@@ -86,10 +88,16 @@ extern "C" {
 	extern void dsyev_(char*,char*,size_t*,double*,size_t*,double*,double*,int*,int*);
 }
 
+extern "C" {
+	extern void dsyevr_(char*,char*,char*,int*,double*,int*,double*,double*,int*,
+						int*,double*,int*,double*,double*,int*,int*,double*,int*,int*,
+						int*,int*);
+}
+
 void ed_dsymv(double *_mat, double *_vec_in, double *_vec_out, size_t n) {
-	int inc = 1;
+	int inc = 1, N = n;
 	double alpha = 1, beta = 0;
-	dsymv("U",&n,&alpha,_mat,&n,_vec_in,&inc,&beta,_vec_out,&inc);
+	dsymv_("U",&N,&alpha,_mat,&N,_vec_in,&inc,&beta,_vec_out,&inc);
 	return;
 }
 
@@ -126,7 +134,32 @@ void ed_dsyev(double* _mat, double* _eigval, size_t n) {
 	return;
 }
 
-// TODO
-void ed_dsyevr(double* _mat, double *_eigvec, double* _eigval, size_t n) {return;}
+void ed_dsyevr(double* _mat, double *_eigvec, double* _eigval, size_t n) {
+	int N = n, LDA = n, LDZ = n, M = n;
+	int il, iu, info, lwork = -1, liwork = -1, iwkopt;
+	char JOBZ = 'V', Range = 'A', UPLO = 'U';
+	double abstol = -1.0, vl, vu, wkopt;
+	double* work;
+	int* iwork;
+	int* isuppz = new int[2*N];
+	dsyevr_(&JOBZ,&Range,&UPLO,&N,_mat,&LDA,&vl,&vu,&il,&iu,&abstol,&M,
+			_eigval,_eigvec,&LDZ,isuppz,&wkopt,&lwork,&iwkopt,&liwork,&info);
+	try {
+		if (info!=0) throw runtime_error( "Error: 1st step dsyevr returned error code ");
+	} catch(const exception &ex) {std::cout << ex.what() << "\n";}
+	lwork = (int)wkopt;
+	work = (double*)malloc(lwork*sizeof(double));
+	liwork = iwkopt;
+	iwork = (int*)malloc(liwork*sizeof(int));
+	dsyevr_(&JOBZ,&Range,&UPLO,&N,_mat,&LDA,&vl,&vu,&il,&iu,&abstol,&M,
+			_eigval,_eigvec,&LDZ,isuppz,work,&lwork,iwork,&liwork,&info);
+	try {
+		if (info!=0) throw runtime_error( "Error: dsyevr returned error code ");
+	} catch(const exception &ex) {std::cout << ex.what() << "\n";}
+	delete [] work;
+	delete [] iwork;
+	delete [] isuppz;
+	return;
+}
 
 #endif
