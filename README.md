@@ -1,8 +1,8 @@
 # ED
-Exact Diagonalization Code
-Different compilation method provided below
-To see stack trace error, compile with -rdynamic
-Arpack & MKL installation is recommended, arpack will use blas if MKL is not present
+Exact Diagonalization Code  
+Different compilation method provided below  
+To see stack trace error, compile with -rdynamic  
+Arpack & MKL installation is recommended, arpack will use blas if MKL is not present  
 
 1. Compile with this command on MAC
 ```console
