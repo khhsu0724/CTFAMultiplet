@@ -17,7 +17,7 @@ void ed_dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n) {
 	MKL_INT *bwork;
 	double *work = new double[lwork]{0};
 	MKL_INT (*select)(const double*,const double*);
-	dgees_("Vectors","N",select,&N,_mat,&N,&sdim,_eigReal,eigImag,
+	dgees("Vectors","N",select,&N,_mat,&N,&sdim,_eigReal,eigImag,
 			_eigvec,&N,work,&lwork,bwork,&info);
 	try {
 		if (info!=0) throw runtime_error( "Error: dgees returned error code ");
