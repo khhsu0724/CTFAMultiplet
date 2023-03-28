@@ -72,9 +72,94 @@ vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print) {
 	return occ_totc;
 }
 
+
+vecd occupation_test(Hilbert& hilbs, const vector<bindex>& si, bool is_print) {
+	// Calculation occupation of orbitals, only valid when matrix is diagonalized
+	for (auto& blk : hilbs.hblks) if (blk.eigvec == nullptr) throw runtime_error("matrix not diagonalized for occupation");
+	int nvo = hilbs.cluster->vo_persite * hilbs.tot_site_num();
+	int nco = hilbs.cluster->co_persite * hilbs.tot_site_num();
+	// cout << "NVO: " << nvo << ", NCO:" << nco << endl;
+	vecc U = ed::make_blk_mat(hilbs.cluster->get_seph2real_mat(),hilbs.tot_site_num());
+	vector<double> occ_totc(nvo,0);
+	Hilbert minus_1vh(hilbs,-1);
+	// cout << "hilbs: " << hilbs.hsize << ", minus_vh hsize:" << minus_1vh.hsize << endl;
+	for (auto &s  : si) {
+		Block& blk = hilbs.hblks[s.first];
+		// cout << s.first << ", " << s.second << endl;
+		// double norm = 0;
+		// for (size_t x = 0; x < blk.size; ++x) {
+		// 	// cout << blk.eigvec[s.second*blk.size+x] << endl;
+		// 	norm += pow(blk.eigvec[s.second*blk.size+x],2);
+		// }
+		// cout << "Norm: " << norm << endl;
+		// Pick an operator
+		for (size_t c = 0; c < nvo; ++c) {
+			vecc wvfnc(minus_1vh.hsize,0);
+			for (size_t ci = 0; ci < nvo; ++ci) {
+				if (abs(U[c*nvo+ci]) < TOL) continue;
+				for (size_t j = 0; j < blk.size; ++j) {
+					double sj = blk.eigvec[s.second*blk.size+j];
+					if (abs(sj) < TOL) continue;
+					// Operate on spin up and spin down
+					for (int sud = nco; sud <= 2*(nco+nvo); sud += nco+nvo) {
+						ulli op_state = hilbs.Hashback(bindex(s.first,j)), op;
+						if (BIG1 << (ci+sud) & op_state) op = BIG1<<(ci+sud);
+						else continue;
+						// cout << "opstate: " << bitset<32>(op_state) << ", op: " << bitset<32>(op) << ", minus: " <<  bitset<32>(op_state-op) << endl;
+						bindex ind = minus_1vh.norm_Hash(op_state-op);
+						int fsgn = hilbs.Fsign(&op,op_state,1);
+						wvfnc[ind.second] += fsgn*sj*U[c*nvo+ci];
+					}
+				}
+			}
+			for (auto &w : wvfnc) occ_totc[c] += abs(pow(w,2))/si.size();
+		}
+		// if (is_print) hilbs.cluster->print_eigstate(occ_totc);
+	}
+	// if (is_print) hilbs.cluster->print_eigstate(occ_totc);
+
+	//DEBUG
+	// U = hilbs.cluster->get_seph2real_mat();
+	// cout << "DEBUGGGG NVO: " << nvo << ", NCO:" << nco << " U size: " << U.size()  << endl;
+	// occ_totc = vecd(nvo,0);
+	// for (auto &s  : si) {
+	// 	Block& blk = hilbs.hblks[s.first];
+	// 	// Pick an operator
+	// 	for (size_t site = 0; site < hilbs.tot_site_num()*5; site+=5) {
+	// 		for (size_t c = 0; c < 5; ++c) {
+	// 			vecc wvfnc(minus_1vh.hsize,0);
+	// 			for (size_t ci = 0; ci < 5; ++ci) {
+	// 				if (abs(U[c*5+ci]) < TOL) continue;
+	// 				for (size_t j = 0; j < blk.size; ++j) {
+	// 					double sj = blk.eigvec[s.second*blk.size+j];
+	// 					if (abs(sj) < TOL) continue;
+	// 					// Operate on spin up and spin down
+	// 					for (int sud = nco; sud <= 2*(nco+nvo); sud += nco+nvo) {
+	// 						ulli op_state = hilbs.Hashback(bindex(s.first,j)), op = 0;
+	// 						if (BIG1 << (ci+sud+site) & op_state) op = BIG1<<(ci+sud+site);
+	// 						else continue;
+	// 						bindex ind = minus_1vh.norm_Hash(op_state-op);
+	// 						double fsgn = hilbs.Fsign(&op,op_state,1);
+	// 						wvfnc[ind.second] += fsgn*sj*U[c*5+ci];
+	// 					}
+	// 				}
+	// 				for (auto &w : wvfnc) occ_totc[c+site] += abs(pow(w,2))/si.size();
+	// 			}
+	// 		}
+	// 	}
+	// 	if (is_print) hilbs.cluster->print_eigstate(occ_totc);
+	// }
+	// DEBUG
+
+
+	if (is_print) hilbs.cluster->print_eigstate(occ_totc);
+	return occ_totc;
+}
+
 vector<double> wvfnc_weight(Hilbert& hilbs, const vector<bindex>& si, int ligNum, bool print) {
 	// Returns fraction of degenerate states with their ligand occupation
-	vector<double> wvfnc(hilbs.hsize), dLweight(ligNum,0);
+	ligNum = (ligNum < hilbs.num_vh) ? ligNum : hilbs.num_vh;
+	vector<double> wvfnc(hilbs.hsize), dLweight(ligNum+1,0);
 	for (auto& s : si) {
 		auto &blk = hilbs.hblks[s.first];
 		for (size_t i = 0; i < blk.size; ++i) {
@@ -83,17 +168,17 @@ vector<double> wvfnc_weight(Hilbert& hilbs, const vector<bindex>& si, int ligNum
 			wvfnc[blk.f_ind+i] += pow(blk.eigvec[s.second*blk.size+i],2);
 			ulli state = hilbs.Hashback(bindex(s.first,i));
 			int Lcnt = 0;
-			// This needs to account geometry
-			for (size_t j = 5; j < 11; ++j) {
+			// This needs to account geometry, Need a cleaner solution?
+			for (size_t j = 5*hilbs.cluster->tm_per_site; j < hilbs.cluster->vo_persite; ++j) {
 				if ((BIG1<<(j+hilbs.num_corb/2)) & state) Lcnt++;
 				if ((BIG1<<(j+hilbs.num_corb+hilbs.num_vorb/2)) & state) Lcnt++;
 			}
-			if (Lcnt < ligNum) dLweight[Lcnt] += pow(blk.eigvec[s.second*blk.size+i],2)/si.size();
+			if (Lcnt <= ligNum) dLweight[Lcnt] += pow(blk.eigvec[s.second*blk.size+i],2)/si.size();
 		}
 	}
 	if (print) {
 		cout << "Ground State composition";
-		for (size_t i = 0; i < ligNum; ++i) {
+		for (size_t i = 0; i <= ligNum; ++i) {
 			cout << ", d" << 10-hilbs.num_vh+i;
 			if (i == 1) cout << "L: ";
 			else if (i > 1) cout << "L" << i << ": ";
@@ -108,20 +193,34 @@ vector<double> wvfnc_weight(Hilbert& hilbs, const vector<bindex>& si, int ligNum
 double effective_delta(Hilbert& hilbs, int ligNum, bool is_print) {
 	// Check effective delta, needs t = 0
 	double d, dL;
-	vector<bool> firstLh(ligNum,true);
-	vector<double> distinct = ed::printDistinct(hilbs.get_all_eigval(false),0.0,hilbs.hsize,is_print);
+	ligNum = (ligNum < hilbs.num_vh) ? ligNum : hilbs.num_vh;
+	vector<bool> firstLh(ligNum+1,true);
+	auto all_eig = hilbs.get_all_eigval(false);
+	vector<double> distinct = ed::printDistinct(all_eig,0.0,all_eig.size(),is_print);
 	for (size_t e = 0; e < distinct.size(); ++e) {
 		vector<bindex> gei;
 		for (size_t i = 0; i < hilbs.hblks.size(); ++i) {
 			if (hilbs.hblks[i].eig == nullptr) continue;
-			for (size_t j = 0; j < hilbs.hblks[i].size; ++j) {
+			for (size_t j = 0; j < hilbs.hblks[i].nev; ++j) {
 				if (abs(hilbs.hblks[i].eig[j]-distinct[e]) < TOL) {
 					gei.push_back({i,j});
 				}
 			}
 		}
 		vector<double> dLweight = wvfnc_weight(hilbs,gei,ligNum,false);
-		for (size_t i = 0; i < ligNum; ++i) {
+		// In the rare case where dn and d(n+1)L has the same energy: Occupation both non-zero
+		if (firstLh[0] && firstLh[1] && abs(dLweight[0]*dLweight[1]) > TOL) {
+			d = distinct[e];
+			dL = distinct[e];
+			firstLh[0] = false;
+			firstLh[1] = false;
+			if (is_print) {
+				cout << "Energy: " << distinct[e] << ", degeneracy: " << gei.size() << endl;
+				wvfnc_weight(hilbs,gei,ligNum,true);
+			}
+			continue;
+		}
+		for (size_t i = 0; i <= ligNum; ++i) {
 			if (abs(dLweight[i]-1) < TOL && firstLh[i]) {
 				if (i == 0) d = distinct[e];
 				if (i == 1) dL = distinct[e];
@@ -133,7 +232,7 @@ double effective_delta(Hilbert& hilbs, int ligNum, bool is_print) {
 			}
 		}
 	}
-	if (is_print) cout << "Effective delta: " << dL - d << endl;
+	if (is_print) cout << "Effective delta: " << dL - d << ", d energy: " << d << ", dL energy: " << dL << endl;
 	return dL - d;
 }
 
@@ -175,9 +274,11 @@ void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, vector<blapIndex>& bla
 	vecd pvec = pvout ? pm.pvout : pm.pvin;
 	int cl = GS.atlist[0].l, vl = GS.atlist[GS.atlist[0].vind].l;
 	int half_orb = (EX.num_vorb+EX.num_corb)/2;
-	#pragma omp parallel for shared(blap) collapse(2)
-	for (size_t g = 0; g < GS.hblks[gbi].size; g++) {
-		for (size_t e = 0; e < EX.hblks[exi].size; e++) {
+	const int gsblk_size = GS.hblks[gbi].size;
+	const int exblk_size = EX.hblks[exi].size;
+	#pragma omp parallel for shared(blap) collapse(2) // Somehow sherlock does not recognize collapse
+	for (size_t g = 0; g < gsblk_size; g++) {
+		for (size_t e = 0; e < exblk_size; e++) {
 			ulli gs = GS.Hashback(bindex(gbi,g)), exs = EX.Hashback(bindex(exi,e));
 			ulli ch = exs - (gs & exs), vh = gs - (gs & exs);
 			int coi = EX.orbind(ch), voi = GS.atlist[coi].vind;
@@ -221,7 +322,7 @@ void XAS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd con
 	for (size_t p = 0; p < peak_en_copy.size(); p++) {
 		vector<bindex> peaks;
 		for (auto &blk : EX.hblks) {	
-			for (size_t i = 0; i < blk.size; ++i) {
+			for (size_t i = 0; i < blk.nev; ++i) {
 				if (abs(blk.eig[i]-ref_en-peak_en_copy[p]) < PRINT_TOL) 
 					peaks.push_back(bindex(&blk-&EX.hblks[0],i));
 			}
@@ -268,12 +369,12 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	if (GS.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
 	if (EX.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
 	double gs_en = GS.hblks[0].eig[0];
-	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.size; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
+	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.nev; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
 	vector<bindex> gsi; // index for ground state
 	// Calculate Partition function
 	double Z = 0, emin = pm.ab_range[0], emax = pm.ab_range[1], SDegen = 0;
 	for (size_t i = 0; i < GS.hblks.size(); ++i) {
-	for (size_t j = 0; j < GS.hblks[i].size; ++j) {
+	for (size_t j = 0; j < GS.hblks[i].nev; ++j) {
 		if (abs(GS.hblks[i].eig[j]-gs_en) < TOL) {
 			Z += exp(-beta*GS.hblks[i].eig[j]);
 			if (abs(GS.hblks[i].get_sz()) >= SDegen) SDegen = abs(GS.hblks[i].get_sz());
@@ -298,7 +399,7 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 				last_gs_block = g.first;
 			}
 			#pragma omp parallel for reduction (vec_double_plus:xas_int) schedule(dynamic)
-			for (size_t ei = 0; ei < exblk.size; ++ei) {
+			for (size_t ei = 0; ei < exblk.nev; ++ei) {
 				if (exblk.eig[ei]-gs_en < emin || exblk.eig[ei]-gs_en > emax) continue;
 				dcomp cs = 0;
 				for (auto & b : blap) {
@@ -316,7 +417,7 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 		}
 	}
 	// Calculate peak intensity, TODO: output peaks?
-	XAS_peak_occupation(GS,EX,vecd({10}),xas_aben,xas_int,gsi,gs_en,"top",true);
+	XAS_peak_occupation(GS,EX,vecd({6}),xas_aben,xas_int,gsi,gs_en,"top",true);
 
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -358,16 +459,17 @@ void RIXS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd co
 		vector<bindex> ab_peaks, em_peaks;
 		// Get absorption peaks
 		for (auto &blk : EX.hblks) {	
-			for (size_t i = 0; i < blk.size; ++i) {
-				if (abs(blk.eig[i]-ref_en-peak_ab_en[p]) < PRINT_TOL) 
+			for (size_t i = 0; i < blk.nev; ++i) {
+				if (abs(blk.eig[i]-ref_en-peak_ab_en[p]) < TOL) 
 					ab_peaks.push_back(bindex(&blk-&EX.hblks[0],i));
 			}
 		}
 		// Get emission peaks
 		double loss_en = pm.eloss ? peak_em_en[p] : peak_ab_en[p]-peak_em_en[p];
+		double tolerance = pm.eloss ? TOL : (2*pm.em_energy+pm.ab_range[1]-pm.ab_range[0])/ab_en.size();
 		for (auto &blk : GS.hblks) {	
-			for (size_t i = 0; i < blk.size; ++i) {
-				if (abs(blk.eig[i]-ref_en-loss_en) < PRINT_TOL) 
+			for (size_t i = 0; i < blk.nev; ++i) {
+				if (abs(blk.eig[i]-ref_en-loss_en) < tolerance) 
 					em_peaks.push_back(bindex(&blk-&GS.hblks[0],i));
 			}
 		}
@@ -386,7 +488,7 @@ void RIXS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd co
 			cout << "--------Relative to Ground state-------" << endl;
 			for (size_t i = 0; i < occ_ex.size()/2; ++i) {
 				occ_ex[i] -= occ_gs[i];
-				occ_ex[i+11] -= occ_gs[i];
+				occ_ex[i+occ_ex.size()/2] -= occ_gs[i];
 			}
 			EX.cluster->print_eigstate(occ_ex);
 		}
@@ -431,7 +533,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	if (EX.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
 
 	double gs_en = GS.hblks[0].eig[0];
-	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.size; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
+	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.nev; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
 	vector<bindex> gsi,exi; // index for ground state and excited states
 	double Z = 0, ab_emin = pm.ab_range[0], ab_emax = pm.ab_range[1], elm_min, elm_max;
 	if (pm.eloss) { // Energy Loss
@@ -442,7 +544,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 		elm_min = ab_emin - pm.em_energy;
 	}
 	for (size_t i = 0; i < GS.hblks.size(); ++i) {
-	for (size_t j = 0; j < GS.hblks[i].size; ++j) {
+	for (size_t j = 0; j < GS.hblks[i].nev; ++j) {
 		if (abs(GS.hblks[i].eig[j]-gs_en) < TOL) {
 			gsi.push_back({i,j});
 			Z += exp(-beta*GS.hblks[i].eig[j]);
@@ -453,7 +555,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	vecd exen;
 	for (auto &exblk : EX.hblks) {
 		exblk.init_einrange();
-		for (int ei = 0; ei < exblk.size; ++ei) {
+		for (int ei = 0; ei < exblk.nev; ++ei) {
 			if (exblk.eig[ei] < gs_en + ab_emin || exblk.eig[ei] > gs_en + ab_emax) {
 				exblk.einrange[ei] = -1;
 				continue;
@@ -473,7 +575,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	if (exen.size() > 1) { // Skip this if there are less than 1 excited state
 		for (auto &exblk : EX.hblks) {
 		#pragma omp parallel for shared(exblk)
-		for (size_t ei = 0; ei < exblk.size; ++ei) {
+		for (size_t ei = 0; ei < exblk.nev; ++ei) {
 			if (exblk.einrange[ei] == -1) continue;
 			exblk.einrange[ei] = ed::binary_search(exen,exblk.eig[ei],std::greater<double>(),
 					[&](double a, double b){return abs(a-b) < TOL;});
@@ -502,7 +604,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 				last_gs_block = g.first;
 			}	
 			#pragma omp parallel for reduction (vec_dcomp_plus:rixskern) schedule(dynamic)
-			for (size_t ei = 0; ei < exblk.size; ++ei) {
+			for (size_t ei = 0; ei < exblk.nev; ++ei) {
 				if (exblk.eig[ei]-gs_en < ab_emin || exblk.eig[ei]-gs_en > ab_emax) continue;
 				dcomp csvi = 0;
 				for (auto & b : blap) {
@@ -522,20 +624,20 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 		if (!GS.SO_on && !EX.SO_on && fsblk.get_sz() != exblk.get_sz()) continue; // Spin order blocks
 		cout << "FS blk: " << &fsblk-&GS.hblks[0] << ", EX blk: " << &exblk-&EX.hblks[0] << endl;
 		basis_overlap(GS,EX,bindex(&fsblk-&GS.hblks[0],&exblk-&EX.hblks[0]),blap,pm,true);
-		for (size_t fi = 0; fi < fsblk.size; ++fi) {
-			ed::print_progress((double)fi+1,(double)fsblk.size);
+		for (size_t fi = 0; fi < fsblk.nev; ++fi) {
+			ed::print_progress((double)fi+1,(double)fsblk.nev);
 			if (pm.eloss) {if (fsblk.eig[fi]-gs_en > elm_max) continue;}
 			vector<dcomp> csum(gsi.size()*exen.size(),0);
 			bool is_gs = abs(fsblk.eig[fi]-gs_en) < TOL;
 			size_t gsind;
 			if (is_gs) gsind = distance(gsi.begin(), find(gsi.begin(), gsi.end(), bindex(&fsblk-&GS.hblks[0],fi)));
 			#pragma omp parallel for reduction (vec_dcomp_plus:csum) schedule(dynamic)
-			for (size_t ei = 0; ei < exblk.size; ++ei) {
+			for (size_t ei = 0; ei < exblk.nev; ++ei) {
 				if (exblk.einrange[ei] == -1) continue; // Not in absorption range
 				if (!pm.eloss) {if (exblk.eig[ei]-fsblk.eig[fi] > elm_max || exblk.eig[ei]-fsblk.eig[fi] < elm_min) continue;}
 				// Breaks if no ground state connects with intermediate state
 				bool skip_ei = true;
-				for (size_t gi = 0; gi < gsi.size(); ++gi) {
+				for (size_t gi = 0; gi < gsi.size();++gi) {
 					if (abs(rixskern[gi*EX.hsize+ei+exblk.f_ind]) > TOL) {
 						skip_ei = false;
 						break;

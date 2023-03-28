@@ -12,6 +12,7 @@ double calc_U(double* gaunt1, double* gaunt2, const double* SC, int size) {
 
 void calc_ham(Hilbert& hilbs, const HParam& hparam) {
 	// Assemble Hamiltonian of the hilbert space
+	for (auto& blk : hilbs.hblks) blk.malloc_ham(hparam.diag_option);
 	calc_coulomb(hilbs,hparam.SC); 
 	if (hilbs.SO_on) calc_SO(hilbs,hparam.SO);
 	if (hilbs.CF_on) calc_CF(hilbs,&hparam.CF[0]);
@@ -100,7 +101,7 @@ void calc_CF(Hilbert& hilbs, const double* CF) {
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		int l = hilbs.atlist[i].l;
 		vecd cfmat;
-		if (l == 2 && CF != 0 && !hilbs.atlist[i].is_lig) cfmat = CFmat(l, CF);
+		if (l == 2 && !hilbs.atlist[i].is_lig) cfmat = CFmat(l, CF);
 		else continue;
 		for (int j = 0; j < (l*2+1)*(l*2+1); ++j) {
 			if (cfmat[j] == 0) continue;
@@ -129,7 +130,8 @@ void calc_SO(Hilbert& hilbs, const double lambda) {
 			for (auto spin : {-0.5,0.5}) {
 				QN qn(ml,spin,i);
 				vpulli entries = hilbs.match(1,&qn,&qn);
-				double matelem = -lambda * spin * ml; // No sign traversing issue due to symmetry
+				// No sign traversing issue due to symmetry, spin = 1/2 factored in equation
+				double matelem = -lambda * spin * ml;
 				for (auto& e : entries) hilbs.fill_hblk(matelem,e.first,e.second);
 			}
 			// transverse phonon
@@ -149,7 +151,6 @@ void calc_SO(Hilbert& hilbs, const double lambda) {
 void calc_CV(Hilbert& hilbs, const double* FG) {
 	// Calculate core valence interactions
 	if (!hilbs.is_ex) return;
-	// int ci = 0, vi = 1;
 	for (int ci = 0; ci < hilbs.val_ati; ci++) {
 		int vi = hilbs.atlist[ci].vind;
 		int cl = hilbs.atlist[ci].l, vl = hilbs.atlist[vi].l;
@@ -183,8 +184,10 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam) {
 	// Charge Transfer and Hybridization
 	if (hilbs.cluster->no_HYB) return;
 	else hilbs.cluster->set_hyb_params(hparam);
-	int nvo = hilbs.num_vorb/2, nco = hilbs.num_corb/2;
-	vecd hybmat = hilbs.cluster->get_tmat_real();
+	int nvo = hilbs.cluster->vo_persite * hilbs.tot_site_num();
+	int nco = hilbs.cluster->co_persite * hilbs.tot_site_num();
+	// HYBRIDIZATION is momentum dependent, need to rewrite code here
+	vecd hybmat = ed::make_blk_mat(hilbs.cluster->get_tmat_real(),hilbs.tot_site_num());
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
 	// Loop through hyb matrix, TODO: Loop through each site
 	for (int i = 0; i < nvo; ++i) {
