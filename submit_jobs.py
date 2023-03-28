@@ -18,9 +18,6 @@ class Input_Param:
         self.del_eff = del_eff
         self.tpd = tpd
         self.tpp = tpp
-
-def generate_input():
-    # Returns Array of Input Param
         
 base_dir = os.getcwd()
 data_dir = os.path.join(base_dir, "DATA_DIR")

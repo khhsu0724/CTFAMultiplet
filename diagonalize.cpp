@@ -11,13 +11,6 @@ using namespace std;
 
 #ifdef __INTEL_MKL__
 
-void ed_dsymv(double *_mat, double *_vec_in, double *_vec_out, size_t n) {
-	MKL_INT N = n, lda = N, inc = 1;
-	double alpha = 1, beta = 0;
-	dsymv("U",&N,&alpha,_mat,&lda,_vec_in,&inc,&beta,_vec_out,&inc);
-	return;
-}
-
 void ed_dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n) {
 	double *eigImag = new double[n]{0};
 	MKL_INT N = n, info = 0, sdim = 0, lwork = 6*n;
@@ -75,10 +68,6 @@ void ed_dsyevr(double* _mat, double *_eigvec, double* _eigval, size_t n) {
 
 #else
 // For sherlock, if we want to use arpack we can write in openblas routine?
-extern "C" {
-	extern void dsymv_(char*,int*,double*,double*,int*,double*,int*,
-						double*,double*,int*);
-}
 
 extern "C" {
 	extern void dgees_(char*,char*,int(*)(double*,double*),size_t*,double*,size_t*,
@@ -92,13 +81,6 @@ extern "C" {
 	extern void dsyevr_(char*,char*,char*,int*,double*,int*,double*,double*,int*,
 						int*,double*,int*,double*,double*,int*,int*,double*,int*,int*,
 						int*,int*);
-}
-
-void ed_dsymv(double *_mat, double *_vec_in, double *_vec_out, size_t n) {
-	int inc = 1, N = n;
-	double alpha = 1, beta = 0;
-	dsymv_("U",&N,&alpha,_mat,&N,_vec_in,&inc,&beta,_vec_out,&inc);
-	return;
 }
 
 void ed_dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n) {

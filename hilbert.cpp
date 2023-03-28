@@ -206,8 +206,8 @@ void Hilbert::fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs)
 	// Find block index for lhs and rhs
 	bindex lind = Hash(lhs);
 	bindex rind = Hash(rhs);
-	if (lind.first == rind.first) hblks[lind.first]. \
-		ham[lind.second+hblks[lind.first].size*rind.second] += matelem;
+	if (lind.first == rind.first) 
+		hblks[lind.first].ham->fill_mat(lind.second,rind.second,matelem);
 	else throw out_of_range("invalid block matrix element entry");
 	return;
 }
