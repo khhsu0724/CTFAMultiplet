@@ -33,13 +33,12 @@ Compile it in NERSC Haswell (-pedantic will give a lot of warnings)
 CC -std=c++1y -mkl="parallel" -O3 -fopenmp -ffast-math -march=native -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp cluster.cpp
 ```
 
-Compile it in Sherlock
-Compile with MKL
+Compile it in Sherlock with MKL
 ```console
 module load imkl icc boost gcc/6.3.0
 icpc -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -ldl -std=c++1y -O3 -fopenmp -ffast-math -march=native -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp cluster.cpp -lm
 ```
-Compile with Arpack
+Compile it in Sherlock with Arpack
 ```console
 module load arpack icc boost gcc/8.1.0
 icpc -llapack -lpthread -ldl -larpack -std=c++1y -m64 -O3 -fopenmp -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp cluster.cpp -lm -lgfortran
