@@ -1,12 +1,7 @@
 #ifndef DIAGONALIZE
 #define DIAGONALIZE
-#include "helper.hpp"
+#include "matrix.hpp"
 #include <omp.h>
-#if defined __has_include && __has_include ("mkl.h") 
-#include "mkl.h" // Can we auto-detect if mkl is installed
-#include "mkl_lapacke.h"
-#include "mkl_blas.h"
-#endif
 #if defined __has_include && __has_include (<arpack/arpack.hpp>) 
 #if __APPLE__  //Disable some warning from MacOS
 #pragma GCC diagnostic push
@@ -22,9 +17,6 @@
 #include <arpack-ng/arpack.hpp>
 #endif
 
-typedef std::unique_ptr<double[]> uptrd;
-
-void ed_dsymv(double *_mat, double *_vec_in, double *_vec_out, size_t n);
 void ed_dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n);
 void ed_dsyev(double *_mat, double *_eigval, size_t n);
 void ed_dsyevr(double *_mat, double *_eigvec, double* _eigReal, size_t n);
@@ -32,11 +24,11 @@ void ed_dsyevr(double *_mat, double *_eigvec, double* _eigReal, size_t n);
 #ifdef __ARPACK_HPP__
 #define ARPACK_TOL 1e-10
 template <typename Real> 
-void ed_dsarpack(Real* _mat, Real *_eigvec, Real* _eigval, size_t n, size_t _nev) {
+void ed_dsarpack(Matrix<Real>* ham, Real *_eigvec, Real* _eigval, size_t n, size_t _nev) {
 	std::cout << "Using Arpack" << std::endl;
 	const a_int N      = n;
 	const a_int nev    = (_nev < N) ? _nev : N;
-	const a_int ncv    = 2*nev+1;
+	const a_int ncv    = std::min(2*nev+1,N); // NCV size could be increased??
 	const a_int ldv    = N;
 	const a_int ldz    = N;
 	const a_int lworkl = ncv * (ncv + 8);
@@ -62,7 +54,7 @@ void ed_dsarpack(Real* _mat, Real *_eigvec, Real* _eigval, size_t n, size_t _nev
 		arpack::saupd(ido, arpack::bmat::identity, N, arpack::which::smallest_algebraic, 
 						nev, tol, resid, ncv, V, ldv, iparam, ipntr, workd, 
 						workl, lworkl, info);
-		ed_dsymv(_mat,workd+ipntr[0]-1,workd+ipntr[1]-1,N);
+		ham->mvmult(workd+ipntr[0]-1,workd+ipntr[1]-1,N);
 	} while (ido == 1 || ido == -1);
 
 	// check info and number of ev found by arpack.
@@ -87,10 +79,13 @@ void ed_dsarpack(Real* _mat, Real *_eigvec, Real* _eigval, size_t n, size_t _nev
 }
 #else
 template <typename Real> 
-void ed_dsarpack(Real* _mat, Real *_eigvec, Real* _eigval, size_t n, size_t& nev) {
+void ed_dsarpack(Matrix<Real>* ham, Real *_eigvec, Real* _eigval, size_t n, size_t& nev) {
 	std::cout << "Arpack not available, switching to mkl/lapack" << std::endl;
 	nev = n;
-	ed_dsyevr(_mat,_eigvec,_eigval,n);
+	_ham = ham->get_dense();
+	ed_dsyevr(_ham,_eigvec,_eigval,n);
+	delete [] _ham;
+	_ham = nullptr;
 	return;
 };
 #endif
@@ -102,7 +97,9 @@ private:
 public:
 	size_t size, f_ind; // Accumulated first index of this Block
 	size_t nev;			// Number of eigenvalues
-	uptrd ham, eig, eigvec;
+	int diag_option;
+	Matrix<double>* ham;
+	uptrd eig, eigvec;
 	std::vector<int> einrange;
 	std::vector<ulli> rank; // rank keeps some rank information for faster hashing
 	Block(double Sz, double Jz, double K, size_t size, size_t f_ind_in = 0,
@@ -115,6 +112,7 @@ public:
 	};
 	
 	Block(Block&& blk) : Sz(blk.Sz), Jz(blk.Jz), K(blk.K), size(blk.size), f_ind(blk.f_ind), nev(blk.nev) {
+		// This is a bit odd, should I copy or move?
 		ham = std::move(blk.ham);
 		eig = std::move(blk.eig);
 		eigvec = std::move(blk.eigvec);
@@ -128,40 +126,55 @@ public:
 	double get_sz() {return Sz;};
 	double get_jz() {return Jz;};
 	double get_k() {return K;};	
-	void malloc_ham() {ham = std::make_unique<double[]>(size*size);};
-	void diagonalize(int option = 2, size_t nev_in = 20) {
+	void malloc_ham(int diag_option) {
+		// If matrix is too large, automatically use arpack
+		if (size >= 2e5) {
+			this->diag_option = 4;
+			ham = new EZSparse<double>();
+		} else if (size <= 1e4) {
+			this->diag_option = 2;
+			ham = new Dense<double>();
+		} else {
+			this->diag_option = diag_option;
+			if (diag_option == 4) ham = new EZSparse<double>();
+			else ham = new Dense<double>();
+		}
+		ham->malloc(size);
+	};
+	void diagonalize(size_t nev_in = 20) {
 		// Options: 1. DGEES 2. DSYEVR (MRRR) 3. DSYEV (Shifted QR) 
 		// 4. ARPACK (Lanczos)
-		_ham = ham.release(); // Release for diagonalize
-		if (option == 4 && nev_in < size) {
-			nev = nev_in;
-		} else nev = size;
-		if (option == 3) {
-			_eig = new double[size]{0};
-			ed_dsyev(_ham,_eig,size);
-			eigvec = return_uptr(&_ham);
-			eig = return_uptr(&_eig);
-		} else if (option != 3) {
+		int option = this->diag_option;
+		if (option == 1 || option == 2) {
+			nev = size;
+			_ham = ham->get_dense();
 			_eig = new double[nev]{0};
 			_eigvec = new double[size*nev]{0};
 			if (option == 1) ed_dgees(_ham,_eigvec,_eig,size);
 			else if (option == 2) ed_dsyevr(_ham,_eigvec,_eig,size);
-			else if (option == 4) ed_dsarpack(_ham,_eigvec,_eig,size,nev);
-			else throw std::invalid_argument("invalid diagonalize method");
-			eigvec = return_uptr(&_eigvec);
-			eig = return_uptr(&_eig);
+			eigvec = return_uptr<double>(&_eigvec);
+			eig = return_uptr<double>(&_eig);
 			delete [] _ham;
 			_ham = nullptr;
+		} else if (option == 3) {
+			nev = size;
+			_ham = ham->get_dense();
+			_eig = new double[size]{0};
+			ed_dsyev(_ham,_eig,size);
+			eigvec = return_uptr<double>(&_ham);
+			eig = return_uptr<double>(&_eig);
+		} else if (option == 4) {
+			nev = std::min(nev_in,size/3);
+			_eig = new double[nev]{0};
+			_eigvec = new double[size*nev]{0};
+			ed_dsarpack(ham,_eigvec,_eig,size,nev);
+			eigvec = return_uptr<double>(&_eigvec);
+			eig = return_uptr<double>(&_eig);
 		} else throw std::invalid_argument("invalid diagonalize method");
 		return;
 	}
 	void init_einrange() {
 		einrange = std::vector<int>(size,0); // Hopefully there are more elegant solutions in the future
-	}
-	uptrd return_uptr(double** arr) {
-		uptrd tmp(*arr);
-		*arr = NULL;
-		return tmp;
 	}
 };
 

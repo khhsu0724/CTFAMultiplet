@@ -276,7 +276,7 @@ void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, vector<blapIndex>& bla
 	int half_orb = (EX.num_vorb+EX.num_corb)/2;
 	const int gsblk_size = GS.hblks[gbi].size;
 	const int exblk_size = EX.hblks[exi].size;
-	#pragma omp parallel for shared(blap) collapse(2)
+	#pragma omp parallel for shared(blap) collapse(2) // Somehow sherlock does not recognize collapse
 	for (size_t g = 0; g < gsblk_size; g++) {
 		for (size_t e = 0; e < exblk_size; e++) {
 			ulli gs = GS.Hashback(bindex(gbi,g)), exs = EX.Hashback(bindex(exi,e));

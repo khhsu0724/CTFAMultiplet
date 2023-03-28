@@ -67,6 +67,7 @@ vecd Cluster::get_tmat_real() {
 	vecd tmatreal(vo_persite*vo_persite,0);
 	std::transform(tmat.begin(), tmat.end(), tmatreal.begin(), 
 						[](complex<double> c) {return c.real();});
+	ed::write_vec(tmatreal,11,11,"tmatreal.txt");
 	return tmatreal;
 };
 

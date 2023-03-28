@@ -270,8 +270,7 @@ double calculate_effective_delta(const string& input_dir, HParam& hparam, const 
 	}
 	calc_ham(GS,hparam);
 	for (size_t g = 0; g < (GS.hblks.size()+1)/2; g++) {
-		if (GS.hblks[g].size < 1e4) GS.hblks[g].diagonalize(2);
-		else GS.hblks[g].diagonalize(hparam.diag_option,abs(hparam.MLdelta)*30);
+		GS.hblks[g].diagonalize(abs(hparam.MLdelta)*30);
 	}
 	hparam.tpd = inp_tpd;
 	hparam.tpp = inp_tpp;
@@ -292,20 +291,13 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	cout << "Diagonalizing Hamiltonian..." << endl;
 	auto diag_start = chrono::high_resolution_clock::now();
 	cout << "Diagonalizing Ground State" << endl;
+	int gs_nev = 0;
+	if (pm.RIXS) gs_nev = 400;
+	else gs_nev = 10 * GS.tot_site_num();
 	for (size_t g = 0; g < GS.hblks.size(); g++) {
-		// #ifdef __INTEL_MKL__
-		// cout << "Number of threads: " << mkl_get_max_threads() << endl;
-		// #endif
 		start = chrono::high_resolution_clock::now();
 		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size << endl;
-		if (pm.RIXS) {
-			if (GS.hblks[g].size < 1e4) GS.hblks[g].diagonalize(2);
-			else GS.hblks[g].diagonalize(hparam.diag_option,sqrt(GS.hblks[g].size)*10); // Might underestimate
-		} else {
-			int gs_nev = 10 * GS.tot_site_num();
-			cout << "gs nev: " << gs_nev << endl;
-			GS.hblks[g].diagonalize(hparam.diag_option,gs_nev);
-		}
+		GS.hblks[g].diagonalize(gs_nev);
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -329,7 +321,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	if (hparam.block_diag) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
 	occupation(GS,gsi);
-	wvfnc_weight(GS,gsi,2);
+	wvfnc_weight(GS,gsi,2,true);
 	cout << endl;
 
 	// Assemble Core Hole Hamiltonian
@@ -340,32 +332,19 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	calc_ham(EX,hparam);
 	stop = chrono::high_resolution_clock::now();
 	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-
-	ed::write_mat(EX.hblks[0].ham,EX.hblks[0].size,EX.hblks[0].size,"./exmat.txt");
 	cout << "size: " << EX.hblks[0].size << endl;
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
 
 	cout << "Diagonalizing Core-Hole Hamiltonian" << endl;
 	diag_start = chrono::high_resolution_clock::now();
+	int ex_nev = 0;
+	if (pm.edge == "K") ex_nev = 200;
+	else if (pm.edge == "L3") ex_nev = 500;
+	else if (pm.edge == "L") ex_nev = 1500;
 	for (size_t e = 0; e < EX.hblks.size(); e++) {
 		start = chrono::high_resolution_clock::now();
-		size_t ex_nev = EX.hblks[e].size;
-		// #ifdef __INTEL_MKL__
-		// cout << "Number of threads: " << mkl_get_max_threads() << endl;
-		// #endif
 		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
-		if (pm.edge == "K") {
-			ex_nev = std::max((size_t)200,(size_t)sqrt(EX.hblks[e].size)*5);	
-			if (EX.hblks[e].size < 2e3) EX.hblks[e].diagonalize(2); // Small matrix use dsyev
-			else EX.hblks[e].diagonalize(hparam.diag_option,ex_nev);
-		} else if (pm.edge == "L") {
-			EX.hblks[e].diagonalize(2); // Full L edge probably needs full Diagonalization
-		} else if (pm.edge == "L3") {
-			ex_nev = std::max((size_t)400,(size_t)sqrt(EX.hblks[e].size)*20);
-			if (EX.hblks[e].size < 9e3) EX.hblks[e].diagonalize(2); // Small matrix use dsyev
-			else EX.hblks[e].diagonalize(hparam.diag_option,ex_nev);
-		}
-		cout << "ex nev: " << ex_nev << endl;
+		EX.hblks[e].diagonalize(ex_nev);
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -376,16 +355,15 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	double ex_min_en = EX.hblks[0].eig[0];
 	vector<bindex> exmin_ind;
 	for (auto &exb : EX.hblks) for (size_t i = 0; i < exb.nev; ++i) if (exb.eig[i] <= ex_min_en) ex_min_en = exb.eig[i];
-	if (hparam.block_diag) {
-		SDegen = 0;
-		for (size_t i = 0; i < EX.hblks.size(); ++i) {
-		for (size_t j = 0; j < EX.hblks[i].size; ++j) {
-			if (abs(EX.hblks[i].eig[j]-ex_min_en) < TOL) {
-				if (abs(EX.hblks[i].get_sz()) >= SDegen) SDegen = abs(EX.hblks[i].get_sz());
-				exmin_ind.push_back({i,j});
-			}
-		}}
-	}
+	SDegen = 0;
+	for (size_t i = 0; i < EX.hblks.size(); ++i) {
+	for (size_t j = 0; j < EX.hblks[i].size; ++j) {
+		if (abs(EX.hblks[i].eig[j]-ex_min_en) < TOL) {
+			if (hparam.block_diag && abs(EX.hblks[i].get_sz()) >= SDegen) 
+				SDegen = abs(EX.hblks[i].get_sz());
+			exmin_ind.push_back({i,j});
+		}
+	}}
 	// cout << "Band Gap: " << ex_min_en - gs_en << "eV" << endl;
 	// auto all_eig = EX.get_all_eigval(true);
 	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
@@ -455,7 +433,6 @@ int main(int argc, char** argv){
 	cout << "Diagonalization Option: " << hparam.diag_option << endl;
 
 	// Calculate Delta or Effective Delta
-	// IF There are no ligands then 
 	if (hparam.effective_delta) {
 		cout << "effective delta: " << hparam.MLdelta << endl; 
 		double del = calculate_effective_delta(IDIR,hparam,pm);
