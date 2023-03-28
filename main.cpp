@@ -37,7 +37,7 @@ void handler(int sig) {
 using namespace std;
 
 void tb() {
-	// This is pretty out of date
+	// Tanabe-Sugano This is pretty out of date
 	ofstream myfile;
     myfile.open ("./tb.txt");
     HParam hparam;
@@ -55,7 +55,7 @@ void tb() {
 		for (int c = 0; c < 5; c++) CF_TB[c] = CF[c] * m;
 		calc_coulomb(input,SC);
 		calc_CF(input,CF_TB);
-		input.hblks[0].diagonalize();
+		input.hblks[0].diagonalize(2);
 		vector<double> unique_eig = ed::printDistinct(input.hblks[0].eig,
 							input.hblks[0].eig[0],input.hblks[0].size,false);
 		auto min_eig = *min_element(unique_eig.begin(), unique_eig.end());
@@ -168,6 +168,12 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 							else if (p == "MLCT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.MLdelta,1);
 							else if (p == "EFFDEL") skip = read_bool(line.substr(s+1,line.size()-1),hparam.effective_delta);
 							else if (p == "BLOCK") skip = read_bool(line.substr(s+1,line.size()-1),hparam.block_diag);
+							else if (p == "DIAG") {
+								double diag_option = 0;
+								skip = read_num(line.substr(s+1,line.size()-1),&diag_option,1);
+								hparam.diag_option = (int)diag_option;
+							}
+							else if (p == "SITEOCC") skip = read_bool(line.substr(s+1,line.size()-1),hparam.print_site_occ);
 							else if (p == "OVERWRITE") skip = read_bool(line.substr(s+1,line.size()-1),overwrite);
 							p = "";
 						}
@@ -258,46 +264,54 @@ double calculate_effective_delta(const string& input_dir, HParam& hparam, const 
 	hparam.tpd = 0;
 	hparam.tpp = 0;
 	Hilbert GS(input_dir,hparam,pm.edge,false);
+	if (!GS.cluster->lig_per_site) {
+		cout << "No ligands, skipping calculate delta" << endl;
+		return 0;
+	}
 	calc_ham(GS,hparam);
-	for (size_t g = 0; g < (GS.hblks.size()+1)/2; g++) GS.hblks[g].diagonalize();
+	for (size_t g = 0; g < (GS.hblks.size()+1)/2; g++) {
+		GS.hblks[g].diagonalize(abs(hparam.MLdelta)*30);
+	}
 	hparam.tpd = inp_tpd;
 	hparam.tpp = inp_tpp;
-	return effective_delta(GS,3);
+	return effective_delta(GS,2);
 }
 
-void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam) {
+void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	// Assembling Hamiltonian and Diagonalizing, returns partition function
 	double beta = 0;
-	cout << "Assembling Hamiltonian..." << endl;
+	// Assemble GS Hamiltonian
+	cout << "Assembling GS Hamiltonian..." << endl;
 	auto start = chrono::high_resolution_clock::now();
 	calc_ham(GS,hparam);
-	hparam.SC.pop_back();
-	hparam.SC.push_back(hparam.SC2EX);
-	calc_ham(EX,hparam);
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
 
 	cout << "Diagonalizing Hamiltonian..." << endl;
 	auto diag_start = chrono::high_resolution_clock::now();
-	// #pragma omp parallel for schedule(static) num_threads(4)
 	cout << "Diagonalizing Ground State" << endl;
+	int gs_nev = 0;
+	if (pm.RIXS) gs_nev = 400;
+	else gs_nev = 10 * GS.tot_site_num();
 	for (size_t g = 0; g < GS.hblks.size(); g++) {
-		cout << "Number of threads: " << mkl_get_max_threads() << endl;
 		start = chrono::high_resolution_clock::now();
 		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size << endl;
-		GS.hblks[g].diagonalize();
+		GS.hblks[g].diagonalize(gs_nev);
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
 	}
+	auto diag_stop = chrono::high_resolution_clock::now();
+	auto diag_duration = chrono::duration_cast<chrono::milliseconds>(diag_stop - diag_start);
+
 	double gs_en = GS.hblks[0].eig[0];
 	vector<bindex> gsi;
-	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.size; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
+	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.nev; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
 	// Calculate Partition function
 	double Z = 0, emin = -25.0, emax = 25.0, SDegen = 0;
 	for (size_t i = 0; i < GS.hblks.size(); ++i) {
-	for (size_t j = 0; j < GS.hblks[i].size; ++j) {
+	for (size_t j = 0; j < GS.hblks[i].nev; ++j) {
 		if (abs(GS.hblks[i].eig[j]-gs_en) < TOL) {
 			Z += exp(-beta*GS.hblks[i].eig[j]);
 			if (abs(GS.hblks[i].get_sz()) >= SDegen) SDegen = abs(GS.hblks[i].get_sz());
@@ -307,39 +321,59 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam) {
 	if (hparam.block_diag) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
 	occupation(GS,gsi);
-	wvfnc_weight(GS,gsi,3,true);
+	wvfnc_weight(GS,gsi,2,true);
 	cout << endl;
 
-	// #pragma omp parallel for
-	cout << "Diagonalizing Core-Hole State" << endl;
+	// Assemble Core Hole Hamiltonian
+	cout << "Assembling Core Hole Hamiltonian..." << endl;
+	start = chrono::high_resolution_clock::now();
+	hparam.SC.pop_back();
+	hparam.SC.push_back(hparam.SC2EX);
+	calc_ham(EX,hparam);
+	stop = chrono::high_resolution_clock::now();
+	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+	cout << "size: " << EX.hblks[0].size << endl;
+	cout << "Run time = " << duration.count() << " ms\n" << endl;
+
+	cout << "Diagonalizing Core-Hole Hamiltonian" << endl;
+	diag_start = chrono::high_resolution_clock::now();
+	int ex_nev = 0;
+	if (pm.edge == "K") ex_nev = 200;
+	else if (pm.edge == "L3") ex_nev = 500;
+	else if (pm.edge == "L") ex_nev = 1500;
 	for (size_t e = 0; e < EX.hblks.size(); e++) {
 		start = chrono::high_resolution_clock::now();
-		cout << "Number of threads: " << mkl_get_max_threads() << endl;
 		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
-		EX.hblks[e].diagonalize();
+		EX.hblks[e].diagonalize(ex_nev);
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
 	}
+	diag_stop = chrono::high_resolution_clock::now();
+	diag_duration += chrono::duration_cast<chrono::milliseconds>(diag_stop - diag_start);
+	
 	double ex_min_en = EX.hblks[0].eig[0];
 	vector<bindex> exmin_ind;
-	for (auto &exb : EX.hblks) for (size_t i = 0; i < exb.size; ++i) if (exb.eig[i] <= ex_min_en) ex_min_en = exb.eig[i];
-	if (hparam.block_diag) {
-		SDegen = 0;
-		for (size_t i = 0; i < EX.hblks.size(); ++i) {
-		for (size_t j = 0; j < EX.hblks[i].size; ++j) {
-			if (abs(EX.hblks[i].eig[j]-ex_min_en) < TOL) {
-				if (abs(EX.hblks[i].get_sz()) >= SDegen) SDegen = abs(EX.hblks[i].get_sz());
-				exmin_ind.push_back({i,j});
-			}
-		}}
-	}
+	for (auto &exb : EX.hblks) for (size_t i = 0; i < exb.nev; ++i) if (exb.eig[i] <= ex_min_en) ex_min_en = exb.eig[i];
+	SDegen = 0;
+	for (size_t i = 0; i < EX.hblks.size(); ++i) {
+	for (size_t j = 0; j < EX.hblks[i].size; ++j) {
+		if (abs(EX.hblks[i].eig[j]-ex_min_en) < TOL) {
+			if (hparam.block_diag && abs(EX.hblks[i].get_sz()) >= SDegen) 
+				SDegen = abs(EX.hblks[i].get_sz());
+			exmin_ind.push_back({i,j});
+		}
+	}}
+	// cout << "Band Gap: " << ex_min_en - gs_en << "eV" << endl;
+	// auto all_eig = EX.get_all_eigval(true);
+	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
+
+	if (hparam.block_diag && EX.edge == "K") cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << exmin_ind.size() << endl;
 	occupation(EX,exmin_ind);
-	wvfnc_weight(EX,exmin_ind,3,true);
-	auto diag_stop = chrono::high_resolution_clock::now();
-	duration = chrono::duration_cast<chrono::milliseconds>(diag_stop - diag_start);
-	cout << "Total diagonalize run time = " << duration.count() << " ms\n" << endl;
+	wvfnc_weight(EX,exmin_ind,2);
+	
+	cout << endl << "Total diagonalize run time: " << ed::format_duration(diag_duration) << endl << endl;
 	return;
 }
 
@@ -362,7 +396,7 @@ int main(int argc, char** argv){
 	if (pm.edge == "K") {
 		if (hparam.FG[2] != 0 || hparam.FG[3] != 0) 
 			throw invalid_argument("invalid FG input");
-	} else if (pm.edge != "L") throw invalid_argument("invalid edge input");
+	} else if (pm.edge != "L" && pm.edge != "L3") throw invalid_argument("invalid edge input");
 	// U = F^0 + 4*F^2 + 36*F^4
 
 	cout << "Input parameters" << endl;
@@ -394,7 +428,9 @@ int main(int argc, char** argv){
 	cout << ", JH: " << (hparam.SC2[2]/14+hparam.SC2[4]/14) << endl;
 	cout << "Core-Hole State Udd: " << (hparam.SC2EX[0]-hparam.SC2EX[2]*2/63-hparam.SC2EX[4]*2/63);
 	cout << ", JH: " << (hparam.SC2EX[2]/14+hparam.SC2EX[4]/14);
-	cout << ", Udp: " << (hparam.FG[0] - hparam.FG[1]/15 - hparam.FG[3]*3/70) << endl;
+	cout << ", Udp: " << (hparam.FG[0] - hparam.FG[1]/15 - hparam.FG[3]*3/70);
+	cout << ", Fdp: " << (hparam.FG[0] + hparam.FG[1]/15 + hparam.FG[3]*3/70) << endl;
+	cout << "Diagonalization Option: " << hparam.diag_option << endl;
 
 	// Calculate Delta or Effective Delta
 	if (hparam.effective_delta) {
@@ -425,13 +461,13 @@ int main(int argc, char** argv){
 
 	if (!pm.XAS && !pm.RIXS) return 0; // Return if no photon methods
 	// Reading and Checking input parameters
-	Hilbert GS(IDIR,hparam,pm.edge,false);
-	Hilbert EX(IDIR,hparam,pm.edge,true);
+	Hilbert GS(IDIR,hparam,pm.edge.substr(0,1),false);
+	Hilbert EX(IDIR,hparam,pm.edge.substr(0,1),true);
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Number of Holes: " << GS.num_vh << endl;
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
-	process_hilbert_space(GS,EX,hparam);
+	process_hilbert_space(GS,EX,hparam,pm);
 
 	// Calculate Cross Sections
 	vector<double> pvin = pm.pvin, pvout = pm.pvout;

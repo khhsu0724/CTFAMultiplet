@@ -2,12 +2,21 @@
 using namespace std;
 
 // Shared Cluster Implementation
+// void Cluster::print_state_orbs(const vecd& occ, const vector<string>& names, int p) {
+// 	for (size_t i = 0; i < vo_persite; ++i) {
+// 		cout << setw(w) << (names[i]+": ") << fixed << setprecision(p);
+// 		for (size_t n = i; n < occ.size(); n+=vo_persite) cout << setw(w) << occ[n];
+// 		cout << endl;
+// 	}
+// }
+
 void Cluster::print_state_header(const vecd& occ) {
 	cout << setw(w) << "Num Holes: ";
-	if (occ.size() % vo_persite != 0) throw runtime_error("Wrong occ vector size");
-	for (size_t n = 0; n < occ.size(); n+=vo_persite) {
+	int nvo = vo_persite * num_sites;
+	if (occ.size() % nvo != 0) throw runtime_error("Wrong occ vector size");
+	for (size_t n = 0; n < occ.size(); n += nvo) {
 		double num_h = 0;
-		for (int i = n; i < n+vo_persite; ++i) num_h += occ[i];
+		for (int i = n; i < n+nvo; ++i) num_h += occ[i];
 		cout << setprecision(3) << setw(w) << num_h;
 	}
 	cout << endl;
@@ -15,30 +24,50 @@ void Cluster::print_state_header(const vecd& occ) {
 };
 
 void Cluster::print_state_orbs(const vecd& occ, const vector<string>& names, int p) {
-	for (size_t i = 0; i < vo_persite; ++i) {
-		cout << setw(w) << (names[i]+": ") << fixed << setprecision(p);
-		for (size_t n = i; n < occ.size(); n+=vo_persite) cout << setw(w) << occ[n];
-		cout << endl;
+	int num_sites_print = num_sites;
+	vecd occ_print = occ;
+	if (num_sites > 1 && !print_all_sites) {
+		occ_print = vecd(occ.size()/num_sites,0);
+		num_sites_print = 1;
+		for (size_t i = 0; i < occ.size()/num_sites/vo_persite; ++i) {
+		for (size_t o = 0; o < occ_print.size()/num_sites; ++o) {
+		for (size_t s = 0; s < num_sites; ++s) {
+			occ_print[o+i*occ_print.size()/num_sites] += 
+				occ[o+vo_persite*s+i*occ.size()/num_sites];
+		}}}
 	}
+	for (size_t s = 0; s < num_sites_print; ++s) {
+		if (num_sites_print > 1) cout << setw(w) << "SITE NUMBER: " << s << endl;
+		for (size_t i = s*vo_persite; i < (s+1)*vo_persite; ++i) {
+			cout << setw(w) << (names[i-s*vo_persite]+": ") << fixed << setprecision(p);
+			for (size_t n = i; n < occ_print.size(); n+=vo_persite*num_sites_print) {
+				cout << setw(w) << occ_print[n];
+			}
+			cout << endl;
+		}
+	}
+	return;
 }
 
 vecd Cluster::get_tmat_real() {
 	// Swap spherical harmonics basis
-	vecd tmatreal(vo_persite*vo_persite,0);
 	vecc tmat = get_tmat();
 	vecc U = get_seph2real_mat();
-	tmat = ed::matmult(tmat,U,vo_persite);
-	ed::ctranspose(U,vo_persite,vo_persite);
+    tmat = ed::matmult(tmat,U,vo_persite);
+	U = ed::ctranspose(U,vo_persite,vo_persite);
 	tmat = ed::matmult(U,tmat,vo_persite);
 	// Swap operator basis
 	vecc a = get_operator_mat();
 	tmat = ed::matmult(tmat,a,vo_persite);
-	ed::ctranspose(a,vo_persite,vo_persite);
+	a = ed::ctranspose(a,vo_persite,vo_persite);
 	tmat = ed::matmult(a,tmat,vo_persite);
 	if (!check_tmat_all_real(tmat))
 		cerr << "WARNING: hybridization matrix contains imaginary elemenets" << endl;
+
+	vecd tmatreal(vo_persite*vo_persite,0);
 	std::transform(tmat.begin(), tmat.end(), tmatreal.begin(), 
 						[](complex<double> c) {return c.real();});
+	ed::write_vec(tmatreal,11,11,"tmatreal.txt");
 	return tmatreal;
 };
 
@@ -141,7 +170,7 @@ vecc SquarePlanar::get_tmat() {
 	tmat[5*nvo+9] = tmat[9*nvo+5] = {-tppsigma*sx*sy,0};
 	tmat[6*nvo+8] = tmat[8*nvo+6] = {-tppsigma*sx*sy,0};
 	tmat[6*nvo+9] = tmat[9*nvo+6] = {-tpppi*cx*cy,0};
-	tmat[7*nvo+10] = tmat[10*nvo+7] = {tppzpi*cx*cy,0};
+	tmat[7*nvo+10] = tmat[10*nvo+7] = {-tppzpi*cx*cy,0};
 	return tmat;
 };
 
@@ -200,10 +229,13 @@ vecc Octahedral::get_operator_mat() {
 
 vecc Octahedral::get_tmat() {
 	double tpdz = 0.25*tpd, tpdxy = tpd*tpd_sig_pi, tpdxz = tpd*tpd_sig_pi, tpdyz = tpd*tpd_sig_pi;
+	// tpp_pi_1 is pxy/pyy type overlaps, tpp_pi_2 is pzy/pxy type overlaps
 	double tpppi_1 = tpp_sig_pi_1*tpp, tppsigma = tpp, tpppi_2 = tpp_sig_pi_2*tpp;
 	double kx = PI/2, ky = PI/2, kz = PI/2; // relative oxygen positionss
 	double sx = 2*sin(kx), sy = 2*sin(ky), sz = 2*sin(kz);
 	double cx = 2*cos(kx), cy = 2*cos(ky), cz = 2*sin(kz);
+	double d = 1;
+	std::cout << "tpd modulation: " << pow(d,-4) << ", tpp modulation: " << pow(d,-3) << std::endl;
 	int nvo = vo_persite;
 	vecc tmat(nvo*nvo,0);
 	tmat[0*nvo+5] = {0,-tpd*sx};
@@ -214,7 +246,7 @@ vecc Octahedral::get_tmat() {
 	tmat[5*nvo+1] = -tmat[1*nvo+5];
 	tmat[1*nvo+9] = {0,-tpdz*sy};
 	tmat[9*nvo+1] =  -tmat[1*nvo+9];
-	tmat[1*nvo+13] = {0,-tpd*sz};
+	tmat[1*nvo+13] = {0,tpd*sz*pow(d,-4)}; // Modulate the strength?	
 	tmat[13*nvo+1] =  -tmat[1*nvo+13];
 	tmat[2*nvo+6] = {0,tpdxy*sx};
 	tmat[6*nvo+2] = -tmat[2*nvo+6];
@@ -222,30 +254,30 @@ vecc Octahedral::get_tmat() {
 	tmat[8*nvo+2] =  -tmat[2*nvo+8];
 	tmat[3*nvo+7] = {0,tpdxz*sx};
 	tmat[7*nvo+3] =  -tmat[3*nvo+7];
-	tmat[3*nvo+11] = {0,tpdxz*sz};
+	tmat[3*nvo+11] = {0,tpdxz*sz*pow(d,-4)};
 	tmat[11*nvo+3] =  -tmat[3*nvo+11];
 	tmat[4*nvo+10] = {0,tpdyz*sy};
 	tmat[10*nvo+4] =  -tmat[4*nvo+10];
-	tmat[4*nvo+12] = {0,tpdyz*sz};
+	tmat[4*nvo+12] = {0,tpdyz*sz*pow(d,-4)};
 	tmat[12*nvo+4] =  -tmat[4*nvo+12];
 	tmat[5*nvo+5] = tmat[6*nvo+6] = tmat[7*nvo+7] = del;
-	tmat[8*nvo+8] = tmat[9*nvo+9] = tmat[10*nvo+10] = del;
-	tmat[11*nvo+11] = tmat[12*nvo+12] = tmat[13*nvo+13] = del;
 	tmat[5*nvo+8] = tmat[8*nvo+5] = {-tpppi_1*cx*cy,0};
 	tmat[5*nvo+9] = tmat[9*nvo+5] = {-tppsigma*sx*sy,0};
 	tmat[5*nvo+11] = tmat[11*nvo+5] = {-tpppi_1*cx*cz,0};
-	tmat[5*nvo+13] = tmat[13*nvo+5] = {-tppsigma*sx*sz,0};
+	tmat[5*nvo+13] = tmat[13*nvo+5] = {-tppsigma*sx*sz*pow(d,-3),0};
 	tmat[6*nvo+8] = tmat[8*nvo+6] = {-tppsigma*sx*sy,0};
 	tmat[6*nvo+9] = tmat[9*nvo+6] = {-tpppi_1*cx*cy,0};
-	tmat[6*nvo+12] = tmat[12*nvo+6] = {tpppi_2*cx*cz,0};
-	tmat[7*nvo+10] = tmat[10*nvo+7] = {tpppi_2*cx*cy,0};
-	tmat[7*nvo+11] = tmat[11*nvo+7] = {-tppsigma*sx*sz,0};
+	tmat[6*nvo+12] = tmat[12*nvo+6] = {-tpppi_2*cx*cz,0};
+	tmat[7*nvo+10] = tmat[10*nvo+7] = {-tpppi_2*cx*cy,0};
+	tmat[7*nvo+11] = tmat[11*nvo+7] = {-tppsigma*sx*sz*pow(d,-3),0};
 	tmat[7*nvo+13] = tmat[13*nvo+7] = {-tpppi_1*cx*cz,0};
-	tmat[8*nvo+11] = tmat[11*nvo+8] = {tpppi_2*cy*cz,0};
+	tmat[8*nvo+8] = tmat[9*nvo+9] = tmat[10*nvo+10] = del;
+	tmat[8*nvo+11] = tmat[11*nvo+8] = {-tpppi_2*cy*cz,0};
 	tmat[9*nvo+12] = tmat[12*nvo+9] = {-tpppi_1*cy*cz,0};
-	tmat[9*nvo+13] = tmat[13*nvo+9] = {-tppsigma*sy*sz,0};
-	tmat[10*nvo+12] = tmat[12*nvo+10] = {-tppsigma*sy*sz,0};
+	tmat[9*nvo+13] = tmat[13*nvo+9] = {-tppsigma*sy*sz*pow(d,-3),0};
+	tmat[10*nvo+12] = tmat[12*nvo+10] = {-tppsigma*sy*sz*pow(d,-3),0};
 	tmat[10*nvo+13] = tmat[13*nvo+10] = {-tpppi_1*cy*cz,0};
+	tmat[11*nvo+11] = tmat[12*nvo+12] = tmat[13*nvo+13] = del;
 	return tmat;
 };
 
