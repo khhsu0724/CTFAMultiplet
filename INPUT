@@ -11,9 +11,9 @@
     MLCT = 2 
     EFFDEL = False
     DIAG = 4
-    #BLOCK = False
+    EXNEV = 800
+    GSNEV = 100
     OVERWRITE = True # Overwrite photon file in the directory
-    #SITEOCC = True
 /
 &CELL
     Coordination = "Square Planar" # Defaults to no coordination

@@ -69,7 +69,12 @@ void tb() {
 	}
 }
 
-bool read_num(string line, double* tgt, int pnum) {
+void stot(string p, double& tgt) {tgt = stod(p);};
+void stot(string p, float& tgt) {tgt = stof(p);};
+void stot(string p, int& tgt) {tgt = stoi(p);};
+
+template<typename T> 
+bool read_num(string line, T* tgt, int pnum) {
 	try {
 		string p;
 		bool skip = false;
@@ -79,7 +84,7 @@ bool read_num(string line, double* tgt, int pnum) {
 			else if (line[s] == '=') p = "";
 			else if (line[s] != ',' && line[s] != ' ' && line[s] != '	') p.push_back(line[s]);
 			else if (regex_match(p,regex(R"(^([+-]?(?:[[:d:]]+\.?|[[:d:]]*\.[[:d:]]+))(?:[Ee][+-]?[[:d:]]+)?$)"))) {
-				if (ncnt < pnum) tgt[ncnt] = stod(p);
+				if (ncnt < pnum) stot(p,tgt[ncnt]);
 				else throw invalid_argument("Too many input parameter");
 				ncnt++;
 				p = "";
@@ -87,7 +92,7 @@ bool read_num(string line, double* tgt, int pnum) {
 			else p = "";
 		}
 		if (p.size() != 0 && regex_match(p,regex(R"(^([+-]?(?:[[:d:]]+\.?|[[:d:]]*\.[[:d:]]+))(?:[Ee][+-]?[[:d:]]+)?$)"))) {
-			if (ncnt < pnum) tgt[ncnt] = stod(p);
+			if (ncnt < pnum) stot(p,tgt[ncnt]);
 			else throw invalid_argument("Too many input parameter");
 			ncnt++;
 			p = "";
@@ -168,13 +173,11 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 							else if (p == "MLCT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.MLdelta,1);
 							else if (p == "EFFDEL") skip = read_bool(line.substr(s+1,line.size()-1),hparam.effective_delta);
 							else if (p == "BLOCK") skip = read_bool(line.substr(s+1,line.size()-1),hparam.block_diag);
-							else if (p == "DIAG") {
-								double diag_option = 0;
-								skip = read_num(line.substr(s+1,line.size()-1),&diag_option,1);
-								hparam.diag_option = (int)diag_option;
-							}
+							else if (p == "DIAG") skip = read_num(line.substr(s+1,line.size()-1),&hparam.diag_option,1);
 							else if (p == "SITEOCC") skip = read_bool(line.substr(s+1,line.size()-1),hparam.print_site_occ);
 							else if (p == "OVERWRITE") skip = read_bool(line.substr(s+1,line.size()-1),overwrite);
+							else if (p == "GSNEV") skip = read_num(line.substr(s+1,line.size()-1),&hparam.gs_nev,1);
+							else if (p == "EXNEV") skip = read_num(line.substr(s+1,line.size()-1),&hparam.ex_nev,1);
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -212,11 +215,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 								skip = read_bool(line.substr(s+1,line.size()-1),el);
 								pm.set_eloss(el);
 							}
-							else if (p == "NEDOS") {
-								double nedos;
-								skip = read_num(line.substr(s+1,line.size()-1),&nedos,1);
-								pm.nedos = (int)nedos;
-							}
+							else if (p == "NEDOS") skip = read_num(line.substr(s+1,line.size()-1),&pm.nedos,1);
 							else if (p == "SPINFLIP") skip = read_bool(line.substr(s+1,line.size()-1),pm.spin_flip);
 							else if (p == "AB") {
 								skip = read_num(line.substr(s+1,line.size()-1),abrange_temp,2);
@@ -291,13 +290,15 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	cout << "Diagonalizing Hamiltonian..." << endl;
 	auto diag_start = chrono::high_resolution_clock::now();
 	cout << "Diagonalizing Ground State" << endl;
-	int gs_nev = 0;
-	if (pm.RIXS) gs_nev = 400;
-	else gs_nev = 10 * GS.tot_site_num();
+	if (!hparam.gs_nev) {
+		if (pm.RIXS) hparam.gs_nev = 400;
+		else hparam.gs_nev = 10 * GS.tot_site_num();
+	}
 	for (size_t g = 0; g < GS.hblks.size(); g++) {
 		start = chrono::high_resolution_clock::now();
-		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size << endl;
-		GS.hblks[g].diagonalize(gs_nev);
+		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size;
+		cout << ", gs nev: " << hparam.gs_nev << endl;
+		GS.hblks[g].diagonalize(hparam.gs_nev);
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -320,7 +321,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	}}
 	if (hparam.block_diag) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
-	occupation(GS,gsi);
+	occupation(GS,gsi,true,"./gs_occ.txt");
 	wvfnc_weight(GS,gsi,2,true);
 	cout << endl;
 
@@ -337,14 +338,16 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 
 	cout << "Diagonalizing Core-Hole Hamiltonian" << endl;
 	diag_start = chrono::high_resolution_clock::now();
-	int ex_nev = 0;
-	if (pm.edge == "K") ex_nev = 200;
-	else if (pm.edge == "L3") ex_nev = 500;
-	else if (pm.edge == "L") ex_nev = 1500;
+	if (!hparam.ex_nev) {
+		if (pm.edge == "K") hparam.ex_nev = 200;
+		else if (pm.edge == "L3") hparam.ex_nev = 500;
+		else if (pm.edge == "L") hparam.ex_nev = 1500;
+	}
 	for (size_t e = 0; e < EX.hblks.size(); e++) {
 		start = chrono::high_resolution_clock::now();
-		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
-		EX.hblks[e].diagonalize(ex_nev);
+		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size;
+		cout << ", ex nev: " << hparam.ex_nev << endl;
+		EX.hblks[e].diagonalize(hparam.ex_nev);
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -372,7 +375,6 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	cout << "Calculating Occupation (with degeneracy): " << exmin_ind.size() << endl;
 	occupation(EX,exmin_ind);
 	wvfnc_weight(EX,exmin_ind,2);
-	
 	cout << endl << "Total diagonalize run time: " << ed::format_duration(diag_duration) << endl << endl;
 	return;
 }
@@ -440,8 +442,8 @@ int main(int argc, char** argv){
 		cout << "calculated delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
 	} else {
 		cout << "delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
-		double del = calculate_effective_delta(IDIR,hparam,pm);
-		cout << "Calculated effective delta: " << del << endl;
+		// double del = calculate_effective_delta(IDIR,hparam,pm);
+		// cout << "Calculated effective delta: " << del << endl;
 	}
 
 	if (pm.RIXS) {

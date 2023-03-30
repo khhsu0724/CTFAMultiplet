@@ -26,13 +26,13 @@ void ed_dsyevr(double *_mat, double *_eigvec, double* _eigReal, size_t n);
 template <typename Real> 
 void ed_dsarpack(Matrix<Real>* ham, Real *_eigvec, Real* _eigval, size_t n, size_t _nev) {
 	std::cout << "Using Arpack" << std::endl;
-	const a_int N      = n;
-	const a_int nev    = (_nev < N) ? _nev : N;
-	const a_int ncv    = std::min(2*nev+1,N); // NCV size could be increased??
-	const a_int ldv    = N;
-	const a_int ldz    = N;
-	const a_int lworkl = ncv * (ncv + 8);
-	const a_int rvec   = 1;      // need eigenvectors
+	const a_uint N      = n;
+	const a_uint nev    = (_nev < N) ? _nev : N;
+	const a_uint ncv    = std::min(2*nev+1,N); // NCV size could be increased??
+	const a_uint ldv    = N;
+	const a_uint ldz    = N;
+	const a_uint lworkl = ncv * (ncv + 8);
+	const a_uint rvec   = 1;      // need eigenvectors
 
 	const Real tol   = ARPACK_TOL; // small tol => more stable checks after EV computation.
 	const Real sigma = 0.0;      // not referenced in this mode
@@ -170,11 +170,12 @@ public:
 			ed_dsarpack(ham,_eigvec,_eig,size,nev);
 			eigvec = return_uptr<double>(&_eigvec);
 			eig = return_uptr<double>(&_eig);
+			ham->clear_mat();
 		} else throw std::invalid_argument("invalid diagonalize method");
 		return;
 	}
 	void init_einrange() {
-		einrange = std::vector<int>(size,0); // Hopefully there are more elegant solutions in the future
+		einrange = std::vector<int>(nev,0); // Hopefully there are more elegant solutions in the future
 	}
 };
 

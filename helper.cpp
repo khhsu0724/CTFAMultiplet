@@ -72,7 +72,8 @@ std::string ed::format_duration(std::chrono::milliseconds ms) {
 }
 
 void ed::print_progress(double frac, double all) {
-	if (((int)frac+1)%((int)all/50+1)) return; // Print at least every 2%
+	// Print at least every 2%
+	if (((int)frac+1)%((int)all/50+1) && frac != all) return;
 	double progress = frac/all;
     int barWidth = 40;
     std::cout << "[";

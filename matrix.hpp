@@ -48,6 +48,7 @@ public:
 	virtual void malloc(int size) = 0;
 	virtual T* get_dense() = 0;
 	virtual void mvmult(T* vec_in, T* vec_out, int N) = 0;
+	virtual void clear_mat() = 0;
 };
 
 template<typename T> 
@@ -76,6 +77,12 @@ public:
 		this->ham = return_uptr<double>(&_ham);
 		return;
 	};
+	void clear_mat() {
+		T* _ham = ham.release();
+		ham = nullptr;
+		delete [] _ham;
+		return;
+	}
 private:
 	std::unique_ptr<double[]> ham;
 };
@@ -131,6 +138,12 @@ public:
 		}
 		return;
 	};
+	void clear_mat() {
+		indexi = std::vector<size_t>();
+		indexj = std::vector<size_t>();
+		val = std::vector<T>();
+		return;
+	}
 private:
 	std::vector<size_t> indexi;
 	std::vector<size_t> indexj;
