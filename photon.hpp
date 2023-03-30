@@ -35,7 +35,8 @@ struct blapIndex {
 
 std::string pol_str(const vecd& pvec);
 std::complex<double> proj_pvec(int ml, const vecd& pvec);
-vecd occupation(Hilbert& hilbs, const std::vector<bindex>& si, bool is_print=true);
+vecd occupation(Hilbert& hilbs, const std::vector<bindex>& si, bool is_print=true, 
+				std::string fname = "");
 vecd wvfnc_weight(Hilbert& hilbs, const std::vector<bindex>& si, 
 								int ligNum = 3, bool print = false);
 double effective_delta(Hilbert& hilbs, int ligNum = 3, bool is_print = false);
@@ -46,15 +47,15 @@ void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, std::vector<blapIndex>
 void XAS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd const& energy, 
 						vecd const& intensity, std::vector<bindex> const& gsi, double ref_en = 0, 
 						std::string mode = "list", bool ref_gs = false);
-void write_XAS(vecd const& aben, vecd const& intensity, std::string file_dir, bool print = true);
+void write_XAS(vecd const& aben, vecd const& intensity, std::string file_dir = "");
 void XAS(Hilbert& GS, Hilbert& EX, const PM& pm);
 
 // RIXS functions
 void RIXS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd const& ab_en, 
 						vecd const& em_en, vecd const& intensity, std::vector<bindex> const& gsi,
 						PM const& pm, double ref_en = 0, std::string mode = "list", bool ref_gs = false);
-void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, std::string file_dir, 
-				bool eloss, bool print = true);
+void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, bool eloss, 
+				std::string file_dir = "");
 void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm);
 
 #endif

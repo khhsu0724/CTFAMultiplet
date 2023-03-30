@@ -3,8 +3,6 @@
 #include "multiplet.hpp"
 #include "photon.hpp"
 
-#define PRINT_TOL 1E-4
-
 using namespace std;
 #pragma omp declare reduction(vec_double_plus : std::vector<double> : \
 		std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<double>())) \
@@ -35,7 +33,7 @@ dcomp proj_pvec(int ml, const vecd& pvec) {
 	}
 }
 
-vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print) {
+vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print, string fname) {
 	// Calculation occupation of orbitals, only valid when matrix is diagonalized
 	for (auto& blk : hilbs.hblks) if (blk.eigvec == nullptr) throw runtime_error("matrix not diagonalized for occupation");
 	int nvo = hilbs.cluster->vo_persite, nco = hilbs.cluster->co_persite;
@@ -68,7 +66,7 @@ vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print) {
 	}
 	double tot_h = 0;
 	for (auto &h : occ_totc) tot_h += h;
-	if (is_print) hilbs.cluster->print_eigstate(occ_totc);
+	if (is_print) hilbs.cluster->print_eigstate(occ_totc,fname);
 	return occ_totc;
 }
 
@@ -345,20 +343,15 @@ void XAS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd con
 	return;
 }
 
-void write_XAS(vecd const& aben, vecd const& intensity, string file_dir, bool print) {
-	std::ofstream xasfile;
-	xasfile.open(file_dir);
-	xasfile << setw(15) << "peaks (eV)" << setw(15) << "intensity" << endl;
-	if (print) cout << fixed << setprecision(5) << setw(15) << "peaks" << setw(15) << "intensity" << endl;
+void write_XAS(vecd const& aben, vecd const& intensity, string file_dir) {
+	multistream mout(true,file_dir);
+	mout << setw(15) << "peaks (eV)" << setw(15) << "intensity" << endl;
 	for (int i = 0; i < intensity.size(); ++i) {
 		if (intensity[i] < TOL) continue;
-		xasfile << setw(15) << aben[i] << setw(15) << intensity[i] << endl;
-		if (print) {
-			if (intensity[i] < PRINT_TOL) continue;
-			cout << fixed << setprecision(5) << setw(15) << aben[i] << setw(15) << intensity[i] << endl;
-		}
+		mout.set_skip_cout(intensity[i] < PRINT_TOL);
+		mout << setw(15) << aben[i] << setw(15) << intensity[i] << endl;
 	}
-	xasfile.close();
+	return;
 }
 
 void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
@@ -497,30 +490,19 @@ void RIXS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd co
 	return;
 }
 
-void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, string file_dir, bool eloss, bool print) {
-	std::ofstream rixsfile;
-	rixsfile.open(file_dir);
-	if (eloss) rixsfile << setw(18) << "absorption (eV)" << setw(18) << "energy loss (eV)" << setw(18) << "intensity" << endl;
-	else rixsfile << setw(18) << "absorption (eV)" << setw(18) << "emission (eV)" << setw(18) << "intensity" << endl;
-	if (print) {
-		if (eloss) cout << setw(18) << "absorption (eV)" << setw(18) << "energy loss (eV)" << setw(18) << "intensity" << endl;
-		else cout << setw(18) << "absorption (eV)" << setw(18) << "emission (eV)" << setw(18) << "intensity" << endl;
-	}
+void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, bool eloss, string file_dir) {
+	multistream mout(true,file_dir);
+	if (eloss) mout << setw(18) << "absorption (eV)" << setw(18) << "energy loss (eV)" << setw(18) << "intensity" << endl;
+	else mout << setw(18) << "absorption (eV)" << setw(18) << "emission (eV)" << setw(18) << "intensity" << endl;
 	for (int y = 0; y < em.size(); ++y) {
 		for (int x = 0; x < ab.size(); ++x) {
 			if (peaks[y*ab.size()+x] < TOL) continue;
-			rixsfile << setw(18) << ab[x];
-			rixsfile << setw(18) << em[y];
-			rixsfile << setw(18) << peaks[y*ab.size()+x] << endl;
-			if (print) {
-				if (peaks[y*ab.size()+x] < PRINT_TOL) continue;
-				cout << setw(18) << ab[x];
-				cout << setw(18) << em[y];
-				cout << setw(18) << peaks[y*ab.size()+x] << endl;
-			}
+			mout.set_skip_cout(peaks[y*ab.size()+x] < PRINT_TOL);
+			mout << setw(18) << ab[x];
+			mout << setw(18) << em[y];
+			mout << setw(18) << peaks[y*ab.size()+x] << endl;
 	 	}
 	}
-	rixsfile.close();
 	return;
 }
 
@@ -703,6 +685,6 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n";
 	cout << "Writing results..." << endl << endl;
-	write_RIXS(rixs_peaks,rixs_ab,rixs_em,"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt",pm.eloss,true);
+	write_RIXS(rixs_peaks,rixs_ab,rixs_em,pm.eloss,"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt");
 	return;
 }

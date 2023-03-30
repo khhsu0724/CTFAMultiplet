@@ -15,9 +15,8 @@ public:
 	// Redefine operators to bring hybridization matrix into real matrix
 	virtual vecc get_operator_mat() {return vecc(0);};
 	virtual vecc get_tmat() {return vecc(0);};
-	virtual void print_eigstate(const vecd& occ, int p = 5) = 0;
 // Shared Implementation
-public: 
+public:
 	Cluster(std::string _edge): edge(_edge) {};
 	~Cluster() {};
 	void make_atlist(std::vector<Atom>& atlist, int num_vh, 
@@ -45,12 +44,12 @@ public:
 	int at_per_site() {return lig_per_site + tm_per_site;};
 	void set_print_site(bool print_site_occ) {this->print_all_sites = print_site_occ;};
 	void set_num_sites(int _num_sites) {this->num_sites = _num_sites;};
+	void print_eigstate(const vecd& occ, std::string fname = "", int p = 5);
 	vecd get_tmat_real();
 protected:
 	int w = 12, num_sites = 1;
+	std::vector<std::string> orb_names;
 	bool print_all_sites = true; // If false program will print per_site
-	void print_state_header(const vecd& occ);
-	void print_state_orbs(const vecd& occ, const std::vector<std::string>& names, int p);
 	bool check_tmat_all_real(const vecc& tmatreal);
 	vecc U_d() {
 		vecc U(5*5,0);
@@ -82,7 +81,6 @@ class Ion: public Cluster {
 public:
 	Ion(std::string edge);
 	vecc get_seph2real_mat() {return U_d();};
-	void print_eigstate(const vecd& occ, int p = 5);
 };
 
 class SquarePlanar : public Cluster {
@@ -93,7 +91,6 @@ public:
 	vecc get_seph2real_mat();
 	vecc get_operator_mat();
 	vecc get_tmat();
-	void print_eigstate(const vecd& occ, int p = 5);
 private:
 	double sig_pi = 0.5;
 };
@@ -106,7 +103,6 @@ public:
 	vecc get_seph2real_mat();
 	vecc get_operator_mat();
 	vecc get_tmat();
-	void print_eigstate(const vecd& occ, int p = 5);
 private:
 	double tpd_sig_pi = 0.4; // This needed to be checked
 	double tpp_sig_pi_1 = 0;

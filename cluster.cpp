@@ -2,28 +2,19 @@
 using namespace std;
 
 // Shared Cluster Implementation
-// void Cluster::print_state_orbs(const vecd& occ, const vector<string>& names, int p) {
-// 	for (size_t i = 0; i < vo_persite; ++i) {
-// 		cout << setw(w) << (names[i]+": ") << fixed << setprecision(p);
-// 		for (size_t n = i; n < occ.size(); n+=vo_persite) cout << setw(w) << occ[n];
-// 		cout << endl;
-// 	}
-// }
-
-void Cluster::print_state_header(const vecd& occ) {
-	cout << setw(w) << "Num Holes: ";
+void Cluster::print_eigstate(const vecd& occ, string fname, int p) {
+	multistream mout(true,fname);
+	// Print Header
+	mout << setw(w) << "Num Holes: ";
 	int nvo = vo_persite * num_sites;
 	if (occ.size() % nvo != 0) throw runtime_error("Wrong occ vector size");
 	for (size_t n = 0; n < occ.size(); n += nvo) {
 		double num_h = 0;
 		for (int i = n; i < n+nvo; ++i) num_h += occ[i];
-		cout << setprecision(3) << setw(w) << num_h;
+		mout << setprecision(3) << setw(w) << num_h;
 	}
-	cout << endl;
-	return;
-};
-
-void Cluster::print_state_orbs(const vecd& occ, const vector<string>& names, int p) {
+	mout << endl;
+	// Print Occupation
 	int num_sites_print = num_sites;
 	vecd occ_print = occ;
 	if (num_sites > 1 && !print_all_sites) {
@@ -37,17 +28,17 @@ void Cluster::print_state_orbs(const vecd& occ, const vector<string>& names, int
 		}}}
 	}
 	for (size_t s = 0; s < num_sites_print; ++s) {
-		if (num_sites_print > 1) cout << setw(w) << "SITE NUMBER: " << s << endl;
+		if (num_sites_print > 1) mout << setw(w) << "SITE NUMBER: " << s << endl;
 		for (size_t i = s*vo_persite; i < (s+1)*vo_persite; ++i) {
-			cout << setw(w) << (names[i-s*vo_persite]+": ") << fixed << setprecision(p);
+			mout << setw(w) << (orb_names[i-s*vo_persite]+": ") << fixed << setprecision(p);
 			for (size_t n = i; n < occ_print.size(); n+=vo_persite*num_sites_print) {
-				cout << setw(w) << occ_print[n];
+				mout << setw(w) << occ_print[n];
 			}
-			cout << endl;
+			mout << endl;
 		}
 	}
 	return;
-}
+};
 
 vecd Cluster::get_tmat_real() {
 	// Swap spherical harmonics basis
@@ -67,7 +58,6 @@ vecd Cluster::get_tmat_real() {
 	vecd tmatreal(vo_persite*vo_persite,0);
 	std::transform(tmat.begin(), tmat.end(), tmatreal.begin(), 
 						[](complex<double> c) {return c.real();});
-	ed::write_vec(tmatreal,11,11,"tmatreal.txt");
 	return tmatreal;
 };
 
@@ -87,15 +77,10 @@ Ion::Ion(std::string edge) : Cluster(edge) {
 	lig_per_site = 0;
 	tm_per_site = 1;
 	no_HYB = true;
+	orb_names = {"dx2","dz2","dxy","dxz","dyz"};
 	return;
 };
 
-void Ion::print_eigstate(const vecd& occ, int p) {
-	print_state_header(occ);
-	vector<string> names = {"dx2","dz2","dxy","dxz","dyz"};
-	print_state_orbs(occ,names,p);
-	return;
-};
 // End of Ion Implementation
 
 // Square-Planar Implementation
@@ -106,6 +91,8 @@ SquarePlanar::SquarePlanar(std::string edge) : Cluster(edge) {
 	lig_per_site = 2;
 	tm_per_site = 1;
 	no_HYB = false;
+	orb_names = {"dx2","dz2","dxy","dxz","dyz",
+				"pxx","pxy","pxz","pyx","pyy","pyz"};
 	return;
 };
 
@@ -117,19 +104,7 @@ void SquarePlanar::set_hyb_params(const HParam& hparam) {
 };
 
 vecc SquarePlanar::get_seph2real_mat() {
-	vecc U(vo_persite*vo_persite,0);
-	U[0*vo_persite+0] = U[0*vo_persite+4] = {1/sqrt(2),0};
-	U[1*vo_persite+2] = {1,0};
-	U[2*vo_persite+0] = {0,1/sqrt(2)};
-	U[2*vo_persite+4] = {0,-1/sqrt(2)};
-	U[3*vo_persite+1] = {1/sqrt(2),0};
-	U[3*vo_persite+3] = {-1/sqrt(2),0};
-	U[4*vo_persite+1] = U[4*vo_persite+3] = {0,1/sqrt(2)};
-	U[5*vo_persite+5] = U[5*vo_persite+7] = U[8*vo_persite+8] = U[8*vo_persite+10] = {1/sqrt(2),0};
-	U[6*vo_persite+5] = U[9*vo_persite+8] = {0,1/sqrt(2)};
-	U[6*vo_persite+7] = U[9*vo_persite+10] = {0,-1/sqrt(2)};
-	U[7*vo_persite+6] = U[10*vo_persite+9] = {1,0};
-	return U;
+	return ed::make_blk_mat(U_d(),1,U_p(),2);
 };
 
 vecc SquarePlanar::get_operator_mat() {
@@ -173,14 +148,6 @@ vecc SquarePlanar::get_tmat() {
 	tmat[7*nvo+10] = tmat[10*nvo+7] = {-tppzpi*cx*cy,0};
 	return tmat;
 };
-
-void SquarePlanar::print_eigstate(const vecd& occ, int p) {
-	print_state_header(occ);
-	vector<string> names = {"dx2","dz2","dxy","dxz","dyz",
-							"pxx","pxy","pxz","pyx","pyy","pyz"};
-	print_state_orbs(occ,names,p);
-	return;
-};
 // End of Square-Planar Implementation
 
 // Octahedral Implementation
@@ -190,6 +157,9 @@ Octahedral::Octahedral(std::string edge) : Cluster(edge) {
 	lig_per_site = 3;
 	tm_per_site = 1;
 	no_HYB = false;
+	orb_names = {"dx2","dz2","dxy","dxz","dyz",
+				"pxx","pxy","pxz","pyx","pyy",
+				"pyz","pzx","pzy","pzz"};
 	return;
 };
 
@@ -201,21 +171,7 @@ void Octahedral::set_hyb_params(const HParam& hparam) {
 };
 
 vecc Octahedral::get_seph2real_mat() {
-	vecc U(vo_persite*vo_persite,0);
-	U[0*vo_persite+0] = U[0*vo_persite+4] = {1/sqrt(2),0};
-	U[1*vo_persite+2] = {1,0};
-	U[2*vo_persite+0] = {0,1/sqrt(2)};
-	U[2*vo_persite+4] = {0,-1/sqrt(2)};
-	U[3*vo_persite+1] = {1/sqrt(2),0};
-	U[3*vo_persite+3] = {-1/sqrt(2),0};
-	U[4*vo_persite+1] = U[4*vo_persite+3] = {0,1/sqrt(2)};
-	U[5*vo_persite+5] = U[5*vo_persite+7] = {1/sqrt(2),0};
-	U[8*vo_persite+8] = U[8*vo_persite+10] = {1/sqrt(2),0};
-	U[11*vo_persite+11] = U[11*vo_persite+13] = {1/sqrt(2),0};
-	U[6*vo_persite+5] = U[9*vo_persite+8] = U[12*vo_persite+11] = {0,1/sqrt(2)};
-	U[6*vo_persite+7] = U[9*vo_persite+10] = U[12*vo_persite+13] = {0,-1/sqrt(2)};
-	U[7*vo_persite+6] = U[10*vo_persite+9] = U[13*vo_persite+12] = {1,0};
-	return U;
+	return ed::make_blk_mat(U_d(),1,U_p(),3);
 };
 
 vecc Octahedral::get_operator_mat() {
@@ -281,12 +237,4 @@ vecc Octahedral::get_tmat() {
 	return tmat;
 };
 
-void Octahedral::print_eigstate(const vecd& occ, int p) {
-	print_state_header(occ);
-	vector<string> names = {"dx2","dz2","dxy","dxz","dyz",
-							"pxx","pxy","pxz","pyx","pyy","pyz",
-							"pzx","pzy","pzz"};
-	print_state_orbs(occ,names,p);
-	return;
-};
 // End of Octahedral Implementation

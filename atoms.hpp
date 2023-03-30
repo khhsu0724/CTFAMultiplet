@@ -51,6 +51,7 @@ struct HParam {
 	int diag_option = 2;
 	bool block_diag = true, HYB = true, effective_delta = true;
 	bool print_site_occ = false;
+	int ex_nev = 0, gs_nev = 0;
 	std::vector<double*> SC;
 	HParam() {
 		SC.emplace_back(SC1);

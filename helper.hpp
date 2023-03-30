@@ -15,6 +15,7 @@
 #define HELPER
 
 #define TOL 1E-7
+#define PRINT_TOL 1E-4
 #define PI 3.141592653589793238462643383279502884L
 typedef std::complex<double> dcomp;
 typedef std::vector<double> vecd;
@@ -24,6 +25,37 @@ typedef unsigned long int uli;
 typedef std::pair<size_t,size_t> bindex;
 typedef std::vector<std::pair<ulli,ulli>> vpulli;
 #define BIG1 ulli(1)
+
+
+class multistream {
+// Custom stream class that can direct output to cout & fstream
+public:
+	multistream(bool is_cout = true, std::string fname = "") {
+		this->skip_cout = !is_cout;
+		this->write_cout = is_cout;
+		this->write_file = !fname.empty();
+		if (write_file) file_stream = std::ofstream(fname);
+	};
+	// for regular output of variables and stuff
+	template<typename T> multistream& operator<<(const T& input) {
+		if (!skip_cout && write_cout) std::cout << input;
+		if (write_file) file_stream << input;
+		return *this;
+	}
+	// for manipulators like std::endl
+	typedef std::ostream& (*stream_function)(std::ostream&);
+	multistream& operator<<(stream_function func) {
+		if (!skip_cout && write_cout) func(std::cout);
+		if (write_file) func(file_stream);
+		return *this;
+	}
+	void set_skip_cout(bool skip_cout) {this->skip_cout = skip_cout;};
+private:
+	std::ofstream file_stream;
+	bool write_cout;
+	bool write_file;
+	bool skip_cout;
+};
 
 namespace ed {
 	bool is_pw2(ulli x);
