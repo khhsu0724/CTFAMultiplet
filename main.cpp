@@ -360,7 +360,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	for (auto &exb : EX.hblks) for (size_t i = 0; i < exb.nev; ++i) if (exb.eig[i] <= ex_min_en) ex_min_en = exb.eig[i];
 	SDegen = 0;
 	for (size_t i = 0; i < EX.hblks.size(); ++i) {
-	for (size_t j = 0; j < EX.hblks[i].size; ++j) {
+	for (size_t j = 0; j < EX.hblks[i].nev; ++j) {
 		if (abs(EX.hblks[i].eig[j]-ex_min_en) < TOL) {
 			if (hparam.block_diag && abs(EX.hblks[i].get_sz()) >= SDegen) 
 				SDegen = abs(EX.hblks[i].get_sz());
