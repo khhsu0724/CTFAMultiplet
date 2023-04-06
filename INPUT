@@ -10,20 +10,18 @@
     tpp = 1
     MLCT = 2 
     EFFDEL = False
-    DIAG = 4
-    EXNEV = 800
-    GSNEV = 100
+    DIAG = 2
     OVERWRITE = True # Overwrite photon file in the directory
 /
 &CELL
-    Coordination = "Square Planar" # Defaults to no coordination
+    #Coordination = "Square Planar" # Defaults to no coordination
     #Coordination = "OCTAHEDRAL"
     Sites = 1 # x,y,z, Defaults to 1 site
-    Holes = 2 # If this is read then &Atom's will be skipped
+    Holes = 1 # If this is read then &Atom's will be skipped
 /
 &PHOTON
     XAS = true
-    RIXS = false
+    RIXS = true
     pvin = 1 1 1
     pvout = 1 1 1
     Edge = L

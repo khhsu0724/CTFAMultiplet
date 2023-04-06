@@ -259,21 +259,24 @@ bool if_photon_file_exist(const string edge, const string work_dir, bool is_XAS,
 }
 
 double calculate_effective_delta(const string& input_dir, HParam& hparam, const PM& pm) {
-	double inp_tpd = hparam.tpd, inp_tpp = hparam.tpp;
+	double inp_tpd = hparam.tpd, inp_tpp = hparam.tpp, mlct = hparam.MLdelta;
 	hparam.tpd = 0;
 	hparam.tpp = 0;
 	Hilbert GS(input_dir,hparam,pm.edge,false);
+	double del_shift = hparam.SC[1][0]*(ed::choose(GS.num_vh,2)-ed::choose(GS.num_vh-1,2));
+	hparam.MLdelta = del_shift; // Roughly 2*U
 	if (!GS.cluster->lig_per_site) {
 		cout << "No ligands, skipping calculate delta" << endl;
 		return 0;
 	}
 	calc_ham(GS,hparam);
 	for (size_t g = 0; g < (GS.hblks.size()+1)/2; g++) {
-		GS.hblks[g].diagonalize(abs(hparam.MLdelta)*30);
+		GS.hblks[g].diagonalize(100);
 	}
 	hparam.tpd = inp_tpd;
 	hparam.tpp = inp_tpp;
-	return effective_delta(GS,2);
+	hparam.MLdelta = mlct;
+	return effective_delta(GS,2)-del_shift;
 }
 
 void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
@@ -321,7 +324,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	}}
 	if (hparam.block_diag) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
-	occupation(GS,gsi,true,"./gs_occ.txt");
+	occupation(GS,gsi,true);
 	wvfnc_weight(GS,gsi,2,true);
 	cout << endl;
 
@@ -359,6 +362,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	vector<bindex> exmin_ind;
 	for (auto &exb : EX.hblks) for (size_t i = 0; i < exb.nev; ++i) if (exb.eig[i] <= ex_min_en) ex_min_en = exb.eig[i];
 	SDegen = 0;
+
 	for (size_t i = 0; i < EX.hblks.size(); ++i) {
 	for (size_t j = 0; j < EX.hblks[i].nev; ++j) {
 		if (abs(EX.hblks[i].eig[j]-ex_min_en) < TOL) {
@@ -373,7 +377,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 
 	if (hparam.block_diag && EX.edge == "K") cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << exmin_ind.size() << endl;
-	occupation(EX,exmin_ind);
+	occupation(EX,exmin_ind,true);
 	wvfnc_weight(EX,exmin_ind,2);
 	cout << endl << "Total diagonalize run time: " << ed::format_duration(diag_duration) << endl << endl;
 	return;
@@ -438,7 +442,7 @@ int main(int argc, char** argv){
 	if (hparam.effective_delta) {
 		cout << "effective delta: " << hparam.MLdelta << endl; 
 		double del = calculate_effective_delta(IDIR,hparam,pm);
-		hparam.MLdelta = 2*hparam.MLdelta - del;
+		hparam.MLdelta = hparam.MLdelta - del;
 		cout << "calculated delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
 	} else {
 		cout << "delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
