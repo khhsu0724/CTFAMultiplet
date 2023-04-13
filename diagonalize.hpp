@@ -16,6 +16,13 @@
 #if defined __has_include && __has_include (<arpack-ng/arpack.hpp>) 
 #include <arpack-ng/arpack.hpp>
 #endif
+// // For Cori...
+#if defined __has_include && __has_include (<arpack.hpp>) 
+#include <arpack.hpp>
+#endif
+// #if defined __has_include && __has_include (<arpack/arpackicb.h>) 
+// #include <arpack/arpackicb.h>
+// #endif
 
 void ed_dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n);
 void ed_dsyev(double *_mat, double *_eigval, size_t n);
@@ -82,7 +89,7 @@ template <typename Real>
 void ed_dsarpack(Matrix<Real>* ham, Real *_eigvec, Real* _eigval, size_t n, size_t& nev) {
 	std::cout << "Arpack not available, switching to mkl/lapack" << std::endl;
 	nev = n;
-	_ham = ham->get_dense();
+	auto _ham = ham->get_dense();
 	ed_dsyevr(_ham,_eigvec,_eigval,n);
 	delete [] _ham;
 	_ham = nullptr;
@@ -167,6 +174,7 @@ public:
 			nev = std::min(nev_in,size/3);
 			_eig = new double[nev]{0};
 			_eigvec = new double[size*nev]{0};
+			std::cout << "Arpack Routine" << std::endl;
 			ed_dsarpack(ham,_eigvec,_eig,size,nev);
 			eigvec = return_uptr<double>(&_eigvec);
 			eig = return_uptr<double>(&_eig);

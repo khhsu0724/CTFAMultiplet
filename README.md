@@ -27,10 +27,14 @@ With OPENMP + MKL for Linux Machine
 g++ -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl -llapack -larpack -std=c++1y -O3 -fopenmp -ffast-math -march=native -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp cluster.cpp
 ```
 
-I have not figured out how to compile arpack on NERSC & Sherlock
-Compile it in NERSC Haswell (-pedantic will give a lot of warnings)
+Compile it in NERSC Cori (-pedantic will give a lot of warnings)
 ```console
 CC -std=c++1y -mkl="parallel" -O3 -fopenmp -ffast-math -march=native -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp cluster.cpp
+```
+Using arpack in Cori is a bit complicated, you will need to install your own arpack with ico_c_binding and link it to the compiler, for example:
+```console
+CC -I/global/homes/k/khhsu/arpack/include -L/global/homes/k/khhsu/arpack/lib64 -larpack -std=c++1y -mkl="parallel" -O3 -fopenmp -ffast-math -march=native -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp cluster.cpp
+export LD_LIBRARY_PATH=/global/homes/k/khhsu/arpack/lib64:$LD_LIBRARY_PATH
 ```
 
 Compile it in Sherlock with MKL

@@ -14,7 +14,10 @@ void calc_ham(Hilbert& hilbs, const HParam& hparam) {
 	// Assemble Hamiltonian of the hilbert space
 	for (auto& blk : hilbs.hblks) blk.malloc_ham(hparam.diag_option);
 	calc_coulomb(hilbs,hparam.SC); 
-	if (hilbs.SO_on) calc_SO(hilbs,hparam.SO);
+	if (hilbs.SO_on) {
+		calc_SO(hilbs,hparam.SO[0],1);
+		calc_SO(hilbs,hparam.SO[1],2);
+	}
 	if (hilbs.CF_on) calc_CF(hilbs,&hparam.CF[0]);
 	if (hilbs.CV_on) calc_CV(hilbs,&hparam.FG[0]);
 	if (hilbs.HYB_on) calc_HYB(hilbs,hparam);
@@ -119,12 +122,13 @@ void calc_CF(Hilbert& hilbs, const double* CF) {
 	}
 }
 
-void calc_SO(Hilbert& hilbs, const double lambda) {
+void calc_SO(Hilbert& hilbs, const double lambda, int l_in) {
 	// Calculate Spin Orbit Coupling Matrix Element
 	if (lambda == 0) return;
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		int l = hilbs.atlist[i].l;
-		if (l != 1 || hilbs.atlist[i].is_lig) continue;// Only TM 2p core orbitals get spin orbit coupling for now
+		// Only TM 2p/3d core orbitals get spin orbit coupling for now
+		if (l != l_in || hilbs.atlist[i].is_lig) continue;
 		for (int ml = -l; ml <= l; ++ml) {
 			// longitudinal phonon
 			for (auto spin : {-0.5,0.5}) {

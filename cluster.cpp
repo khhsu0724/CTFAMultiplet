@@ -1,6 +1,7 @@
 #include "cluster.hpp"
 using namespace std;
 
+// This file sets up the geometry of the cluster, including hybridization & orbitals
 // Shared Cluster Implementation
 void Cluster::print_eigstate(const vecd& occ, string fname, int p) {
 	multistream mout(true,fname);
@@ -44,7 +45,7 @@ vecd Cluster::get_tmat_real() {
 	// Swap spherical harmonics basis
 	vecc tmat = get_tmat();
 	vecc U = get_seph2real_mat();
-    tmat = ed::matmult(tmat,U,vo_persite);
+	tmat = ed::matmult(tmat,U,vo_persite);
 	U = ed::ctranspose(U,vo_persite,vo_persite);
 	tmat = ed::matmult(U,tmat,vo_persite);
 	// Swap operator basis

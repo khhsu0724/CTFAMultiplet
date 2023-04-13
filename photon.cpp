@@ -3,6 +3,8 @@
 #include "multiplet.hpp"
 #include "photon.hpp"
 
+// This file handles calculating cross section/Occupation/CI configuration
+
 using namespace std;
 #pragma omp declare reduction(vec_double_plus : std::vector<double> : \
 		std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<double>())) \
