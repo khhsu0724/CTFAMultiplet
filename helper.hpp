@@ -117,7 +117,7 @@ namespace ed {
 	    return v3;
 	};
 
-	template <typename DT> void write_mat(std::unique_ptr<DT[]>& mat, size_t x, size_t y, std::string file_dir) {
+	template <typename DT> void write_mat(DT* mat, size_t x, size_t y, std::string file_dir) {
 		std::ofstream matfile;
 	    matfile.open (file_dir);
 		for (int j = 0; j < y; ++j) {

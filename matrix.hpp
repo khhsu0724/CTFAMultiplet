@@ -46,7 +46,7 @@ public:
 	int size = 0;
 	virtual void fill_mat(int lind, int rind, T elem) = 0;
 	virtual void malloc(int size) = 0;
-	virtual T* get_dense() = 0;
+	virtual T* get_dense() = 0; // Call this carefully
 	virtual void mvmult(T* vec_in, T* vec_out, int N) = 0;
 	virtual void clear_mat() = 0;
 };

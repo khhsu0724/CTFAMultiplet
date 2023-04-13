@@ -5,6 +5,7 @@
 #include "hilbert.hpp"
 
 using namespace std;
+// This file contains all operations related to Hilbert space
 
 Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex): 
 					is_ex(is_ex), edge(edge) {
@@ -12,12 +13,11 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 	num_vh -= is_ex;
 	num_ch += is_ex;
 	HYB_on = (hparam.tpd || hparam.tpp || hparam.MLdelta) && hparam.HYB;
-	SO_on = hparam.SO;
+	SO_on = !ed::is_zero_arr(hparam.SO,2);
 	CF_on = !ed::is_zero_arr(hparam.CF,5);
 	CV_on = (is_ex && !ed::is_zero_arr(hparam.FG,4));
 	cluster->set_print_site(hparam.print_site_occ);
-	bool BLOCK_DIAG = false;
-	if (hparam.block_diag) BLOCK_DIAG = !(edge == "L" && is_ex) || !SO_on;
+	if (hparam.block_diag && !hparam.SO[1]) BLOCK_DIAG = !(edge == "L" && is_ex) || !hparam.SO[0];
 	int hv = num_vorb/2, hc = num_corb/2;
 	this->hsize = ed::choose(num_vorb,num_vh) * ed::choose(num_corb,num_ch);
 	if (num_vh > num_vorb) throw invalid_argument("too many holes from input");
@@ -114,6 +114,7 @@ Hilbert::Hilbert(const Hilbert &hilbs, int vh_mod) {
 	CF_on = hilbs.CF_on;
 	CV_on = hilbs.CV_on;
 	HYB_on = hilbs.HYB_on;
+	BLOCK_DIAG = hilbs.BLOCK_DIAG;
 	num_at = hilbs.num_at;
 	at_per_site = hilbs.at_per_site;
 	val_ati = hilbs.val_ati;
@@ -129,32 +130,6 @@ Hilbert::Hilbert(const Hilbert &hilbs, int vh_mod) {
 	hashfunc = &Hilbert::norm_Hash;
 	hbfunc = &Hilbert::norm_Hashback;
 	// TODO: complete copy constructor for no vh_mod
-
-	// DEBUG
-	// cout << "COPY CONSTRUCTOR" << endl;
-	// for (auto & at : atlist) {
-	// 	cout << "atom ind: " << at.atind << ", val_n: " << at.val_n << ", val_l: " << at.val_l <<  ", n: " << at.n << ", l: " << at.l << ", num hole: " << at.num_h << endl;
-	// 	cout << "atom sind: " << at.sind << ", eind: " << at.eind << ", vind: " << at.vind << ", cind: " << at.cind;
-	// 	if (at.is_lig) cout << ", is ligand";
-	// 	if (at.is_val) cout << ", is valence";
-	// 	cout << ", sites: ";
-	// 	for (auto s:at.site) cout << s << ",";
-	// 	cout << " check: " << bitset<34>(at.check) << endl << endl;
-	// }
-	// cout << "num_ch: " << num_ch << ", num_vh: " << num_vh << ", num_corb: " << num_corb << ", num_vorb: " << num_vorb << endl;
-	
-	// vector<ulli> hspace = enum_hspace();
-	// if (is_ex) cout << "excited state" << endl;
-	// else cout << "groud state" << endl;
-	// for (auto & h : hspace) {
-	// 	auto i = Hash(h);
-	// 	Hashback(i);
-	// 	cout << setw(10) << h << ", " << bitset<34>(h) << ", Hash: " << i.first << ", " << i.second << ", Hashback: " << Hashback(Hash(h)) << endl;
-	// 	if (h != Hashback(Hash(h))) cout << "error hashing" << endl;
-	// }
-	// cout << "ATOMS: " << endl;
-	// for (auto & at : atlist) cout << at.atname << ", " << at.is_lig << endl;
-	// DEBUG
 	return;
 }
 

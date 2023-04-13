@@ -74,7 +74,7 @@ void stot(string p, float& tgt) {tgt = stof(p);};
 void stot(string p, int& tgt) {tgt = stoi(p);};
 
 template<typename T> 
-bool read_num(string line, T* tgt, int pnum) {
+bool read_num(string line, T* tgt, int pnum, bool fix_pnum = true) {
 	try {
 		string p;
 		bool skip = false;
@@ -97,7 +97,7 @@ bool read_num(string line, T* tgt, int pnum) {
 			ncnt++;
 			p = "";
 		}
-		if (ncnt != pnum) throw invalid_argument("Wrong number of input parameter");
+		if (fix_pnum && ncnt != pnum) throw invalid_argument("Wrong number of input parameter");
 	} catch (const exception &ex) {
 		cerr << ex.what() << "\n";
 		exit(0);
@@ -155,7 +155,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 						if (line[s] != ' ' && line[s] != '	' && line[s] != '=') p.push_back(line[s]);
 						else {
 							transform(p.begin(),p.end(),p.begin(),::toupper);
-							if (p == "SO") skip = read_num(line.substr(s+1,line.size()-1),&hparam.SO,1);
+							if (p == "SO") skip = read_num(line.substr(s+1,line.size()-1),hparam.SO,2,false);
 							else if (p == "SC1") skip = read_num(line.substr(s+1,line.size()-1),hparam.SC[0],3);
 							else if (p == "SC2") {
 								skip = read_num(line.substr(s+1,line.size()-1),hparam.SC[1],5);
@@ -322,7 +322,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 			gsi.push_back({i,j});
 		}
 	}}
-	if (hparam.block_diag) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
+	if (GS.BLOCK_DIAG) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
 	occupation(GS,gsi,true);
 	wvfnc_weight(GS,gsi,2,true);
@@ -372,10 +372,11 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 		}
 	}}
 	// cout << "Band Gap: " << ex_min_en - gs_en << "eV" << endl;
-	// auto all_eig = EX.get_all_eigval(true);
+	// all_eig = EX.get_all_eigval(true);
 	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
+	// exit(0);
 
-	if (hparam.block_diag && EX.edge == "K") cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
+	if (EX.BLOCK_DIAG) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << exmin_ind.size() << endl;
 	occupation(EX,exmin_ind,true);
 	wvfnc_weight(EX,exmin_ind,2);
@@ -406,7 +407,8 @@ int main(int argc, char** argv){
 	// U = F^0 + 4*F^2 + 36*F^4
 
 	cout << "Input parameters" << endl;
-	cout << "SO: " << hparam.SO << "eV" << endl;
+	cout << "TM 2p Spin-Orbit Coupling: " << hparam.SO[0] << " eV" << endl;
+	cout << "TM 3d Spin-Orbit Coupling: " << hparam.SO[1] << " eV" << endl;
 	cout << "SC1: ";
 	for (int i = 0; i < 3; ++i) cout << hparam.SC[0][i] << ", ";
 	cout << endl << "SC2 for GS: ";

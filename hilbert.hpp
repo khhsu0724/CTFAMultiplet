@@ -11,7 +11,7 @@ public:
 	int val_ati = 0, val_ind = 0; // Index/Orbital index of first valence atom
 	int num_ch = 0, num_vh = 0, num_corb = 0, num_vorb = 0; // This is number of orbital*2 (number of electron sites)
 	bool SO_on = false, CV_on = false, CF_on = false, HYB_on = false;
-	bool is_ex;
+	bool is_ex, BLOCK_DIAG = false;
 	std::string coord = "none", edge;
 	std::vector<Atom> atlist; // atlist is ordered
 	std::vector<Block> hblks;
