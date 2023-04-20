@@ -217,6 +217,7 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam) {
 				}
 				atlist_ind++;
 			}
+			// Fill in spin down matrix element
 			vector<ulli> match_entries = hilbs.enum_hspace(incsd,0,ed::count_bits(incsd)-1,0);
 			vpulli entries;
 			for (auto &me : match_entries) {

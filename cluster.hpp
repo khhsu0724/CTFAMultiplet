@@ -8,7 +8,7 @@ public:
 	int vo_persite = 0, co_persite = 0;
 	int lig_per_site = 0, tm_per_site = 0;
 	bool no_HYB;
-	std::string edge;
+	std::string edge, inp_hyb_file = "";
 	virtual void set_hyb_params(const HParam& hparam) {return;};
 	// Converts spherical harmonics to real space basis, per site
 	virtual vecc get_seph2real_mat() = 0;
@@ -19,32 +19,14 @@ public:
 public:
 	Cluster(std::string _edge): edge(_edge) {};
 	~Cluster() {};
-	void make_atlist(std::vector<Atom>& atlist, int num_vh, 
-						const std::vector<int>& sites) {
-		std::vector<int> nh_per_tm = ed::distribute(num_vh,tm_per_site);
-		int atind = 0;
-		atlist.reserve(at_per_site()*num_sites);
-		for (int x = 0; x < sites[0]; ++x) {
-		for (int y = 0; y < sites[1]; ++y) {
-		for (int z = 0; z < sites[2]; ++z) {
-			std::vector<int> site = {x,y,z};
-			for (size_t tm = 0; tm < tm_per_site; ++tm) {
-				if (edge == "L") atlist.emplace(atlist.begin(),Atom("2p",atind,3,2,0,site));
-				atlist.emplace_back(Atom("3d",atind,3,2,nh_per_tm[tm],site));
-				atind++;
-			}
-			for (size_t lig = 0; lig < lig_per_site; ++lig) {
-				if (edge == "K") atlist.emplace(atlist.begin(),Atom("1s",atind,2,1,0,site));
-				atlist.emplace_back(Atom("2p",atind,2,1,0,site));
-				atind++;
-			}
-		}}}
-		return;
-	};
 	int at_per_site() {return lig_per_site + tm_per_site;};
 	void set_print_site(bool print_site_occ) {this->print_all_sites = print_site_occ;};
 	void set_num_sites(int _num_sites) {this->num_sites = _num_sites;};
+	void read_inp_tmat(std::string inp_hyb_file) {this->inp_hyb_file = inp_hyb_file;};
+	void make_atlist(std::vector<Atom>& atlist, int num_vh, 
+						const std::vector<int>& sites);
 	void print_eigstate(const vecd& occ, std::string fname = "", int p = 5);
+	vecc get_inp_tmat();
 	vecd get_tmat_real();
 protected:
 	int w = 12, num_sites = 1;

@@ -12,10 +12,12 @@
     EFFDEL = False
     DIAG = 4
     EXNEV = 1500
+    GSNEV = 50
     OVERWRITE = True # Overwrite photon file in the directory
 /
 &CELL
     Coordination = "Square Planar" # Defaults to no coordination
+    #HYBMAT = "" # directory, Please see Cluster::get_inp_tmat()
     #Coordination = "OCTAHEDRAL"
     Sites = 1 # x,y,z, Defaults to 1 site
     Holes = 5 # If this is read then &Atom's will be skipped

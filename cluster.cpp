@@ -3,6 +3,29 @@ using namespace std;
 
 // This file sets up the geometry of the cluster, including hybridization & orbitals
 // Shared Cluster Implementation
+void Cluster::make_atlist(std::vector<Atom>& atlist, int num_vh, 
+						const std::vector<int>& sites) {
+	std::vector<int> nh_per_tm = ed::distribute(num_vh,tm_per_site);
+	int atind = 0;
+	atlist.reserve(at_per_site()*num_sites);
+	for (int x = 0; x < sites[0]; ++x) {
+	for (int y = 0; y < sites[1]; ++y) {
+	for (int z = 0; z < sites[2]; ++z) {
+		std::vector<int> site = {x,y,z};
+		for (size_t tm = 0; tm < tm_per_site; ++tm) {
+			if (edge == "L") atlist.emplace(atlist.begin(),Atom("2p",atind,3,2,0,site));
+			atlist.emplace_back(Atom("3d",atind,3,2,nh_per_tm[tm],site));
+			atind++;
+		}
+		for (size_t lig = 0; lig < lig_per_site; ++lig) {
+			if (edge == "K") atlist.emplace(atlist.begin(),Atom("1s",atind,2,1,0,site));
+			atlist.emplace_back(Atom("2p",atind,2,1,0,site));
+			atind++;
+		}
+	}}}
+	return;
+};
+
 void Cluster::print_eigstate(const vecd& occ, string fname, int p) {
 	multistream mout(true,fname);
 	// Print Header
@@ -41,9 +64,58 @@ void Cluster::print_eigstate(const vecd& occ, string fname, int p) {
 	return;
 };
 
+vecc Cluster::get_inp_tmat() {
+	// Please use first line as key for sparse or dense matrix
+	// Sparse: [x,y]: (x,y)
+	// Dense: (real,imag),(real,imag)
+	// TODO: Read in specified datatype?
+	vecc tmat;
+	ifstream infile(inp_hyb_file);
+	if (!infile.good()) throw invalid_argument(inp_hyb_file+" does not exist!");
+	string mat_type, line;
+	getline(infile,mat_type);
+	transform(mat_type.begin(),mat_type.end(),mat_type.begin(),::toupper);
+	if (mat_type != "DENSE" && mat_type != "SPARSE") {
+		mat_type = "DENSE";
+		infile.seekg(0,std::ios_base::beg);
+	}
+	if (mat_type == "DENSE") {
+		tmat.reserve(vo_persite*vo_persite);
+		dcomp matelem = 0;
+		while (infile >> line) {
+			ed::parse_num(line,matelem);
+    		tmat.emplace_back(matelem);
+		}
+		if (tmat.size() != vo_persite*vo_persite) {
+			cout << "Matrix should be size: " << vo_persite << "x" << vo_persite << endl;
+			throw invalid_argument("Incorrect input matrix size");
+		}
+	} else {
+		// Reading in sparse matrix
+		tmat = vecc(vo_persite*vo_persite,0);
+		while (getline(infile,line)) {
+			line = line.substr(0,line.find("#")); // Get rid of comments
+			size_t colon =  line.find(":");
+			dcomp matelem = 0;
+			ed::parse_num(line.substr(colon+1),matelem);
+			line = line.substr(line.find("[")+1);
+			line = line.substr(0,line.find("]"));
+			size_t comma =  line.find(",");
+			int x = stoi(line.substr(0,comma));
+			int y = stoi(line.substr(comma+1));
+			if (x < 0 || x >= vo_persite || y < 0 || y >= vo_persite)
+				throw invalid_argument("Invalid matrix entry from " + inp_hyb_file);
+			tmat[x+vo_persite*y] += matelem;
+		}
+	}
+	return tmat;
+};
+
 vecd Cluster::get_tmat_real() {
 	// Swap spherical harmonics basis
-	vecc tmat = get_tmat();
+	vecc tmat;
+	if (inp_hyb_file.empty()) tmat = get_tmat();
+	else tmat = get_inp_tmat();
 	vecc U = get_seph2real_mat();
 	tmat = ed::matmult(tmat,U,vo_persite);
 	U = ed::ctranspose(U,vo_persite,vo_persite);
@@ -118,7 +190,7 @@ vecc SquarePlanar::get_operator_mat() {
 
 vecc SquarePlanar::get_tmat() {
 	// The ratio of tpd bonds can be tweaked individually
-	double tpdz = 0.25*tpd, tpdxy = tpd*sig_pi/4, tpdxz = tpd*sig_pi, tpdyz = tpd*sig_pi;
+	double tpdz = 0.25*tpd, tpdxy = tpd*sig_pi /4, tpdxz = tpd*sig_pi, tpdyz = tpd*sig_pi;
 	double tpppi = 0*tpp, tppsigma = tpp, tppzpi = 0*tpp;
 	double kx = PI/2, ky = PI/2, kz = 0; // relative oxygen positionss
 	double sx = 2*sin(kx), sy = 2*sin(ky), cx = 2*cos(kx), cy = 2*cos(ky);

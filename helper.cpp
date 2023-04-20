@@ -88,3 +88,14 @@ void ed::print_progress(double frac, double all) {
 	if (progress == 1) std::cout << std::endl;
 	return;
 }
+
+void ed::parse_num(std::string complex_string, dcomp& complex_num) {
+	// Parse complex number from string. Format: (x,y)
+	complex_string = complex_string.substr(complex_string.find("(")+1);
+	complex_string = complex_string.substr(0,complex_string.find(")"));
+	size_t comma =  complex_string.find(",");
+	double real = stod(complex_string.substr(0,comma));
+	double imag = stod(complex_string.substr(comma+1));
+	complex_num = dcomp(real,imag);
+	return;
+}

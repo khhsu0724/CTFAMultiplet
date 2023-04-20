@@ -288,6 +288,19 @@ void Hilbert::read_from_file(string file_dir) {
 								assign_cluster(input);
  								skip = true;
 							}
+							if (p == "HYBMAT") {
+								string input = line;
+								size_t ep, sp = input.find('"');
+								if (sp != string::npos) {
+								 	ep = input.find('"',++sp);
+								 	if (ep != string::npos) input = input.substr(sp,ep-sp);
+								 	else throw invalid_argument("No end quote");
+								} else throw invalid_argument("Quotation needed for argument");
+								// Read in file
+								if (input.empty()) cout << "No input matrix found, default to &CONTROL" << endl;
+								inp_hyb_file = input;
+ 								skip = true;
+							}
 							else if (p == "SITES") {
 								vector<int> site_vec;
 								size_t eqpos = line.find('=');
@@ -330,6 +343,7 @@ void Hilbert::read_from_file(string file_dir) {
 			if (!nh_read) throw invalid_argument("Number of holes needed for input");
 			else if (nh_read == 2) num_vh *= tot_site_num();
 			if (cluster == NULL) assign_cluster("");
+			cluster->read_inp_tmat(inp_hyb_file);
 			this->at_per_site = cluster->at_per_site();
 			this->num_at = cluster->at_per_site() * tot_site_num();
 			cluster->set_num_sites(tot_site_num());

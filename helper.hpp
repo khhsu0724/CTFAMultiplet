@@ -68,6 +68,7 @@ namespace ed {
 	std::vector<int> distribute(int num_h, int num_at);
 	std::string format_duration(std::chrono::milliseconds ms);
 	void print_progress(double frac, double all);
+	void parse_num(std::string complex_string, dcomp& complex_num);
 
 	template <typename T> T dot(std::vector<T> a, std::vector<T> b) {
 		try {
@@ -117,33 +118,35 @@ namespace ed {
 	    return v3;
 	};
 
-	template <typename DT> void write_mat(DT* mat, size_t x, size_t y, std::string file_dir) {
+	template <typename DT> void write_mat(DT* mat, size_t x, size_t y, 
+										std::string file_dir, std::string delim = " ") {
 		std::ofstream matfile;
 	    matfile.open (file_dir);
 		for (int j = 0; j < y; ++j) {
 	    	for (int i = 0; i < x; ++i) {
 	    		matfile << std::setw(8) << mat[i+x*j];
-	    		if (i < x-1) matfile << " ";
+	    		if (i < x-1) matfile << delim;
 	    	}
 	    	matfile << "\n";
 	    }
 	    matfile.close();
 	};
 
-	template <typename DT> void write_vec(std::vector<DT> vec, size_t x, size_t y, std::string file_dir) {
+	template <typename DT> void write_vec(std::vector<DT> vec, size_t x, size_t y, 
+										std::string file_dir, std::string delim = " ") {
 		std::ofstream matfile;
 	    matfile.open (file_dir);
 		for (int j = 0; j < y; ++j) {
 	    	for (int i = 0; i < x; ++i) {
 	    		matfile << vec.at(i+x*j);
-	    		if (i < x-1) matfile << ",";
+	    		if (i < x-1) matfile << delim;
 	    	}
 	    	matfile << "\n";
 	    }
 	    matfile.close();
 	};
 
-	template <typename DT> void write_vec_neat(std::vector<DT> vec, size_t x, size_t y, std::string file_dir) {
+	template <typename DT> void write_vec_sparse(std::vector<DT> vec, size_t x, size_t y, std::string file_dir) {
 		std::ofstream matfile;
 	    matfile.open (file_dir);
 		for (int j = 0; j < y; ++j)
