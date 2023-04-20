@@ -16,13 +16,10 @@
 #if defined __has_include && __has_include (<arpack-ng/arpack.hpp>) 
 #include <arpack-ng/arpack.hpp>
 #endif
-// // For Cori...
+// For HPC self installed arpack
 #if defined __has_include && __has_include (<arpack.hpp>) 
 #include <arpack.hpp>
 #endif
-// #if defined __has_include && __has_include (<arpack/arpackicb.h>) 
-// #include <arpack/arpackicb.h>
-// #endif
 
 void ed_dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n);
 void ed_dsyev(double *_mat, double *_eigval, size_t n);

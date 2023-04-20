@@ -477,6 +477,7 @@ int main(int argc, char** argv){
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
 	process_hilbert_space(GS,EX,hparam,pm);
 
+	exit(0);
 	// Calculate Cross Sections
 	vector<double> pvin = pm.pvin, pvout = pm.pvout;
 	if (pm.XAS) {
