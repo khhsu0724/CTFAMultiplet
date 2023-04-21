@@ -29,7 +29,6 @@ void ed_dsyevr(double *_mat, double *_eigvec, double* _eigReal, size_t n);
 #define ARPACK_TOL 1e-10
 template <typename Real> 
 void ed_dsarpack(Matrix<Real>* ham, Real *_eigvec, Real* _eigval, size_t n, size_t _nev) {
-	std::cout << "Using Arpack" << std::endl;
 	const a_uint N      = n;
 	const a_uint nev    = (_nev < N) ? _nev : N;
 	const a_uint ncv    = std::min(2*nev+1,N); // NCV size could be increased??
@@ -171,7 +170,6 @@ public:
 			nev = std::min(nev_in,size/3);
 			_eig = new double[nev]{0};
 			_eigvec = new double[size*nev]{0};
-			std::cout << "Arpack Routine" << std::endl;
 			ed_dsarpack(ham,_eigvec,_eig,size,nev);
 			eigvec = return_uptr<double>(&_eigvec);
 			eig = return_uptr<double>(&_eig);

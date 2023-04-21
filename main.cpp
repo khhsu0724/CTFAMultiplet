@@ -129,7 +129,7 @@ bool read_bool(string line, bool& tgt) {
 		}
 	} catch (const exception &ex) {
 		cerr << ex.what() << "\n";
-		exit(0);
+		exit(1);
 	}
 	return true;
 }
@@ -239,7 +239,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 		} else throw invalid_argument("Cannot open " + IDIR + " file");
 	} catch (const exception &ex) {
 		cerr << ex.what() << "\n";
-		exit(0);
+		exit(1);
 	}
 	return;
 }
@@ -258,12 +258,14 @@ bool if_photon_file_exist(const string edge, const string work_dir, bool is_XAS,
 	return pfile.good();
 }
 
-double calculate_effective_delta(const string& input_dir, HParam& hparam, const PM& pm) {
+double calculate_effective_delta(const string& input_dir, HParam& hparam, const PM& pm, double del_shift = 0) {
 	double inp_tpd = hparam.tpd, inp_tpp = hparam.tpp, mlct = hparam.MLdelta;
 	hparam.tpd = 0;
 	hparam.tpp = 0;
 	Hilbert GS(input_dir,hparam,pm.edge,false);
-	double del_shift = hparam.SC[1][0]*(ed::choose(GS.num_vh,2)-ed::choose(GS.num_vh-1,2));
+	double U_guess = hparam.SC[1][0]*(ed::choose(GS.num_vh,2)-ed::choose(GS.num_vh-1,2));
+	if (abs(U_guess - del_shift) > 10) 
+		cerr << "WARNING: supplied delta guess might yield bad result" << endl;
 	hparam.MLdelta = del_shift; // Roughly 2*U
 	if (!GS.cluster->lig_per_site) {
 		cout << "No ligands, skipping calculate delta" << endl;
@@ -276,7 +278,7 @@ double calculate_effective_delta(const string& input_dir, HParam& hparam, const 
 	hparam.tpd = inp_tpd;
 	hparam.tpp = inp_tpp;
 	hparam.MLdelta = mlct;
-	return effective_delta(GS,2)-del_shift;
+	return effective_delta(GS,2);
 }
 
 void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
@@ -371,10 +373,8 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 			exmin_ind.push_back({i,j});
 		}
 	}}
-	// cout << "Band Gap: " << ex_min_en - gs_en << "eV" << endl;
 	// all_eig = EX.get_all_eigval(true);
 	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
-	// exit(0);
 
 	if (EX.BLOCK_DIAG) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << exmin_ind.size() << endl;
@@ -439,17 +439,20 @@ int main(int argc, char** argv){
 	cout << ", Udp: " << (hparam.FG[0] - hparam.FG[1]/15 - hparam.FG[3]*3/70);
 	cout << ", Fdp: " << (hparam.FG[0] + hparam.FG[1]/15 + hparam.FG[3]*3/70) << endl;
 	cout << "Diagonalization Option: " << hparam.diag_option << endl;
+	Hilbert GS(IDIR,hparam,pm.edge.substr(0,1),false);
+	Hilbert EX(IDIR,hparam,pm.edge.substr(0,1),true);
 
 	// Calculate Delta or Effective Delta
 	if (hparam.effective_delta) {
 		cout << "effective delta: " << hparam.MLdelta << endl; 
-		double del = calculate_effective_delta(IDIR,hparam,pm);
-		hparam.MLdelta = hparam.MLdelta - del;
+		double del_shift = hparam.SC[1][0]*(ed::choose(GS.num_vh,2)-ed::choose(GS.num_vh-1,2));
+		double del = calculate_effective_delta(IDIR,hparam,pm,del_shift);
+		hparam.MLdelta = hparam.MLdelta - (del - del_shift);
 		cout << "calculated delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
 	} else {
 		cout << "delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
-		// double del = calculate_effective_delta(IDIR,hparam,pm);
-		// cout << "Calculated effective delta: " << del << endl;
+		double del = calculate_effective_delta(IDIR,hparam,pm,hparam.MLdelta);
+		cout << "Calculated effective delta: " << del << endl;
 	}
 
 	if (pm.RIXS) {
@@ -469,8 +472,6 @@ int main(int argc, char** argv){
 
 	if (!pm.XAS && !pm.RIXS) return 0; // Return if no photon methods
 	// Reading and Checking input parameters
-	Hilbert GS(IDIR,hparam,pm.edge.substr(0,1),false);
-	Hilbert EX(IDIR,hparam,pm.edge.substr(0,1),true);
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Number of Holes: " << GS.num_vh << endl;

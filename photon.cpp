@@ -208,20 +208,8 @@ double effective_delta(Hilbert& hilbs, int ligNum, bool is_print) {
 			}
 		}
 		vector<double> dLweight = wvfnc_weight(hilbs,gei,ligNum,false);
-		// In the rare case where dn and d(n+1)L has the same energy: Occupation both non-zero
-		if (firstLh[0] && firstLh[1] && abs(dLweight[0]*dLweight[1]) > TOL) {
-			d = distinct[e];
-			dL = distinct[e];
-			firstLh[0] = false;
-			firstLh[1] = false;
-			if (is_print) {
-				cout << "Energy: " << distinct[e] << ", degeneracy: " << gei.size() << endl;
-				wvfnc_weight(hilbs,gei,ligNum,true);
-			}
-			continue;
-		}
 		for (size_t i = 0; i <= ligNum; ++i) {
-			if (abs(dLweight[i]-1) < TOL && firstLh[i]) {
+			if (firstLh[i] && dLweight[i] > TOL) { //Cases where different dn states mix
 				if (i == 0) d = distinct[e];
 				if (i == 1) dL = distinct[e];
 				firstLh[i] = false;
