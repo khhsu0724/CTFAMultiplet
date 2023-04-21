@@ -190,7 +190,7 @@ vecc SquarePlanar::get_operator_mat() {
 
 vecc SquarePlanar::get_tmat() {
 	// The ratio of tpd bonds can be tweaked individually
-	double tpdz = 0.25*tpd, tpdxy = tpd*sig_pi /4, tpdxz = tpd*sig_pi, tpdyz = tpd*sig_pi;
+	double tpdz = 0.25*tpd, tpdxy = tpd*sig_pi/4, tpdxz = tpd*sig_pi, tpdyz = tpd*sig_pi;
 	double tpppi = 0*tpp, tppsigma = tpp, tppzpi = 0*tpp;
 	double kx = PI/2, ky = PI/2, kz = 0; // relative oxygen positionss
 	double sx = 2*sin(kx), sy = 2*sin(ky), cx = 2*cos(kx), cy = 2*cos(ky);
