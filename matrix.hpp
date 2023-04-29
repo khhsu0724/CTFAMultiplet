@@ -43,12 +43,14 @@ template<typename T> class Matrix {
 public:
 	Matrix() {};
 	std::string mat_type;
-	int size = 0;
 	virtual void fill_mat(int lind, int rind, T elem) = 0;
 	virtual void malloc(int size) = 0;
 	virtual T* get_dense() = 0; // Call this carefully
 	virtual void mvmult(T* vec_in, T* vec_out, int N) = 0;
 	virtual void clear_mat() = 0;
+	virtual int get_mat_size() = 0;
+protected:
+	int size = 0;
 };
 
 template<typename T> 
@@ -60,6 +62,7 @@ public:
 	};
 	void malloc(int size) {
 		this->size = size;
+		// There are some issues when allocating here (bad_alloc)
 		ham = std::make_unique<T[]>(size*size);
 		return;
 	};
@@ -74,7 +77,7 @@ public:
 		T alpha = 1, beta = 0;
 		char UPLO = 'U';
 		_symv(&UPLO,&N,&alpha,_ham,&lda,vec_in,&inc,&beta,vec_out,&inc);
-		this->ham = return_uptr<double>(&_ham);
+		this->ham = return_uptr<T>(&_ham);
 		return;
 	};
 	void clear_mat() {
@@ -83,8 +86,9 @@ public:
 		delete [] _ham;
 		return;
 	}
+	int get_mat_size() {return this->size * this->size;};
 private:
-	std::unique_ptr<double[]> ham;
+	std::unique_ptr<T[]> ham;
 };
 
 template <typename T> 
@@ -114,7 +118,7 @@ public:
 		return dense;
 	};
 	void mvmult(T* vec_in, T* vec_out, int N) {
-		#pragma omp parallel for shared(vec_out)
+		#pragma omp parallel for
 		for (int i = 0; i < this->size; ++i) vec_out[i] = 0;
 		if (this->mat_type == "S") {
 			#pragma omp parallel for shared(vec_out)
@@ -143,7 +147,8 @@ public:
 		indexj = std::vector<size_t>();
 		val = std::vector<T>();
 		return;
-	}
+	};
+	int get_mat_size() {return val.size();};
 private:
 	std::vector<size_t> indexi;
 	std::vector<size_t> indexj;

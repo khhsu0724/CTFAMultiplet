@@ -241,6 +241,18 @@ vector<double> Hilbert::get_all_eigval(bool is_err) {
 	return all_eig;
 }
 
+vector<ulli> Hilbert::get_hashback_list(size_t blk_ind) {
+	// Get list of bit represented state in specified block
+	int blksize = hblks[blk_ind].size;
+	vector<ulli> hblist(blksize);
+	#pragma omp parallel for shared(hblist)
+	for (size_t i = 0; i < blksize; ++i) {
+		hblist[i] = this->Hashback(bindex(blk_ind,i));
+	}
+	return hblist;
+}
+
+
 // Functions for file parsing
 void Hilbert::assign_cluster(string input) {
 	transform(input.begin(),input.end(),input.begin(),::toupper);

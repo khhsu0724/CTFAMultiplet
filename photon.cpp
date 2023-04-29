@@ -207,6 +207,7 @@ double effective_delta(Hilbert& hilbs, int ligNum, bool is_print) {
 				}
 			}
 		}
+
 		vector<double> dLweight = wvfnc_weight(hilbs,gei,ligNum,false);
 		for (size_t i = 0; i <= ligNum; ++i) {
 			if (firstLh[i] && dLweight[i] > TOL) { //Cases where different dn states mix
@@ -264,10 +265,12 @@ void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, vector<blapIndex>& bla
 	int half_orb = (EX.num_vorb+EX.num_corb)/2;
 	const int gsblk_size = GS.hblks[gbi].size;
 	const int exblk_size = EX.hblks[exi].size;
-	#pragma omp parallel for shared(blap) collapse(2) // Somehow sherlock does not recognize collapse
+	vector<ulli> gslist = GS.get_hashback_list(gbi);
+	vector<ulli> exslist = EX.get_hashback_list(exi);
+	#pragma omp parallel for shared(blap,gslist,exslist) collapse(2)
 	for (size_t g = 0; g < gsblk_size; g++) {
 		for (size_t e = 0; e < exblk_size; e++) {
-			ulli gs = GS.Hashback(bindex(gbi,g)), exs = EX.Hashback(bindex(exi,e));
+			ulli gs = gslist.at(g), exs = exslist.at(e);
 			ulli ch = exs - (gs & exs), vh = gs - (gs & exs);
 			int coi = EX.orbind(ch), voi = GS.atlist[coi].vind;
 			if (!ed::is_pw2(vh) || !GS.atlist[voi].contains(vh)) continue;
@@ -278,7 +281,7 @@ void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, vector<blapIndex>& bla
 				* GS.Fsign(&vh,gs,1) * EX.Fsign(&ch,exs,1) * proj_pvec(vhqn.ml-chqn.ml,pvec);
 			if (blap_val != dcomp(0.0,0.0)) {
 				#pragma omp critical
-				{
+				{	
 					blap.emplace_back(g,e,blap_val);
 				}
 			}
@@ -560,7 +563,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	// Calculate and store <v|D|i>
 	vecd rixs_em(nedos,0),rixs_ab(nedos,0),rixs_loss(nedos,0),rixs_peaks(nedos*nedos,0);
 	for (int i = 0; i < nedos; ++i) rixs_ab[i] = ab_emin + i*(ab_emax-ab_emin)/nedos;
-	vector<dcomp> rixskern(gsi.size()*EX.hsize,0);
+	vector<dcomp> rixskern(gsi.size()*EX.hsize,0); // This is very memory exhausive???
 	vector<blapIndex> blap;
 	vector<bindex> peak_occ_ab, peak_occ_em; // Calculate peak occupation
 	cout << "Calculating <v|D|i>" << endl;

@@ -327,7 +327,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	if (GS.BLOCK_DIAG) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
 	occupation(GS,gsi,true);
-	wvfnc_weight(GS,gsi,2,true);
+	wvfnc_weight(GS,gsi,3,true);
 	cout << endl;
 
 	// Assemble Core Hole Hamiltonian
@@ -338,7 +338,6 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	calc_ham(EX,hparam);
 	stop = chrono::high_resolution_clock::now();
 	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-	cout << "size: " << EX.hblks[0].size << endl;
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
 
 	cout << "Diagonalizing Core-Hole Hamiltonian" << endl;
@@ -379,7 +378,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	if (EX.BLOCK_DIAG) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << exmin_ind.size() << endl;
 	occupation(EX,exmin_ind,true);
-	wvfnc_weight(EX,exmin_ind,2);
+	wvfnc_weight(EX,exmin_ind,3);
 	cout << endl << "Total diagonalize run time: " << ed::format_duration(diag_duration) << endl << endl;
 	return;
 }
