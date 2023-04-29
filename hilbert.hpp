@@ -38,6 +38,7 @@ public:
 	int tot_site_num();
 	double pheshift(double trace, int k);
 	std::vector<double> get_all_eigval(bool is_err = true);
+	std::vector<ulli> get_hashback_list(size_t blk_ind);
 
 	// Functions for input file parsing and initialize
 	void assign_cluster(std::string input);

@@ -31,6 +31,7 @@ struct blapIndex {
 	size_t e;
 	dcomp blap;
 	blapIndex(size_t _g, size_t _e, dcomp _blap): g(_g), e(_e), blap(_blap) {};
+	blapIndex(): g(0), e(0), blap(dcomp(0,0)) {};
 };
 
 std::string pol_str(const vecd& pvec);

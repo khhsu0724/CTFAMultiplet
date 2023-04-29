@@ -131,7 +131,7 @@ public:
 	double get_k() {return K;};	
 	void malloc_ham(int diag_option) {
 		// If matrix is too large, automatically use arpack
-		if (size >= 2e5) {
+		if (size >= 1e5) {
 			this->diag_option = 4;
 			ham = new EZSparse<double>();
 		} else if (size <= 1e4) {

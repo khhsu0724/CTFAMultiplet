@@ -20,7 +20,7 @@
     #HYBMAT = "" # directory, Please see Cluster::get_inp_tmat()
     #Coordination = "OCTAHEDRAL"
     Sites = 1 # x,y,z, Defaults to 1 site
-    Holes = 5 # If this is read then &Atom's will be skipped
+    Holes = 4 # If this is read then &Atom's will be skipped
 /
 &PHOTON
     XAS = true
