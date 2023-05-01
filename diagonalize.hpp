@@ -48,7 +48,7 @@ void ed_dsarpack(Matrix<Real>* ham, Real *_eigvec, Real* _eigval, size_t n, size
 
 	a_int iparam[11], ipntr[11];
 	iparam[0] = 1;      // ishift
-	iparam[2] = 3*N; // 3*N on input: maxit; on output: actual iteration
+	iparam[2] = 3*N; 	// 3*N on input: maxit; on output: actual iteration
 	iparam[3] = 1;      // NB, only 1 allowed
 	iparam[6] = 1;      // mode
 

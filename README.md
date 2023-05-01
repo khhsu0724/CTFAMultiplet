@@ -27,7 +27,7 @@ With OPENMP + MKL for Linux Machine
 g++ -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl -llapack -larpack -std=c++1y -O3 -fopenmp -ffast-math -march=native -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp cluster.cpp
 ```
 
-Compile it in NERSC Cori (-pedantic will give a lot of warnings, -march=native is required)
+Compile it in NERSC Cori (-pedantic will give a lot of warnings)
 ```console
 CC -std=c++1y -mkl="parallel" -O3 -fopenmp -ffast-math -march=native -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp cluster.cpp
 ```
