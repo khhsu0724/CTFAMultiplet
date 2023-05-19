@@ -1,33 +1,32 @@
 &CONTROL
-    SO = 12.1 1 # TM p/d spin orbit coupling
-    SC1 = 1.0 0 0.1 #F_0,2 for l = 1
-    SC2 = 7.00356 0 0.1997 0 0.01378
-    SC2EX = 7.03555 0 0.2123 0 0.014665 # SC2 for excited state
-    FG = 7.92123 4.6264 6.176 2.632 #F^0,G^1,F^2,G^2
-    FG = 1.0 0.25 0 0 #F^0,G^1
-    CF = 0 0 1 1 1 #dx2y2, dz2, dxy, dxz, dyz
-    tpd = 2 # The bonding in z direction is weaker due to Jahn Teller *0.8
-    tpp = 1
-    MLCT = 2 
-    EFFDEL = False
-    DIAG = 4
-    EXNEV = 1500
-    GSNEV = 50
-    OVERWRITE = True # Overwrite photon file in the directory
+     SO = 11.506 0 # TM p/d spin orbit coupling
+     SC1 = 1.0 0 0.1 #F_0,2 for l = 1
+     SC2 = 4.4 0 0.125 0 0.025
+     SC2EX = 4.4 0 0.125 0 0.025 # SC2 for excited state
+     FG = 7.461 5.066 6.68 2.882#F^0,G^1,F^2,G^2
+     CF = 0 0 0 0 0
+     tpd = 0
+     tpp = -1
+     MLCT = -8
+     EFFDEL = True
+     DIAG = 2
+     EXNEV = 1500
+     GSNEV = 50
+     OVERWRITE = True # Overwrite photon file in the directory
 /
 &CELL
-    Coordination = "Square Planar" # Defaults to no coordination
-    #HYBMAT = "" # directory, Please see Cluster::get_inp_tmat()
-    #Coordination = "OCTAHEDRAL"
-    Sites = 1 # x,y,z, Defaults to 1 site
-    Holes = 4 # If this is read then &Atom's will be skipped
+	Coordination = "sqpl" # Defaults to no coordination
+     #HYBMAT = “” # directory, Please see Cluster::get_inp_tmat()
+     #Coordination = “OCTAHEDRAL”
+     Sites = 1 # x,y,z, Defaults to 1 site
+     Holes = 2 # If this is read then &Atom’s will be skipped
 /
 &PHOTON
     XAS = true
     RIXS = false
     pvin = 1 1 1
     pvout = 1 1 1
-    Edge = K
+    Edge = L
     Eloss = false
     NEDOS = 2000 # Number of bins for XAS/RIXS
     AB = -25 25

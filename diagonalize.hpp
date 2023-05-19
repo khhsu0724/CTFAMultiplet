@@ -134,10 +134,11 @@ public:
 		if (size >= 1e5) {
 			this->diag_option = 4;
 			ham = new EZSparse<double>();
-		} else if (size <= 1e4) {
+		} else if (size <= 5e3) {
 			this->diag_option = 2;
 			ham = new Dense<double>();
 		} else {
+			if (diag_option > 4 && diag_option < 1) diag_option = 4;
 			this->diag_option = diag_option;
 			if (diag_option == 4) ham = new EZSparse<double>();
 			else ham = new Dense<double>();
@@ -168,6 +169,7 @@ public:
 			eig = return_uptr<double>(&_eig);
 		} else if (option == 4) {
 			nev = std::min(nev_in,size/3);
+			std::cout << "Arpack Eigenvalues " << nev << std::endl;
 			_eig = new double[nev]{0};
 			_eigvec = new double[size*nev]{0};
 			ed_dsarpack(ham,_eigvec,_eig,size,nev);

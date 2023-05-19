@@ -314,7 +314,7 @@ void XAS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd con
 		vector<bindex> peaks;
 		for (auto &blk : EX.hblks) {	
 			for (size_t i = 0; i < blk.nev; ++i) {
-				if (abs(blk.eig[i]-ref_en-peak_en_copy[p]) < PRINT_TOL) 
+				if (abs(blk.eig[i]-ref_en-peak_en_copy[p]) < 1e-8) 
 					peaks.push_back(bindex(&blk-&EX.hblks[0],i));
 			}
 		}

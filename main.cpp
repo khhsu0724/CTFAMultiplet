@@ -170,14 +170,23 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 							else if (p == "HYB") skip = read_bool(line.substr(s+1,line.size()-1),hparam.HYB);
 							else if (p == "TPD") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpd,1);
 							else if (p == "TPP") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpp,1);
+							else if (p == "TPDZR") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpdz_ratio,1);
+							else if (p == "OCTJT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.octJT,1);
 							else if (p == "MLCT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.MLdelta,1);
+							else if (p == "SIGPI") skip = read_num(line.substr(s+1,line.size()-1),&hparam.sig_pi,1);
 							else if (p == "EFFDEL") skip = read_bool(line.substr(s+1,line.size()-1),hparam.effective_delta);
 							else if (p == "BLOCK") skip = read_bool(line.substr(s+1,line.size()-1),hparam.block_diag);
-							else if (p == "DIAG") skip = read_num(line.substr(s+1,line.size()-1),&hparam.diag_option,1);
+							else if (p == "GSDIAG") skip = read_num(line.substr(s+1,line.size()-1),&hparam.gs_diag_option,1);
+							else if (p == "EXDIAG") skip = read_num(line.substr(s+1,line.size()-1),&hparam.ex_diag_option,1);
 							else if (p == "SITEOCC") skip = read_bool(line.substr(s+1,line.size()-1),hparam.print_site_occ);
 							else if (p == "OVERWRITE") skip = read_bool(line.substr(s+1,line.size()-1),overwrite);
 							else if (p == "GSNEV") skip = read_num(line.substr(s+1,line.size()-1),&hparam.gs_nev,1);
 							else if (p == "EXNEV") skip = read_num(line.substr(s+1,line.size()-1),&hparam.ex_nev,1);
+							else if (p == "DIAG") {
+								// Generic Diagonalize Option
+								skip = read_num(line.substr(s+1,line.size()-1),&hparam.gs_diag_option,1);
+								hparam.ex_diag_option = hparam.gs_diag_option;
+							}
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -259,10 +268,14 @@ bool if_photon_file_exist(const string edge, const string work_dir, bool is_XAS,
 }
 
 double calculate_effective_delta(const string& input_dir, HParam& hparam, const PM& pm) {
+	// Measures the energy difference between dn/dn+1 if Delta is set to 0
 	double inp_tpd = hparam.tpd, inp_tpp = hparam.tpp, mlct = hparam.MLdelta;
+	int diag_option = hparam.gs_diag_option;
+	hparam.gs_diag_option = 4;
 	hparam.tpd = 0;
 	hparam.tpp = 0;
 	Hilbert GS(input_dir,hparam,pm.edge,false);
+	GS.HYB_on = true;
 	double U_guess = hparam.SC[1][0]*(ed::choose(GS.num_vh,2)-ed::choose(GS.num_vh-1,2));
 	hparam.MLdelta = U_guess;
 	if (!GS.cluster->lig_per_site) {
@@ -270,12 +283,14 @@ double calculate_effective_delta(const string& input_dir, HParam& hparam, const 
 		return 0;
 	}
 	calc_ham(GS,hparam);
-	for (size_t g = 0; g < (GS.hblks.size()+1)/2; g++) {
+	// for (size_t g = 0; g < (GS.hblks.size()+1)/2; g++) {
+	for (size_t g = 0; g < GS.hblks.size(); g++) {
 		GS.hblks[g].diagonalize(100);
 	}
 	hparam.tpd = inp_tpd;
 	hparam.tpp = inp_tpp;
 	hparam.MLdelta = mlct;
+	hparam.gs_diag_option = diag_option;
 	return effective_delta(GS,2) - U_guess;
 }
 
@@ -299,8 +314,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	}
 	for (size_t g = 0; g < GS.hblks.size(); g++) {
 		start = chrono::high_resolution_clock::now();
-		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size;
-		cout << ", gs nev: " << hparam.gs_nev << endl;
+		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size << endl;
 		GS.hblks[g].diagonalize(hparam.gs_nev);
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -326,6 +340,8 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
 	occupation(GS,gsi,true);
 	wvfnc_weight(GS,gsi,3,true);
+	// auto all_eig = GS.get_all_eigval(true);
+	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
 	cout << endl;
 
 	// Assemble Core Hole Hamiltonian
@@ -347,8 +363,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	}
 	for (size_t e = 0; e < EX.hblks.size(); e++) {
 		start = chrono::high_resolution_clock::now();
-		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size;
-		cout << ", ex nev: " << hparam.ex_nev << endl;
+		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
 		EX.hblks[e].diagonalize(hparam.ex_nev);
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -373,7 +388,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	// all_eig = EX.get_all_eigval(true);
 	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
 
-	if (EX.BLOCK_DIAG) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
+	if (EX.BLOCK_DIAG) cout << "Core-Hole Ground State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << exmin_ind.size() << endl;
 	occupation(EX,exmin_ind,true);
 	wvfnc_weight(EX,exmin_ind,3);
@@ -400,8 +415,11 @@ int main(int argc, char** argv){
 	if (pm.edge == "K") {
 		if (hparam.FG[2] != 0 || hparam.FG[3] != 0) 
 			throw invalid_argument("invalid FG input");
-	} else if (pm.edge != "L" && pm.edge != "L3") throw invalid_argument("invalid edge input");
+	} else if (pm.edge != "L" && pm.edge != "L3") throw invalid_argument("invalid edge input: " + pm.edge);
 	// U = F^0 + 4*F^2 + 36*F^4
+
+	Hilbert GS(IDIR,hparam,pm.edge.substr(0,1),false);
+	Hilbert EX(IDIR,hparam,pm.edge.substr(0,1),true);
 
 	cout << "Input parameters" << endl;
 	cout << "TM 2p Spin-Orbit Coupling: " << hparam.SO[0] << " eV" << endl;
@@ -420,24 +438,32 @@ int main(int argc, char** argv){
 	if (hparam.HYB) {
 		cout << "Hybridization turned on: "; 
 		cout << "tpd = " << hparam.tpd; 
-		cout << ", tpp = " << hparam.tpp << endl; 
+		cout << ", tpp = " << hparam.tpp; 
+		if (GS.coord == "oct") cout << ", z distortion = " << hparam.octJT << endl; 
+		if (GS.coord != "ion") cout << ", sigma pi bond ratio = " << hparam.sig_pi << endl; 
+		else cout << endl;
 	} else cout << "Hybridization turned off" << endl; 
 
 	// Adjust Slater Condor Parameter
+
+	cout << "J1: " << 3*hparam.SC2[2]+20*hparam.SC2[4] << endl;
+	cout << "J2: " << 4*hparam.SC2[2]+15*hparam.SC2[4] << endl;
+	cout << "J3: " << 35*hparam.SC2[4] << endl;
+	cout << "J4: " << hparam.SC2[2]+30*hparam.SC2[4] << endl;
+
 	hparam.SC[0][2] *= 25;
 	hparam.SC[1][2] *= 49;
 	hparam.SC[1][4] *= 441;
 	hparam.SC2EX[2] *= 49;
 	hparam.SC2EX[4] *= 441;
 	cout << "Ground State Udd: " << (hparam.SC2[0]-hparam.SC2[2]*2/63-hparam.SC2[4]*2/63);
-	cout << ", JH: " << (hparam.SC2[2]/14+hparam.SC2[4]/14) << endl;
+	cout << ", JH: " << (hparam.SC2[2]/14+hparam.SC2[4]/14*5/7) << endl; // Adjusted for real space Harmonics
 	cout << "Core-Hole State Udd: " << (hparam.SC2EX[0]-hparam.SC2EX[2]*2/63-hparam.SC2EX[4]*2/63);
-	cout << ", JH: " << (hparam.SC2EX[2]/14+hparam.SC2EX[4]/14);
+	cout << ", JH: " << (hparam.SC2EX[2]/14+hparam.SC2EX[4]/14*5/7);
 	cout << ", Udp: " << (hparam.FG[0] - hparam.FG[1]/15 - hparam.FG[3]*3/70);
 	cout << ", Fdp: " << (hparam.FG[0] + hparam.FG[1]/15 + hparam.FG[3]*3/70) << endl;
-	cout << "Diagonalization Option: " << hparam.diag_option << endl;
-	Hilbert GS(IDIR,hparam,pm.edge.substr(0,1),false);
-	Hilbert EX(IDIR,hparam,pm.edge.substr(0,1),true);
+	cout << "GS Diagonalization Option: " << hparam.gs_diag_option << endl;
+	cout << "EX Diagonalization Option: " << hparam.ex_diag_option << endl;
 
 	// Calculate Delta or Effective Delta
 	if (hparam.effective_delta) {
@@ -450,7 +476,7 @@ int main(int argc, char** argv){
 		double del = calculate_effective_delta(IDIR,hparam,pm);
 		cout << "Calculated effective delta: " << del + hparam.MLdelta << endl;
 	}
-
+	// exit(0);
 	if (pm.RIXS) {
 		if (pm.eloss) cout << "Using energy loss" << endl;
 		else cout << "using omega/omega" << endl;
@@ -473,7 +499,7 @@ int main(int argc, char** argv){
 	cout << "Number of Holes: " << GS.num_vh << endl;
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
 	process_hilbert_space(GS,EX,hparam,pm);
-
+	// exit(0);
 	// Calculate Cross Sections
 	vector<double> pvin = pm.pvin, pvout = pm.pvout;
 	if (pm.XAS) {

@@ -35,8 +35,8 @@ Using arpack in Cori is a bit complicated, you will need to install your own arp
 ```console
 module load cpu # For Perlmutter 
 -mkl="parallel" ==> flag if you want to use mkl
-CC -I/global/homes/k/khhsu/arpack/include -L/global/homes/k/khhsu/arpack/lib64 -larpack -std=c++1y -O3 -fopenmp -ffast-math -march=native -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp cluster.cpp
-export LD_LIBRARY_PATH=/global/homes/k/khhsu/arpack/lib64:$LD_LIBRARY_PATH
+CC -I${INSTALL_DIR}/include -L${INSTALL_DIR}/lib64 -larpack -std=c++1y -O3 -fopenmp -ffast-math -o main main.cpp diagonalize.cpp gaunt.cpp hilbert.cpp multiplet.cpp photon.cpp helper.cpp cluster.cpp
+export LD_LIBRARY_PATH=${INSTALL_DIR}/lib64:$LD_LIBRARY_PATH
 ```
 
 Compile it in Sherlock with MKL
