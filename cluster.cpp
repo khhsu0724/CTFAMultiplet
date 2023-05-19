@@ -312,7 +312,7 @@ vecc Octahedral::get_tmat() {
 	tmat[8*nvo+11] = tmat[11*nvo+8] = {-tpppi_2*cy*cz,0};
 	tmat[9*nvo+12] = tmat[12*nvo+9] = {-tpppi_1*cy*cz,0};
 	tmat[9*nvo+13] = tmat[13*nvo+9] = {tppsigma*sy*sz*pow(d,-3),0};
-	tmat[10*nvo+12] = tmat[12*nvo+10] = {-tppsigma*sy*sz*pow(d,-3),0};
+	tmat[10*nvo+12] = tmat[12*nvo+10] = {tppsigma*sy*sz*pow(d,-3),0};
 	tmat[10*nvo+13] = tmat[13*nvo+10] = {-tpppi_1*cy*cz,0};
 	tmat[11*nvo+11] = tmat[12*nvo+12] = tmat[13*nvo+13] = del;
 	return tmat;
