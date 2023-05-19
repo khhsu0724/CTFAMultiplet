@@ -74,19 +74,19 @@ public:
 	vecc get_operator_mat();
 	vecc get_tmat();
 private:
-	double sig_pi = 0.5;
+	double sig_pi = 0.5, tpdz_ratio = 0;
 };
 
 class Octahedral : public Cluster {
 public:
-	double tpd = 0, tpp = 0, del = 0;
+	double tpd = 0, tpp = 0, del = 0, octJT = 1;
 	Octahedral(std::string edge);
 	void set_hyb_params(const HParam& hparam);
 	vecc get_seph2real_mat();
 	vecc get_operator_mat();
 	vecc get_tmat();
 private:
-	double tpd_sig_pi = 0.4; // This needed to be checked
+	double tpd_sig_pi = 0.5; // This needed to be checked
 	double tpp_sig_pi_1 = 0;
 	double tpp_sig_pi_2 = 0;
 };

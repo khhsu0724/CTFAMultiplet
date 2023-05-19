@@ -12,7 +12,10 @@ double calc_U(double* gaunt1, double* gaunt2, const double* SC, int size) {
 
 void calc_ham(Hilbert& hilbs, const HParam& hparam) {
 	// Assemble Hamiltonian of the hilbert space
-	for (auto& blk : hilbs.hblks) blk.malloc_ham(hparam.diag_option);
+	for (auto& blk : hilbs.hblks) {
+		if (hilbs.num_ch == 0) blk.malloc_ham(hparam.gs_diag_option);
+		if (hilbs.num_ch == 1) blk.malloc_ham(hparam.ex_diag_option);
+	}
 	calc_coulomb(hilbs,hparam.SC); 
 	if (hilbs.SO_on) {
 		calc_SO(hilbs,hparam.SO[0],1);
@@ -89,11 +92,11 @@ vecd CFmat(int l, const double* CF) {
 	try {
 		if (l == 2) {
 			cfmat = vecd(25,0);
-			cfmat[24] = cfmat[0] = (CF[0] + CF[2])/2;
-			cfmat[20] = cfmat[4] = (CF[0] - CF[2])/2;
-			cfmat[18] = cfmat[6] = (CF[3] + CF[4])/2;
-			cfmat[16] = cfmat[8] = (CF[4] - CF[3])/2;
-			cfmat[12] = CF[1];
+			cfmat[0*5+0] = cfmat[4*5+4] = (CF[0] + CF[2])/2;
+			cfmat[0*5+4] = cfmat[4*5+0] = (CF[0] - CF[2])/2;
+			cfmat[1*5+1] = cfmat[3*5+3] = (CF[3] + CF[4])/2;
+			cfmat[1*5+3] = cfmat[3*5+1] = (CF[4] - CF[3])/2;
+			cfmat[2*5+2] = CF[1];
 		} else throw invalid_argument("non-d and non-octahedral crystal field not coded yet");
 	} catch(const exception &ex) {cout << ex.what() << "\n";}
 	return cfmat;
@@ -185,13 +188,14 @@ void calc_CV(Hilbert& hilbs, const double* FG) {
 }
 
 void calc_HYB(Hilbert& hilbs, const HParam& hparam) {
-	// Charge Transfer and Hybridization
+	// Charge Transfer and Hybridization	
 	if (hilbs.cluster->no_HYB) return;
 	else hilbs.cluster->set_hyb_params(hparam);
 	int nvo = hilbs.cluster->vo_persite * hilbs.tot_site_num();
 	int nco = hilbs.cluster->co_persite * hilbs.tot_site_num();
 	// HYBRIDIZATION is momentum dependent, need to rewrite code here
 	vecd hybmat = ed::make_blk_mat(hilbs.cluster->get_tmat_real(),hilbs.tot_site_num());
+	ed::write_vec(hybmat,nvo,nvo,"hybmat.txt");
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
 	// Loop through hyb matrix, TODO: Loop through each site
 	for (int i = 0; i < nvo; ++i) {

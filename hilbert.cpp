@@ -310,6 +310,7 @@ void Hilbert::read_from_file(string file_dir) {
 								} else throw invalid_argument("Quotation needed for argument");
 								// Read in file
 								if (input.empty()) cout << "No input matrix found, default to &CONTROL" << endl;
+								cout << "Found input hybridization matrix, tpd/tpp/MLCT ignored" << endl;
 								inp_hyb_file = input;
  								skip = true;
 							}

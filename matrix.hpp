@@ -121,7 +121,7 @@ public:
 		#pragma omp parallel for
 		for (int i = 0; i < this->size; ++i) vec_out[i] = 0;
 		if (this->mat_type == "S") {
-			#pragma omp parallel for shared(vec_out)
+			#pragma omp parallel for default(shared)
 			for (size_t e = 0; e < val.size(); ++e) {
 				if (indexj[e] == indexi[e])
 					#pragma omp atomic update
