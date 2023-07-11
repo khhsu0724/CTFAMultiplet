@@ -1,21 +1,22 @@
 &CONTROL
-     SO = 11.506 0 # TM p/d spin orbit coupling
-     SC1 = 1.0 0 0.1 #F_0,2 for l = 1
-     SC2 = 4.4 0 0.125 0 0.025
-     SC2EX = 4.4 0 0.125 0 0.025 # SC2 for excited state
-     FG = 7.461 5.066 6.68 2.882#F^0,G^1,F^2,G^2
-     CF = 0 0 0 0 0
-     tpd = 0
-     tpp = -1
-     MLCT = -8
-     EFFDEL = True
-     DIAG = 2
-     EXNEV = 1500
-     GSNEV = 50
-     OVERWRITE = True # Overwrite photon file in the directory
+	SO = 11.506 0 # TM p/d spin orbit coupling
+	SC1 = 1.0 0 0.1 #F_0,2 for l = 1
+	SC2 = 6 0 0.175 0 0.016
+	#SC2EX = 6.55 0 0.125 0 0.025 # SC2 for excited state
+	#FG = 6.5 5.066 6.680 2.882 #F^0,G^1,F^2,G^2
+	FG = 1.0 0.25 0 0 #F^0,G^1
+	CF = 0 0 1.3 1.3 1.3
+	tpd = 0.7
+	tpp = 0.2
+	MLCT = 3.5
+	EFFDEL = True
+	DIAG = 4
+	EXNEV = 1500
+	GSNEV = 50
+	OVERWRITE = True # Overwrite photon file in the directory
 /
 &CELL
-	Coordination = "sqpl" # Defaults to no coordination
+	Coordination = "oct" # Defaults to no coordination
      #HYBMAT = “” # directory, Please see Cluster::get_inp_tmat()
      #Coordination = “OCTAHEDRAL”
      Sites = 1 # x,y,z, Defaults to 1 site
@@ -23,11 +24,12 @@
 /
 &PHOTON
     XAS = true
-    RIXS = false
+    RIXS = true
     pvin = 1 1 1
     pvout = 1 1 1
-    Edge = L
+    Edge = K
     Eloss = false
+    Solver = 3
     NEDOS = 2000 # Number of bins for XAS/RIXS
     AB = -25 25
     EM = 15

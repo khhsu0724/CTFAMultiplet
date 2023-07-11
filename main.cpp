@@ -224,6 +224,9 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 								skip = read_bool(line.substr(s+1,line.size()-1),el);
 								pm.set_eloss(el);
 							}
+							// Spectroscopy solver, 1: Exact Solution, 2: Classic KH, 3: 1+2, 4 (To do): Cont FE, Biconj
+							else if (p == "SOLVER") skip = read_num(line.substr(s+1,line.size()-1),&pm.spec_solver,1);
+							else if (p == "GAMMA") skip = read_num(line.substr(s+1,line.size()-1),&pm.gamma,1);
 							else if (p == "NEDOS") skip = read_num(line.substr(s+1,line.size()-1),&pm.nedos,1);
 							else if (p == "SPINFLIP") skip = read_bool(line.substr(s+1,line.size()-1),pm.spin_flip);
 							else if (p == "AB") {
@@ -282,6 +285,7 @@ double calculate_effective_delta(const string& input_dir, HParam& hparam, const 
 		cout << "No ligands, skipping calculate delta" << endl;
 		return 0;
 	}
+	// Redo delta here, should not need to reset the values
 	calc_ham(GS,hparam);
 	// for (size_t g = 0; g < (GS.hblks.size()+1)/2; g++) {
 	for (size_t g = 0; g < GS.hblks.size(); g++) {
@@ -292,6 +296,38 @@ double calculate_effective_delta(const string& input_dir, HParam& hparam, const 
 	hparam.MLdelta = mlct;
 	hparam.gs_diag_option = diag_option;
 	return effective_delta(GS,2) - U_guess;
+}
+
+
+void dos_eigenenergy(Hilbert& hilbs, int num_eig, string dos_fname = "", string eig_fname = "") {
+	multistream dos_out(false,dos_fname,"w"); // Make sure that it clears the files
+	multistream eig_out(false,eig_fname,"w"); 
+	dos_out.set_mode("a");
+	eig_out.set_mode("a");
+	auto all_eig = hilbs.get_all_eigval(true);
+	auto unique_eig = ed::printDistinct(all_eig,0.0,all_eig.size(),false);
+	double gs_en = unique_eig[0];
+	for (int u = 0; u < unique_eig.size(); u++) {
+		vector<bindex> eigind;
+		for (auto & hblks : hilbs.hblks) {
+			for (size_t i = 0; i < hblks.nev; ++i) {
+				if (abs(hblks.eig[i]-unique_eig[u]) < TOL) {
+					eigind.push_back(bindex(&hblks-&hilbs.hblks[0],i));
+				}
+			}
+		}
+		dos_out << unique_eig[u] << " " << eigind.size() << endl;
+		if (u < num_eig) {
+			eig_out << "Eigen-energy number: " << u+1;
+			eig_out << ", energy (rel to gs): " << unique_eig[u] - gs_en << endl; 
+			eig_out << "Spin: " << abs(hilbs.hblks[eigind[0].first].get_sz()); 
+			eig_out << ", degeneracy: " << eigind.size() << endl;
+			eig_out << "------------------------------" << endl; 
+			occupation(hilbs,eigind,false,eig_fname,false);
+			eig_out << "------------------------------" << endl; 
+		}
+	}
+	return;
 }
 
 void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
@@ -338,10 +374,11 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	}}
 	if (GS.BLOCK_DIAG) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
-	occupation(GS,gsi,true);
+	occupation(GS,gsi,true,"");
 	wvfnc_weight(GS,gsi,3,true);
 	// auto all_eig = GS.get_all_eigval(true);
 	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
+	dos_eigenenergy(GS,20,"dos.txt","eig.txt");
 	cout << endl;
 
 	// Assemble Core Hole Hamiltonian
@@ -385,6 +422,8 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 			exmin_ind.push_back({i,j});
 		}
 	}}
+	dos_eigenenergy(EX,10,"exdos.txt","exeig.txt");
+	wvfnc_weight(EX,exmin_ind,3,true);
 	// all_eig = EX.get_all_eigval(true);
 	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
 
@@ -446,20 +485,21 @@ int main(int argc, char** argv){
 
 	// Adjust Slater Condor Parameter
 
-	cout << "J1: " << 3*hparam.SC2[2]+20*hparam.SC2[4] << endl;
-	cout << "J2: " << 4*hparam.SC2[2]+15*hparam.SC2[4] << endl;
-	cout << "J3: " << 35*hparam.SC2[4] << endl;
-	cout << "J4: " << hparam.SC2[2]+30*hparam.SC2[4] << endl;
+	cout << "J1 (xz/yz-x2/xy): " << 3*hparam.SC2[2]+20*hparam.SC2[4] << endl;
+	cout << "J2 (z2-x2/xy): " << 4*hparam.SC2[2]+15*hparam.SC2[4] << endl;
+	cout << "J3 (x2-xy): " << 35*hparam.SC2[4] << endl;
+	cout << "J4 (z2-xz/yz): " << hparam.SC2[2]+30*hparam.SC2[4] << endl;
 
+	cout << "Racah Parameter, A: " << (hparam.SC2[0]-49*hparam.SC2[4]) << ", B: " << (hparam.SC2[2]-5*hparam.SC2[4]) << ", C: " << (35*hparam.SC2[4]) << endl;
 	hparam.SC[0][2] *= 25;
 	hparam.SC[1][2] *= 49;
 	hparam.SC[1][4] *= 441;
 	hparam.SC2EX[2] *= 49;
 	hparam.SC2EX[4] *= 441;
-	cout << "Ground State Udd: " << (hparam.SC2[0]-hparam.SC2[2]*2/63-hparam.SC2[4]*2/63);
-	cout << ", JH: " << (hparam.SC2[2]/14+hparam.SC2[4]/14*5/7) << endl; // Adjusted for real space Harmonics
-	cout << "Core-Hole State Udd: " << (hparam.SC2EX[0]-hparam.SC2EX[2]*2/63-hparam.SC2EX[4]*2/63);
-	cout << ", JH: " << (hparam.SC2EX[2]/14+hparam.SC2EX[4]/14*5/7);
+	cout << "Ground State Uavg: " << (hparam.SC2[0]+hparam.SC2[2]*2/63+hparam.SC2[4]*2/63);
+	cout << ", JH : " << (hparam.SC2[2]*2.5/49+hparam.SC2[4]*36/441) << " (Kanamori)"; // Adjusted for real space Harmonics
+	// cout << "Core-Hole State Udd: " << (hparam.SC2EX[0]-hparam.SC2EX[2]*2/63-hparam.SC2EX[4]*2/63);
+	// cout << ", JH: " << (hparam.SC2EX[2]/14+hparam.SC2EX[4]/14*5/7);
 	cout << ", Udp: " << (hparam.FG[0] - hparam.FG[1]/15 - hparam.FG[3]*3/70);
 	cout << ", Fdp: " << (hparam.FG[0] + hparam.FG[1]/15 + hparam.FG[3]*3/70) << endl;
 	cout << "GS Diagonalization Option: " << hparam.gs_diag_option << endl;
@@ -476,10 +516,15 @@ int main(int argc, char** argv){
 		double del = calculate_effective_delta(IDIR,hparam,pm);
 		cout << "Calculated effective delta: " << del + hparam.MLdelta << endl;
 	}
-	// exit(0);
 	if (pm.RIXS) {
-		if (pm.eloss) cout << "Using energy loss" << endl;
-		else cout << "using omega/omega" << endl;
+		cout << "RIXS options:" << endl;
+		if (pm.eloss) cout << "	Using energy loss" << endl;
+		else cout << "	WARNING: All spectroscopy will be outputted as energy loss" << endl;
+		pm.eloss = true;
+		if (pm.spec_solver == 1 || pm.spec_solver == 3)
+			cout << "	Output exact RIXS peaks" << endl;
+		if (pm.spec_solver == 2 || pm.spec_solver == 3)
+			cout << "	Evaluate K-H equation, Gamma: " << pm.gamma << endl;
 	}
 	cout << "photon edge: " << pm.edge << endl;
 	cout << "pvin: ";
@@ -499,7 +544,6 @@ int main(int argc, char** argv){
 	cout << "Number of Holes: " << GS.num_vh << endl;
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
 	process_hilbert_space(GS,EX,hparam,pm);
-	// exit(0);
 	// Calculate Cross Sections
 	vector<double> pvin = pm.pvin, pvout = pm.pvout;
 	if (pm.XAS) {
