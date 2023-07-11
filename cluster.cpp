@@ -3,6 +3,7 @@ using namespace std;
 
 // This file sets up the geometry of the cluster, including hybridization & orbitals
 // Shared Cluster Implementation
+// The matrix here uses gauge choice from PhysRevB.93.155166
 void Cluster::make_atlist(std::vector<Atom>& atlist, int num_vh, 
 						const std::vector<int>& sites) {
 	std::vector<int> nh_per_tm = ed::distribute(num_vh,tm_per_site);
@@ -26,8 +27,8 @@ void Cluster::make_atlist(std::vector<Atom>& atlist, int num_vh,
 	return;
 };
 
-void Cluster::print_eigstate(const vecd& occ, string fname, int p) {
-	multistream mout(true,fname);
+void Cluster::print_eigstate(const vecd& occ, bool is_print, string fname, int p) {
+	multistream mout(is_print,fname);
 	// Print Header
 	mout << setw(w) << "Num Holes: ";
 	int nvo = vo_persite * num_sites;
@@ -117,6 +118,7 @@ vecd Cluster::get_tmat_real() {
 	vecc tmat;
 	if (inp_hyb_file.empty()) tmat = get_tmat();
 	else tmat = get_inp_tmat();
+	ed::write_vec(tmat,vo_persite,vo_persite,"./tmat.txt");
 	vecc U = get_seph2real_mat();
 	tmat = ed::matmult(tmat,U,vo_persite);
 	U = ed::ctranspose(U,vo_persite,vo_persite);
@@ -132,7 +134,6 @@ vecd Cluster::get_tmat_real() {
 	vecd tmatreal(vo_persite*vo_persite,0);
 	std::transform(tmat.begin(), tmat.end(), tmatreal.begin(), 
 						[](complex<double> c) {return c.real();});
-	ed::write_vec(tmatreal,vo_persite,vo_persite,"./hybmat.txt");
 	return tmatreal;
 };
 
@@ -196,7 +197,7 @@ vecc SquarePlanar::get_tmat() {
 	// The ratio of tpd bonds can be tweaked individually
 	// double tpdz = 0.25*tpd, tpdxy = tpd*sig_pi/4, tpdxz = tpd*sig_pi, tpdyz = tpd*sig_pi;
 	double tpdz = tpd*tpdz_ratio, tpdxy = tpd*sig_pi, tpdxz = tpd*sig_pi, tpdyz = tpd*sig_pi;
-	cout << "tpd: " << tpd << ", tdpz: " << tpdz << endl;
+	cout << "tpd: " << tpd << ", tdpz: " << tpdz << ", tpdxy: " << tpdxy << ", tpdxz: " << tpdxz << endl;
 	double tpppi = 0*tpp, tppsigma = tpp, tppzpi = 0*tpp;
 	double kx = PI/2, ky = PI/2, kz = 0; // momentum at (pi,pi) for hole language
 	double sx = 2*sin(kx), sy = 2*sin(ky), cx = 2*cos(kx), cy = 2*cos(ky);

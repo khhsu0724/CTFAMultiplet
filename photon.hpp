@@ -12,7 +12,9 @@ struct PM {
 	bool eloss = true;
 	bool spin_flip = false;
 	int nedos = 0;
+	int spec_solver = 1;
 	double em_energy = 15;
+	double gamma = 0.3;
 	std::string edge;
 	std::vector<double> pvin, pvout, ab_range;
 	PM(): XAS(false), RIXS(false), PE(false), eloss(true) {
@@ -37,7 +39,7 @@ struct blapIndex {
 std::string pol_str(const vecd& pvec);
 std::complex<double> proj_pvec(int ml, const vecd& pvec);
 vecd occupation(Hilbert& hilbs, const std::vector<bindex>& si, bool is_print=true, 
-				std::string fname = "");
+				std::string fname = "", bool spin_res = false);
 vecd wvfnc_weight(Hilbert& hilbs, const std::vector<bindex>& si, 
 								int ligNum = 3, bool print = false);
 double effective_delta(Hilbert& hilbs, int ligNum = 3, bool is_print = false);

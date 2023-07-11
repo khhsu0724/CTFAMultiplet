@@ -31,11 +31,14 @@ typedef std::vector<std::pair<ulli,ulli>> vpulli;
 class multistream {
 // Custom stream class that can direct output to cout & fstream
 public:
-	multistream(bool is_cout = true, std::string fname = "") {
+	multistream(bool is_cout = true, std::string fname = "", std::string mode = "a") {
 		this->skip_cout = !is_cout;
 		this->write_cout = is_cout;
 		this->write_file = !fname.empty();
-		if (write_file) file_stream = std::ofstream(fname);
+		this->fname = fname;
+		if (write_file) set_mode(mode);
+		// if (write_file && mode == "a") file_stream = std::ofstream(fname,std::ios_base::app);
+		// if (write_file && mode == "w") file_stream = std::ofstream(fname);
 	};
 	// for regular output of variables and stuff
 	template<typename T> multistream& operator<<(const T& input) {
@@ -51,8 +54,14 @@ public:
 		return *this;
 	}
 	void set_skip_cout(bool skip_cout) {this->skip_cout = skip_cout;};
+	void set_mode(std::string mode = "a") {
+		if (mode == "a") file_stream = std::ofstream(fname,std::ios_base::app);
+		if (mode == "b") file_stream = std::ofstream(fname,std::ios_base::binary);
+		if (mode == "w") file_stream = std::ofstream(fname);
+	}
 private:
 	std::ofstream file_stream;
+	std::string fname;
 	bool write_cout;
 	bool write_file;
 	bool skip_cout;

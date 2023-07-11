@@ -49,7 +49,7 @@ struct HParam {
 	double tpd = 0, tpp = 0, tpdz_ratio = 0.25;
 	double SO[2]{0}, CF[5]{0};
 	double SC2[5]{0}, SC1[3]{0}, FG[4]{0}, SC2EX[5]{0};
-	int gs_diag_option, ex_diag_option = 2;
+	int gs_diag_option = 2, ex_diag_option = 2;
 	bool block_diag = true, HYB = true, effective_delta = true;
 	bool print_site_occ = false;
 	int ex_nev = 0, gs_nev = 0;
