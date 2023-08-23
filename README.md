@@ -1,7 +1,7 @@
-# ED
-Exact Diagonalization Code  
-Different compilation method provided below  
-To see stack trace error, compile with -rdynamic  
+# Charge Transfer Full Atomic Multiplet
+Charge transfer full atomic multiplet code to calculate XAS & RIXS spectroscopy (Dipole allowed transitions)
+Using Exact Diagonalization or Lanczos, depending on matrix size
+TODO: Input descriptions
 Arpack & MKL installation is recommended, arpack will use blas if MKL is not present  
 
 1. Compile with this command on MAC
