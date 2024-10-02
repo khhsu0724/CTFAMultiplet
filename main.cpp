@@ -168,9 +168,11 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 							else if (p == "FG") skip = read_num(line.substr(s+1,line.size()-1),hparam.FG,4);
 							else if (p == "CF") skip = read_num(line.substr(s+1,line.size()-1),hparam.CF,5);
 							else if (p == "HYB") skip = read_bool(line.substr(s+1,line.size()-1),hparam.HYB);
+							else if (p == "HFSCALE") skip = read_num(line.substr(s+1,line.size()-1),&hparam.HFscale,1);
 							else if (p == "TPD") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpd,1);
 							else if (p == "TPP") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpp,1);
 							else if (p == "TPDZR") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpdz_ratio,1);
+							else if (p == "TPPSIGMA") skip = read_bool(line.substr(s+1,line.size()-1),hparam.tppsigma_on);
 							else if (p == "OCTJT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.octJT,1);
 							else if (p == "MLCT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.MLdelta,1);
 							else if (p == "SIGPI") skip = read_num(line.substr(s+1,line.size()-1),&hparam.sig_pi,1);
@@ -375,6 +377,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	if (GS.BLOCK_DIAG) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
 	occupation(GS,gsi,true,"");
+	occupation(GS,gsi,true,"",true);
 	wvfnc_weight(GS,gsi,3,true);
 	// auto all_eig = GS.get_all_eigval(true);
 	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
@@ -456,6 +459,11 @@ int main(int argc, char** argv){
 			throw invalid_argument("invalid FG input");
 	} else if (pm.edge != "L" && pm.edge != "L3") throw invalid_argument("invalid edge input: " + pm.edge);
 	// U = F^0 + 4*F^2 + 36*F^4
+	// Scaling Slater Parameters
+	for (int i = 0; i < 3; ++i) hparam.SC[0][i] *= hparam.HFscale;
+	for (int i = 0; i < 5; ++i) hparam.SC[1][i] *= hparam.HFscale;
+	for (int i = 0; i < 5; ++i) hparam.SC2EX[i] *= hparam.HFscale;
+	for (int i = 0; i < 4; ++i) hparam.FG[i] *= hparam.HFscale;
 
 	Hilbert GS(IDIR,hparam,pm.edge.substr(0,1),false);
 	Hilbert EX(IDIR,hparam,pm.edge.substr(0,1),true);
@@ -479,7 +487,11 @@ int main(int argc, char** argv){
 		cout << "tpd = " << hparam.tpd; 
 		cout << ", tpp = " << hparam.tpp; 
 		if (GS.coord == "oct") cout << ", z distortion = " << hparam.octJT << endl; 
-		if (GS.coord != "ion") cout << ", sigma pi bond ratio = " << hparam.sig_pi << endl; 
+		if (GS.coord != "ion") {
+			cout << ", sigma pi bond ratio = " << hparam.sig_pi; 
+			if (hparam.tppsigma_on) cout << ", tppsigma on (only tppzpi!!!)" << endl; 
+			else cout << ", tppsigma off" << endl; 
+		}
 		else cout << endl;
 	} else cout << "Hybridization turned off" << endl; 
 
@@ -537,7 +549,6 @@ int main(int argc, char** argv){
 	cout << endl;
 	cout << "emission range: " << pm.em_energy << endl;
 
-	if (!pm.XAS && !pm.RIXS) return 0; // Return if no photon methods
 	// Reading and Checking input parameters
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
