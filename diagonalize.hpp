@@ -93,7 +93,8 @@ void ed_dsarpack(Matrix<Real>* ham, Real *_eigvec, Real* _eigval, size_t n, size
 };
 #endif
 
-class Block {
+template <typename T>
+class Block  {
 private:
 	double Sz = 0, Jz = 0, K = 0;
 	double *_ham, *_eig, *_eigvec; // Implicit pointer that faciliates diagonalization
@@ -101,7 +102,8 @@ public:
 	size_t size, f_ind; // Accumulated first index of this Block
 	size_t nev;			// Number of eigenvalues
 	int diag_option;
-	Matrix<double>* ham;
+
+	Matrix<T>* ham;
 	uptrd eig, eigvec;
 	std::vector<int> einrange;
 	std::vector<ulli> rank; // rank keeps some rank information for faster hashing
@@ -114,7 +116,7 @@ public:
 		rank = std::move(rank_in);
 	};
 	
-	Block(Block&& blk) : Sz(blk.Sz), Jz(blk.Jz), K(blk.K), size(blk.size), f_ind(blk.f_ind), nev(blk.nev) {
+	Block(Block<T>&& blk) : Sz(blk.Sz), Jz(blk.Jz), K(blk.K), size(blk.size), f_ind(blk.f_ind), nev(blk.nev) {
 		// This is a bit odd, should I copy or move?
 		ham = std::move(blk.ham);
 		eig = std::move(blk.eig);
@@ -156,6 +158,10 @@ public:
 			_eigvec = new double[size*nev]{0};
 			if (option == 1) ed_dgees(_ham,_eigvec,_eig,size);
 			else if (option == 2) ed_dsyevr(_ham,_eigvec,_eig,size);
+			// Sanity check for small matrices
+			// std::cout << "Diag size: " << size << std::endl;
+			// for (int i = 0; i < size; ++i) std::cout << _eig[i] << ", ";
+			// std::cout << std::endl;
 			eigvec = return_uptr<double>(&_eigvec);
 			eig = return_uptr<double>(&_eig);
 			delete [] _ham;
@@ -169,7 +175,7 @@ public:
 			eig = return_uptr<double>(&_eig);
 		} else if (option == 4) {
 			nev = std::min(nev_in,size/3);
-			std::cout << "Arpack Eigenvalues " << nev << std::endl;
+			std::cout << "Arpack Eigenvalues " << nev << ", size: " << size << std::endl;
 			_eig = new double[nev]{0};
 			_eigvec = new double[size*nev]{0};
 			ed_dsarpack(ham,_eigvec,_eig,size,nev);

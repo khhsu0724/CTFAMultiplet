@@ -32,6 +32,7 @@ protected:
 	int w = 12, num_sites = 1;
 	std::vector<std::string> orb_names;
 	bool print_all_sites = true; // If false program will print per_site
+	bool tppsigma_on = false;
 	bool check_tmat_all_real(const vecc& tmatreal);
 	vecc U_d() {
 		vecc U(5*5,0);
