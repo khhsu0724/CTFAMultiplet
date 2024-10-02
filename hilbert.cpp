@@ -482,7 +482,7 @@ bindex Hilbert::sz_Hash(ulli s) {
 ulli Hilbert::sz_Hashback(bindex ind) {
 	// Hashback function that uses sz as main QN
 	int max_2sz = int(2*hblks.back().get_sz());
-	Block& blk = hblks[ind.first];
+	auto& blk = hblks[ind.first];
 	auto r = std::find_if(blk.rank.rbegin(), blk.rank.rend(),
 				[&](size_t e){return (e >= 0) && (ind.second >= e);});
 	if (r == blk.rank.rend()) r = blk.rank.rend() - 1;

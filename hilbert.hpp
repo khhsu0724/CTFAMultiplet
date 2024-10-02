@@ -3,6 +3,7 @@
 #ifndef HILBERT
 #define HILBERT
 
+// template <typename T>
 class Hilbert {
 public:
 	// TODO: make some of the variables private
@@ -14,7 +15,7 @@ public:
 	bool is_ex, BLOCK_DIAG = false;
 	std::string coord = "none", edge, inp_hyb_file;
 	std::vector<Atom> atlist; // atlist is ordered
-	std::vector<Block> hblks;
+	std::vector<Block<double>> hblks;
 	std::vector<int> sites = {1,1,1};
 	using Hashptr = bindex (Hilbert::*)(ulli s);
 	using HBptr = ulli (Hilbert::*)(bindex ind);

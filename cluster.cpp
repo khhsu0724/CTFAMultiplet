@@ -178,6 +178,7 @@ void SquarePlanar::set_hyb_params(const HParam& hparam) {
 	del = hparam.MLdelta;
 	sig_pi = hparam.sig_pi;
 	tpdz_ratio = hparam.tpdz_ratio;
+	tppsigma_on = hparam.tppsigma_on;
 	return;
 };
 
@@ -197,11 +198,13 @@ vecc SquarePlanar::get_tmat() {
 	// The ratio of tpd bonds can be tweaked individually
 	// double tpdz = 0.25*tpd, tpdxy = tpd*sig_pi/4, tpdxz = tpd*sig_pi, tpdyz = tpd*sig_pi;
 	double tpdz = tpd*tpdz_ratio, tpdxy = tpd*sig_pi, tpdxz = tpd*sig_pi, tpdyz = tpd*sig_pi;
-	cout << "tpd: " << tpd << ", tdpz: " << tpdz << ", tpdxy: " << tpdxy << ", tpdxz: " << tpdxz << endl;
-	double tpppi = 0*tpp, tppsigma = tpp, tppzpi = 0*tpp;
+	double tpppi = 0*tpp, tppsigma = tpp, tppzpi = 0*tpp; // Introduces tppzpi
 	double kx = PI/2, ky = PI/2, kz = 0; // momentum at (pi,pi) for hole language
 	double sx = 2*sin(kx), sy = 2*sin(ky), cx = 2*cos(kx), cy = 2*cos(ky);
 	int nvo = vo_persite;
+	// if (tppsigma_on) tppzpi = 20*tpp;
+	cout << "tpd: " << tpd << ", tdpz: " << tpdz << ", tpdxy: " << tpdxy << ", tpdxz: " << tpdxz << endl;
+	cout << "tpp: " << tpp << ", tppzpi: " << tppzpi << endl;
 	vecc tmat(nvo*nvo,0);
 	tmat[0*nvo+5] = {0,-tpd*sx};
 	tmat[5*nvo+0] = -tmat[0*nvo+5];
@@ -225,7 +228,7 @@ vecc SquarePlanar::get_tmat() {
 	tmat[5*nvo+9] = tmat[9*nvo+5] = {tppsigma*sx*sy,0};
 	tmat[6*nvo+8] = tmat[8*nvo+6] = {tppsigma*sx*sy,0};
 	tmat[6*nvo+9] = tmat[9*nvo+6] = {-tpppi*cx*cy,0};
-	tmat[7*nvo+10] = tmat[10*nvo+7] = {-tppzpi*cx*cy,0};
+	tmat[7*nvo+10] = tmat[10*nvo+7] = {tppzpi*cx*cy,0};
 	return tmat;
 };
 // End of Square-Planar Implementation
@@ -249,6 +252,7 @@ void Octahedral::set_hyb_params(const HParam& hparam) {
 	del = hparam.MLdelta;
 	octJT = hparam.octJT;
 	tpd_sig_pi = hparam.sig_pi;
+	tppsigma_on = hparam.tppsigma_on;
 	return;
 };
 

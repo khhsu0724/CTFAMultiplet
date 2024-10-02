@@ -45,7 +45,7 @@ vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print, string 
 	Hilbert minus_1vh(hilbs,-1);
 	int gs_count = 0;
 	for (auto &s  : si) {
-		Block& blk = hilbs.hblks[s.first];
+		auto& blk = hilbs.hblks[s.first];
 		if (spin_res && s.first >= (hilbs.hblks.size()+1)/2) continue;
 		gs_count++;
 		// Pick an operator
@@ -105,7 +105,7 @@ vecd occupation_test(Hilbert& hilbs, const vector<bindex>& si, bool is_print) {
 	Hilbert minus_1vh(hilbs,-1);
 	// cout << "hilbs: " << hilbs.hsize << ", minus_vh hsize:" << minus_1vh.hsize << endl;
 	for (auto &s  : si) {
-		Block& blk = hilbs.hblks[s.first];
+		auto& blk = hilbs.hblks[s.first];
 		// cout << s.first << ", " << s.second << endl;
 		// double norm = 0;
 		// for (size_t x = 0; x < blk.size; ++x) {
@@ -144,7 +144,7 @@ vecd occupation_test(Hilbert& hilbs, const vector<bindex>& si, bool is_print) {
 	// cout << "DEBUGGGG NVO: " << nvo << ", NCO:" << nco << " U size: " << U.size()  << endl;
 	// occ_totc = vecd(nvo,0);
 	// for (auto &s  : si) {
-	// 	Block& blk = hilbs.hblks[s.first];
+	// 	auto& blk = hilbs.hblks[s.first];
 	// 	// Pick an operator
 	// 	for (size_t site = 0; site < hilbs.tot_site_num()*5; site+=5) {
 	// 		for (size_t c = 0; c < 5; ++c) {
@@ -400,7 +400,7 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 		size_t last_gs_block = gsi[0].first;
 		basis_overlap(GS,EX,bindex(last_gs_block,&exblk-&EX.hblks[0]),blap,pm);
 		for (auto &g  : gsi) {
-			Block& gsblk = GS.hblks[g.first];
+			auto& gsblk = GS.hblks[g.first];
 			// ed::print_progress((&exblk-&EX.hblks[0])*gsi.size()+(&g-&gsi[0])+1,EX.hblks.size()*gsi.size());
 			if (!GS.SO_on && !EX.SO_on && gsblk.get_sz() != exblk.get_sz()) continue; // Spin order blocks
 			if (g.first != last_gs_block) {
@@ -619,7 +619,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 		size_t last_gs_block = gsi[0].first;
 		basis_overlap(GS,EX,bindex(last_gs_block,&exblk-&EX.hblks[0]),blap,pm);
 		for (auto &g : gsi) {
-			Block& gsblk = GS.hblks[g.first];
+			auto& gsblk = GS.hblks[g.first];
 			// ed::print_progress((&exblk-&EX.hblks[0])*gsi.size()+(&g-&gsi[0])+1,EX.hblks.size()*gsi.size());
 			if (!GS.SO_on && !EX.SO_on && gsblk.get_sz() != exblk.get_sz()) continue;
 			if (g.first != last_gs_block) {
@@ -693,7 +693,8 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 						double omega_in = ab_emin + n*freq_step;
 						// #pragma omp parallel for reduction(+:intensity)
 						for (size_t ei = 0; ei < exblk.nev; ++ei) {
-							if (abs(omega_in-(exblk.eig[ei]-gs_en))>gamma_tol) continue; 
+							if (abs(fDvvDi[ei]) < TOL) continue;
+							// if (abs(omega_in-(exblk.eig[ei]-gs_en))>gamma_tol) continue; 
 							intensity += fDvvDi[ei]/(omega_in-(exblk.eig[ei]-gs_en)+igamma);
 						}
 						rixs_peaks_kh[eloss_ind*nedos+n] += exp(-beta*gs_en)*pow(abs(intensity),2);
