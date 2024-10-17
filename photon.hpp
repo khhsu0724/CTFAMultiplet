@@ -12,7 +12,7 @@ struct PM {
 	bool eloss = true;
 	bool spin_flip = false;
 	int nedos = 0;
-	int spec_solver = 1;
+	int spec_solver = 1; // 1 = exact, 2 = Classic K-H, 3 = both, 4 Lanczos/BiCGS
 	double em_energy = 15;
 	double gamma = 0.3;
 	std::string edge;
@@ -50,7 +50,7 @@ void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, std::vector<blapIndex>
 void XAS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd const& energy, 
 						vecd const& intensity, std::vector<bindex> const& gsi, double ref_en = 0, 
 						std::string mode = "list", bool ref_gs = false);
-void write_XAS(vecd const& aben, vecd const& intensity, std::string file_dir = "");
+void write_XAS(vecd const& aben, vecd const& intensity, std::string file_dir = "", bool exact=true);
 void XAS(Hilbert& GS, Hilbert& EX, const PM& pm);
 
 // RIXS functions
@@ -60,5 +60,7 @@ void RIXS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd co
 void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, bool eloss, 
 				std::string file_dir = "");
 void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm);
+vecc gen_dipole_state(Hilbert& GS, Hilbert& EX, const PM& pm, const bindex& gi
+						,size_t exi, const std::vector<blapIndex>& blap);
 
 #endif

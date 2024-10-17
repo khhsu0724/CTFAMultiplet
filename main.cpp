@@ -350,10 +350,12 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 		if (pm.RIXS) hparam.gs_nev = 400;
 		else hparam.gs_nev = 10 * GS.tot_site_num();
 	}
+
+	bool clear_mat = !(pm.spec_solver == 4);
 	for (size_t g = 0; g < GS.hblks.size(); g++) {
 		start = chrono::high_resolution_clock::now();
 		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size << endl;
-		GS.hblks[g].diagonalize(hparam.gs_nev);
+		GS.hblks[g].diagonalize(hparam.gs_nev,clear_mat);
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -393,7 +395,6 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	stop = chrono::high_resolution_clock::now();
 	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
-
 	cout << "Diagonalizing Core-Hole Hamiltonian" << endl;
 	diag_start = chrono::high_resolution_clock::now();
 	if (!hparam.ex_nev) {
@@ -404,7 +405,9 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	for (size_t e = 0; e < EX.hblks.size(); e++) {
 		start = chrono::high_resolution_clock::now();
 		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
-		EX.hblks[e].diagonalize(hparam.ex_nev);
+		// Only need the lowest eigenvalue if using Lanczos
+		if (pm.spec_solver == 4) EX.hblks[e].diagonalize(5,clear_mat);
+		else EX.hblks[e].diagonalize(hparam.ex_nev,clear_mat);
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -447,6 +450,7 @@ int main(int argc, char** argv){
 	// Reading and Checking input parameters
 	auto run_start = chrono::high_resolution_clock::now();
 	cout << "Reading files..." << endl;
+
 	auto start = chrono::high_resolution_clock::now();
 	PM pm;
 	HParam hparam; 
@@ -459,11 +463,11 @@ int main(int argc, char** argv){
 			throw invalid_argument("invalid FG input");
 	} else if (pm.edge != "L" && pm.edge != "L3") throw invalid_argument("invalid edge input: " + pm.edge);
 	// U = F^0 + 4*F^2 + 36*F^4
-	// Scaling Slater Parameters
-	for (int i = 0; i < 3; ++i) hparam.SC[0][i] *= hparam.HFscale;
-	for (int i = 0; i < 5; ++i) hparam.SC[1][i] *= hparam.HFscale;
-	for (int i = 0; i < 5; ++i) hparam.SC2EX[i] *= hparam.HFscale;
-	for (int i = 0; i < 4; ++i) hparam.FG[i] *= hparam.HFscale;
+	// Scaling Slater Parameters, without the bare Coulomb term
+	for (int i = 1; i < 3; ++i) hparam.SC[0][i] *= hparam.HFscale;
+	for (int i = 1; i < 5; ++i) hparam.SC[1][i] *= hparam.HFscale;
+	for (int i = 1; i < 5; ++i) hparam.SC2EX[i] *= hparam.HFscale;
+	for (int i = 1; i < 4; ++i) hparam.FG[i] *= hparam.HFscale;
 
 	Hilbert GS(IDIR,hparam,pm.edge.substr(0,1),false);
 	Hilbert EX(IDIR,hparam,pm.edge.substr(0,1),true);
@@ -528,8 +532,9 @@ int main(int argc, char** argv){
 		double del = calculate_effective_delta(IDIR,hparam,pm);
 		cout << "Calculated effective delta: " << del + hparam.MLdelta << endl;
 	}
-	if (pm.RIXS) {
-		cout << "RIXS options:" << endl;
+	cout << "solver options: " <<  pm.spec_solver << endl;
+	if (pm.spec_solver == 4) cout << "Lanczos/BiCGS Methods" << endl;
+	else if (pm.RIXS) {
 		if (pm.eloss) cout << "	Using energy loss" << endl;
 		else cout << "	WARNING: All spectroscopy will be outputted as energy loss" << endl;
 		pm.eloss = true;

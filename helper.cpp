@@ -37,6 +37,13 @@ int ed::count_bits(ulli b) {
 	return c;
 }
 
+vecc ed::vec_conj(vecc vin) {
+	vecc vout(vin.size(),0);
+	#pragma omp parallel for
+	for (int i = 0; i < vin.size(); ++i) vout[i] = std::conj(vin[i]);
+	return vout;
+}
+
 vecc ed::ctranspose(const vecc& mat, size_t m, size_t n) {
 	// Conjugate Transpose of a matrix
 	vecc trans(m*n,0);

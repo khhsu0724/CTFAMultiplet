@@ -33,6 +33,7 @@ public:
 	ulli qn2ulli(int snum, QN* qn, bool only_val = false, bool only_core = false);
 	vpulli match(int snum, QN* lhs, QN* rhs);
 	void fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs);
+	void print_bits(ulli state);
 	double Fsign(QN* op, ulli state, int opnum);
 	double Fsign(ulli* op, ulli state, int opnum);
 	int orbind(ulli s);

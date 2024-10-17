@@ -10,6 +10,7 @@
 	tpp = 0
 	MLCT = 0
 	EFFDEL = True
+	HFSCALE = 0.8
 	tppsigma = True
 	DIAG = 4
 	EXNEV = 1500

@@ -359,15 +359,30 @@ void XAS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd con
 	return;
 }
 
-void write_XAS(vecd const& aben, vecd const& intensity, string file_dir) {
+void write_XAS(vecd const& aben, vecd const& intensity, string file_dir, bool exact) {
 	multistream mout(true,file_dir,"w");
 	mout << setw(15) << "peaks (eV)" << setw(15) << "intensity" << endl;
 	for (int i = 0; i < intensity.size(); ++i) {
-		if (intensity[i] < TOL) continue;
-		mout.set_skip_cout(intensity[i] < PRINT_TOL);
+		if (intensity[i] < TOL and exact) continue;
+		mout.set_skip_cout(intensity[i] < PRINT_TOL or !exact);
 		mout << setw(15) << aben[i] << setw(15) << intensity[i] << endl;
 	}
 	return;
+}
+
+vecc gen_dipole_state(Hilbert& GS, Hilbert& EX, const PM& pm, const bindex& gi
+						,size_t exi, const vector<blapIndex>& blap) {
+	// Generate excited state with D|g>
+	size_t gbi = gi.first;
+	size_t gblk_size = GS.hblks[gbi].size;
+	vecc dpvec(EX.hblks[exi].size,0);
+	// cout << gi.second << ", " << exi << endl;
+	// cout << gblk_size << ", " << EX.hblks[exi].size << endl;
+	for (auto & b : blap) {
+		size_t gsind = gi.second*gblk_size+b.g;
+		dpvec[b.e] += GS.hblks[gbi].eigvec[gi.second*gblk_size+b.g] * b.blap;
+	}
+	return dpvec;
 }
 
 void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
@@ -378,6 +393,7 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	if (GS.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
 	if (EX.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
 	double gs_en = GS.hblks[0].eig[0];
+	double ex_en = EX.hblks[0].eig[0];
 	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.nev; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
 	vector<bindex> gsi; // index for ground state
 	// Calculate Partition function
@@ -396,37 +412,56 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	vector<blapIndex> blap;
 
 	vecd xas_aben(nedos,0), xas_int(nedos,0);
-	for (auto &exblk : EX.hblks) {
-		size_t last_gs_block = gsi[0].first;
-		basis_overlap(GS,EX,bindex(last_gs_block,&exblk-&EX.hblks[0]),blap,pm);
+	bool write_output = true;
+	if (pm.spec_solver == 4) {
+		write_output = false;
+		// Lanczos solver
+		double minE = ex_en - gs_en - 1;
+		for (int i = 0; i < nedos; ++i) xas_aben[i] = minE + 20.0/nedos*i; // This should be changed with pm.abrange
 		for (auto &g  : gsi) {
-			auto& gsblk = GS.hblks[g.first];
-			// ed::print_progress((&exblk-&EX.hblks[0])*gsi.size()+(&g-&gsi[0])+1,EX.hblks.size()*gsi.size());
-			if (!GS.SO_on && !EX.SO_on && gsblk.get_sz() != exblk.get_sz()) continue; // Spin order blocks
-			if (g.first != last_gs_block) {
-				basis_overlap(GS,EX,bindex(g.first,&exblk-&EX.hblks[0]),blap,pm);
-				last_gs_block = g.first;
+			cout << g.first << "," << g.second << endl;
+			for (auto &exblk : EX.hblks) {
+				size_t exblk_ind = &exblk-&EX.hblks[0];
+				basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm);
+				vecc dipole_vec = gen_dipole_state(GS,EX,pm,g,exblk_ind,blap);
+				// Perform Lanczos
+				ContFracExpan(exblk.ham,dipole_vec,gs_en,xas_aben,xas_int,0.1,150);
 			}
-			#pragma omp parallel for reduction (vec_double_plus:xas_int) schedule(dynamic)
-			for (size_t ei = 0; ei < exblk.nev; ++ei) {
-				if (exblk.eig[ei]-gs_en < emin || exblk.eig[ei]-gs_en > emax) continue;
-				dcomp cs = 0;
-				for (auto & b : blap) {
-					size_t gsind = g.second*gsblk.size+b.g;
-					size_t exind = ei*exblk.size+b.e;
-					cs +=  gsblk.eigvec[gsind] * exblk.eigvec[exind] * b.blap;
+		}
+		cout << "Finish solving Lanczos!" << endl;
+	} else {
+		for (auto &exblk : EX.hblks) {
+			size_t last_gs_block = gsi[0].first;
+			basis_overlap(GS,EX,bindex(last_gs_block,&exblk-&EX.hblks[0]),blap,pm);
+			for (auto &g  : gsi) {
+				auto& gsblk = GS.hblks[g.first];
+				// ed::print_progress((&exblk-&EX.hblks[0])*gsi.size()+(&g-&gsi[0])+1,EX.hblks.size()*gsi.size());
+				if (!GS.SO_on && !EX.SO_on && gsblk.get_sz() != exblk.get_sz()) continue; // Spin order blocks
+				if (g.first != last_gs_block) {
+					basis_overlap(GS,EX,bindex(g.first,&exblk-&EX.hblks[0]),blap,pm);
+					last_gs_block = g.first;
 				}
-				if (abs(cs) > TOL) { // Is this arbritrary?????	
-					size_t peak_pos = round((exblk.eig[ei]-gs_en-emin)/((emax-emin)/nedos));
-					xas_aben[peak_pos] = exblk.eig[ei]-gs_en;
-					// Peaks position might be different if delta function is too wide, we can fix this by taking the smaller value
-					xas_int[peak_pos] += exp(-beta*gs_en)*pow(abs(cs),2);
+				#pragma omp parallel for reduction (vec_double_plus:xas_int) schedule(dynamic)
+				for (size_t ei = 0; ei < exblk.nev; ++ei) {
+					if (exblk.eig[ei]-gs_en < emin || exblk.eig[ei]-gs_en > emax) continue;
+					dcomp cs = 0;
+					for (auto & b : blap) {
+						size_t gsind = g.second*gsblk.size+b.g;
+						size_t exind = ei*exblk.size+b.e;
+						cs +=  gsblk.eigvec[gsind] * exblk.eigvec[exind] * b.blap;
+					}
+					if (abs(cs) > TOL) { // Is this arbritrary?????	
+						size_t peak_pos = round((exblk.eig[ei]-gs_en-emin)/((emax-emin)/nedos));
+						xas_aben[peak_pos] = exblk.eig[ei]-gs_en;
+						// Peaks position might be different if delta function is too wide, we can fix this by taking the smaller value
+						xas_int[peak_pos] += exp(-beta*gs_en)*pow(abs(cs),2);
+					}
 				}
 			}
 		}
+		// Calculate peak intensity, TODO: output peaks?
+		XAS_peak_occupation(GS,EX,vecd({10}),xas_aben,xas_int,gsi,gs_en,"top",write_output);
 	}
-	// Calculate peak intensity, TODO: output peaks?
-	XAS_peak_occupation(GS,EX,vecd({10}),xas_aben,xas_int,gsi,gs_en,"top",true);
 
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
