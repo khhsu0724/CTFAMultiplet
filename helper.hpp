@@ -74,6 +74,7 @@ namespace ed {
 	void enum_states(std::vector<ulli>& states, ulli n, ulli k, ulli inc = 0, ulli s = 0);
 	ulli add_bits(ulli b1, ulli b2, int b1size, int b2size);
 	int count_bits(ulli b);
+	vecc vec_conj(vecc vin);
 	vecc ctranspose(const vecc& mat, size_t m, size_t n);
 	std::vector<int> distribute(int num_h, int num_at);
 	std::string format_duration(std::chrono::milliseconds ms);
@@ -84,6 +85,7 @@ namespace ed {
 		try {
 			if (a.size() != b.size()) std::invalid_argument("different vector size for dot product");
 			T dp = 0;
+			#pragma omp parallel for
 			for (int i = 0; i < a.size(); ++i) dp += a[i]*b[i];
 			return dp;
 		} catch (const std::exception &ex) {
@@ -92,17 +94,20 @@ namespace ed {
 		}
 	};
 
-	template <typename T> double norm(std::vector<T>& vin) {
+	template <typename T> double norm(const std::vector<T>& vin) {
 		double n = 0;
-		for (auto& v : vin) n += pow(abs(v),2);
+		#pragma omp parallel for reduction (+:n)
+		for (int i = 0; i < vin.size(); ++i) n += pow(abs(vin[i]),2);
 		return sqrt(n);
 	};
 
 	template <typename T> void norm_vec(std::vector<T>& invec) {
 		double norm = 0;
-		for (auto & i : invec) norm += pow(abs(i),2);
+		#pragma omp parallel for reduction (+:norm)
+		for (int i = 0; i < invec.size(); ++i) norm += pow(abs(invec[i]),2);
 		norm = sqrt(norm);
-		for (auto & i : invec) i = i / norm;
+		#pragma omp parallel for
+		for (int i = 0; i < invec.size(); ++i) invec[i] = invec[i] / norm;
 	};
 
 	template <typename T> void norm_ev(T* ev, int n) {

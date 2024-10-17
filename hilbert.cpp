@@ -187,6 +187,11 @@ void Hilbert::fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs)
 	return;
 }
 
+void Hilbert::print_bits(ulli state) {
+	// const int bitnum = (num_corb+num_vorb)*2;
+	cout << bitset<22>(state) << endl; // This is a bit crude
+}
+
 double Hilbert::Fsign(QN* op, ulli state, int opnum) {
 	// Calculate Fermion Sign Problem, return +1 or -1
 	int p = 0;

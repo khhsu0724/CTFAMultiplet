@@ -47,8 +47,10 @@ public:
 	virtual void malloc(int size) = 0;
 	virtual T* get_dense() = 0; // Call this carefully
 	virtual void mvmult(T* vec_in, T* vec_out, int N) = 0;
+	virtual void mvmult_cmplx(vecc& vec_in, vecc& vec_out) = 0; // Unfortunate implementation
 	virtual void clear_mat() = 0;
 	virtual int get_mat_size() = 0;
+	int get_mat_dim() {return this->size;};
 protected:
 	int size = 0;
 };
@@ -80,6 +82,16 @@ public:
 		this->ham = return_uptr<T>(&_ham);
 		return;
 	};
+	void mvmult_cmplx(vecc& vec_in, vecc& vec_out) {
+        // specific case for complex vectors
+        for (int i = 0; i < this->size; ++i) {
+            vec_out[i] = dcomp(0); 
+            for (int j = 0; j < this->size; ++j) {
+                vec_out[i] += this->ham[j*this->size+i]*vec_in[j];
+            }
+        }
+		return;
+	}
 	void clear_mat() {
 		T* _ham = ham.release();
 		ham = nullptr;
@@ -118,28 +130,37 @@ public:
 		return dense;
 	};
 	void mvmult(T* vec_in, T* vec_out, int N) {
-		#pragma omp parallel for
-		for (int i = 0; i < this->size; ++i) vec_out[i] = 0;
-		if (this->mat_type == "S") {
-			#pragma omp parallel for default(shared)
-			for (size_t e = 0; e < val.size(); ++e) {
-				if (indexj[e] == indexi[e])
-					#pragma omp atomic update
-					vec_out[indexj[e]] += val[e] * vec_in[indexi[e]];
-				else {
-					#pragma omp atomic update
-					vec_out[indexj[e]] += val[e] * vec_in[indexi[e]];
-					#pragma omp atomic update
-					vec_out[indexi[e]] += val[e] * vec_in[indexj[e]];
-				}
-			}
-		} else {
-			#pragma omp parallel for shared(vec_out)
-			for (size_t e = 0; e < val.size(); ++e) {
-				#pragma omp atomic update
-				vec_out[indexj[e]] += val[e] * vec_in[indexi[e]];
-			}
-		}
+		this->sparse_mvmult(vec_in,vec_out);
+		return;
+		// #pragma omp parallel for
+		// for (int i = 0; i < this->size; ++i) vec_out[i] = 0;
+		// if (this->mat_type == "S") {
+		// 	#pragma omp parallel for default(shared)
+		// 	for (size_t e = 0; e < val.size(); ++e) {
+		// 		if (indexj[e] == indexi[e])
+		// 			#pragma omp atomic update
+		// 			vec_out[indexj[e]] += val[e] * vec_in[indexi[e]];
+		// 		else {
+		// 			#pragma omp atomic update
+		// 			vec_out[indexj[e]] += val[e] * vec_in[indexi[e]];
+		// 			#pragma omp atomic update
+		// 			vec_out[indexi[e]] += val[e] * vec_in[indexj[e]];
+		// 		}
+		// 	}
+		// } else {
+		// 	#pragma omp parallel for shared(vec_out)
+		// 	for (size_t e = 0; e < val.size(); ++e) {
+		// 		#pragma omp atomic update
+		// 		vec_out[indexj[e]] += val[e] * vec_in[indexi[e]];
+		// 	}
+		// }
+		// return;
+	};
+	void mvmult_cmplx(vecc& vec_in, vecc& vec_out) {
+		// std::cout << "MVMULT_CMPLX!" << indexi.size() << std::endl;
+		if (vec_in.size() != this->size or vec_out.size() != this->size) 
+			std::cout << "MVMULT_CMPLX matrix size mismatch!" << std::endl;
+		this->sparse_mvmult(vec_in.data(),vec_out.data());
 		return;
 	};
 	void clear_mat() {
@@ -152,7 +173,34 @@ public:
 private:
 	std::vector<size_t> indexi;
 	std::vector<size_t> indexj;
-	std::vector<T> val;                    
+	std::vector<T> val;
+	template <typename U>
+	void sparse_mvmult(U* vec_in, U* vec_out) {
+		// Question: OMP critical is slower, but works with complex instead like atomic..
+		#pragma omp parallel for
+		for (int i = 0; i < this->size; ++i) vec_out[i] = 0;
+		if (this->mat_type == "S") {
+			#pragma omp parallel for default(shared)
+			for (size_t e = 0; e < val.size(); ++e) {
+				if (indexj[e] == indexi[e])
+					#pragma omp critical
+					vec_out[indexj[e]] += val[e] * vec_in[indexi[e]];
+				else {
+					#pragma omp critical
+					vec_out[indexj[e]] += val[e] * vec_in[indexi[e]];
+					#pragma omp critical
+					vec_out[indexi[e]] += val[e] * vec_in[indexj[e]];
+				}
+			}
+		} else {
+			// #pragma omp parallel for shared(vec_out)
+			for (size_t e = 0; e < val.size(); ++e) {
+				#pragma omp critical
+				vec_out[indexj[e]] += val[e] * vec_in[indexi[e]];
+			}
+		}
+		return;
+	}                    
 };
 
 // A wrapper class for boost Sparse Matrix

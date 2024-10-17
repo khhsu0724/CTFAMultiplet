@@ -94,6 +94,74 @@ void ed_dsarpack(Matrix<Real>* ham, Real *_eigvec, Real* _eigval, size_t n, size
 #endif
 
 template <typename T>
+int Lanczos(Matrix<T>* ham, const vecc& v0, vecc& alpha, vecc& betha, int niter_CFE=150) {
+	// returns new niter_CFE value
+	int hsize = ham->get_mat_dim();
+	// std::cout << "Hdim: " << hsize  << "," << v0.size() << std::endl;
+	vecc phip(hsize,0);
+	vecc phipp(hsize,0);
+	vecc phil(hsize,0);
+	// Normalize the vector
+	vecc phi = v0;
+	ed::norm_vec(phi);
+
+	for (int i = 0; i < niter_CFE; ++i) {
+		ham->mvmult_cmplx(phi,phip);
+		dcomp alpha_element(0);
+		#pragma omp parallel for reduction (+:alpha_element)
+		for (int j = 0; j < hsize; ++j) alpha_element += std::conj(phi[j])*phip[j];
+		alpha[i] = alpha_element;
+		if (i != 0) {
+			#pragma omp parallel for 
+			for (int j = 0; j < hsize; ++j) phip[j] -= betha[i] * phil[j];
+		}
+		#pragma omp parallel for 
+		for (int j = 0; j < hsize; ++j) phipp[j] = phip[j] - alpha[i] * phi[j];
+		if (i != niter_CFE-1) {
+			betha[i+1] = ed::norm(phipp);
+			if (std::abs(betha[i+1]) < 1E-13) {
+				std::cout << "Lanzcos ended after: " << i << " steps." << std::endl;
+				niter_CFE = i;
+				break;
+			}
+			phil = phi;
+			#pragma omp parallel for
+			for (int j = 0; j < hsize; ++j) phi[j] = phipp[j]/betha[i+1];
+		}
+	}
+	return niter_CFE;
+};
+
+template <typename T>
+void ContFracExpan(Matrix<T>* ham, const vecc& v0, double E0, vecd& specX, vecd& specY, 
+					double eps = 0.1, int niter_CFE=150) {
+	// This solver specifically does not subtract elastic scattering
+	// specX should specify: minE, maxE, nedos
+	int nedos = specX.size();
+	vecc intensity(nedos,0);
+	double factor = ed::norm(v0);
+	factor = factor*factor;
+	// std::cout << "FACTOR: " << factor << std::endl;
+	vecc alpha(niter_CFE,0);
+	vecc betha(niter_CFE,0);
+	niter_CFE = Lanczos(ham,v0,alpha,betha,niter_CFE);
+	// for (int i = 0; i < niter_CFE; ++i) std::cout << "a: " << alpha[i] << ", b: " << betha[i] << std::endl;
+	#pragma omp parallel for shared(intensity,specY,alpha,betha)
+	for (int i = 0; i < nedos; ++i) {
+		dcomp z = dcomp(specX[i]+E0,eps);
+		intensity[i] = z - alpha[niter_CFE-1];
+		for (int j = 1; j < niter_CFE; ++j) {
+			intensity[i] = z - alpha[niter_CFE-j-1] - 
+							(pow(betha[niter_CFE-j],2)/intensity[i]);
+		}
+		specY[i] += -1/PI * std::imag(factor/intensity[i]);
+	}
+
+	return;
+}
+
+
+template <typename T>
 class Block  {
 private:
 	double Sz = 0, Jz = 0, K = 0;
@@ -136,7 +204,7 @@ public:
 		if (size >= 1e5) {
 			this->diag_option = 4;
 			ham = new EZSparse<double>();
-		} else if (size <= 5e3) {
+		} else if (size <= 2e3) {
 			this->diag_option = 2;
 			ham = new Dense<double>();
 		} else {
@@ -147,7 +215,7 @@ public:
 		}
 		ham->malloc(size);
 	};
-	void diagonalize(size_t nev_in = 20) {
+	void diagonalize(size_t nev_in = 20, bool clear_mat = true) {
 		// Options: 1. DGEES 2. DSYEVR (MRRR) 3. DSYEV (Shifted QR) 
 		// 4. ARPACK (Lanczos)
 		int option = this->diag_option;
@@ -181,7 +249,7 @@ public:
 			ed_dsarpack(ham,_eigvec,_eig,size,nev);
 			eigvec = return_uptr<double>(&_eigvec);
 			eig = return_uptr<double>(&_eig);
-			ham->clear_mat();
+			if (clear_mat) ham->clear_mat();
 		} else throw std::invalid_argument("invalid diagonalize method");
 		return;
 	}
