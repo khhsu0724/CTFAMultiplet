@@ -11,3 +11,6 @@ This project provides a **charge transfer full atomic multiplet code** designed 
 - **ARPACK** (Optional, but recommended) 
 
 For detailed input cards, please refer to the **[Wiki](https://github.com/khhsu0724/CTFAMultiplet/wiki/Input-Parameters)**.
+
+## Compile and running
+See **[this link](https://github.com/khhsu0724/CTFAMultiplet/wiki/Getting-Started#how-to-compile-this-code)**.
