@@ -416,8 +416,15 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 		start = chrono::high_resolution_clock::now();
 		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
 		// Only need the lowest eigenvalue if using Lanczos
-		if (pm.spec_solver == 4) EX.hblks[e].diagonalize(5,clear_mat);
-		else EX.hblks[e].diagonalize(hparam.ex_nev,clear_mat);
+		if (hparam.ex_nev > 0) {
+			if (pm.spec_solver == 4) EX.hblks[e].diagonalize(5,clear_mat);
+			else EX.hblks[e].diagonalize(hparam.ex_nev,clear_mat);
+		} else {
+			if (pm.spec_solver != 4) {
+				cout << "WARNING: EXNEV = 0" << endl;
+				exit(1);
+			} else cout << "skipping core-hole state diagonalization" << endl;
+		}
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -438,6 +445,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 			exmin_ind.push_back({i,j});
 		}
 	}}
+	if (pm.incident[2] == -1) pm.set_incident_points(true,gs_en,ex_min_en);
 	dos_eigenenergy(EX,10,"exdos.txt","exeig.txt");
 	wvfnc_weight(EX,exmin_ind,3,true);
 	// all_eig = EX.get_all_eigval(true);
@@ -467,57 +475,6 @@ int main(int argc, char** argv){
 	// Reading and Checking input parameters
 	auto run_start = chrono::high_resolution_clock::now();
 	cout << "Reading files..." << endl;
-	// EZSparse<double> *mat = new EZSparse<double>();
-	// std::ifstream infile("../ResRaman/Ham.txt");
-    // if (!infile.is_open()) {
-    //     throw std::runtime_error("Unable to open file");
-    // }
-    // int N = 400;
-    // mat->malloc(N);
-    // for (int i = 0; i < N; ++i) {
-    //     for (int j = 0; j < N; ++j) {
-    //         double value;
-    //         infile >> value;
-    //         mat->fill_mat(i, j, value);
-    //     }
-    // }
-    // int nev = 10;
-    // auto eig = new double[nev]{0};
-	// auto eigvec = new double[N*nev]{0};
-	// ed_dsarpack(mat,eigvec,eig,N,nev);
-	// cout << "E0: " << eig[0] << endl;
-
-	// std::ifstream jxfile("../ResRaman/jxvec.dat");
-    // if (!jxfile.is_open()) {
-    //     throw std::runtime_error("Unable to open file");
-    // }
-    // vecc jxvec(N,0);
-    // for (int i = 0; i < N; ++i) {
-    //     string value;
-    //     jxfile >> value;
-    //     // cout << value << endl;
-    //     value.erase(0, 1);  // Remove '('
-    //     value.erase(value.size() - 1);  // Remove ')'
-    //     size_t plus_pos = value.find('+');
-    //     size_t minus_pos = value.find('-', 1);  // Start searching for '-' after the first character
-        
-    //     size_t pos = (plus_pos != std::string::npos) ? plus_pos : minus_pos;
-    //     double real = std::stod(value.substr(0, pos));
-    //     double imag = std::stod(value.substr(pos, value.size() - pos - 1));  // Remove 'j'
-    //     // cout << real << "," << imag << endl;
-    //     jxvec[i] = dcomp(real,imag);
-    //     // cout << jxvec[i] << endl;
-    // }
-    // int nedos = int(40/0.04)+1;
-	// vecd xas_aben(nedos,0), xas_int(nedos,0);
-	// for (int i = 0; i < nedos; ++i) xas_aben[i] = i * 0.1;
-	// // dcomp z = dcomp(-3.313594932617293,1);
-	// // auto midvec = BiCGS(mat,jxvec,z);
-	// // for (int i = 0; i < 400; ++i) cout << midvec[i] << "," << endl;
-    // ContFracExpan(mat,jxvec,eig[0],xas_aben,xas_int,0.1,150);
-    // write_XAS(xas_aben,xas_int,"test-jxvec.txt",false);
-	// return 0;
-
 	auto start = chrono::high_resolution_clock::now();
 	PM pm;
 	HParam hparam; 
@@ -635,11 +592,6 @@ int main(int argc, char** argv){
 	cout << "Incident (For solver = 4): ";
 	for (int i = 0; i < 3; ++i) cout << pm.incident[i] << ", ";
 	cout << endl;
-	cout << "Energy points: ";
-	if (pm.inc_e_points.size() != 0)
-		for (auto &inc_e : pm.inc_e_points) cout << inc_e << ", ";
-	cout << endl;
-
 	// Reading and Checking input parameters
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -649,6 +601,11 @@ int main(int argc, char** argv){
 	// Calculate Cross Sections
 	vector<double> pvin = pm.pvin, pvout = pm.pvout;
 
+	cout << "RIXS Energy points: ";
+	if (pm.inc_e_points.size() != 0)
+		for (auto &inc_e : pm.inc_e_points) cout << inc_e << ", ";
+	cout << endl;
+	exit(0);
 	if (pm.XAS) {
 		for (size_t in = 0; in < 3; ++in) {
 			fill(pm.pvin.begin(), pm.pvin.end(), 0);

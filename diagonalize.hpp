@@ -22,13 +22,6 @@
 #endif
 
 #pragma omp declare reduction(+:dcomp:omp_out=omp_out+omp_in) initializer (omp_priv=omp_orig)
-// #pragma omp declare reduction(vec_dcomp_plus : std::vector<dcomp> : \
-// 		std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<dcomp>())) \
-// 		initializer(omp_priv = decltype(omp_orig)(omp_orig.size()))
-
-// #pragma omp declare reduction(complex_sum : dcomp : \
-// 		std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<dcomp>())) \
-// 		initializer(omp_priv = decltype(omp_orig)(omp_orig.size()))
 
 void ed_dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n);
 void ed_dsyev(double *_mat, double *_eigval, size_t n);
