@@ -199,6 +199,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 					bool skip = false;
 					double pvtmp[3]{0};
 					double abrange_temp[2]{0};
+					double incident_temp[3]{0};
 					for (int s = 0; s < line.size() && !skip; ++s) {
 						if (line[s] != ' ' && line[s] != '	' && line[s] != '=') p.push_back(line[s]);
 						else {
@@ -228,12 +229,21 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 							}
 							// Spectroscopy solver, 1: Exact Solution, 2: Classic KH, 3: 1+2, 4 (To do): Cont FE, Biconj
 							else if (p == "SOLVER") skip = read_num(line.substr(s+1,line.size()-1),&pm.spec_solver,1);
-							else if (p == "GAMMA") skip = read_num(line.substr(s+1,line.size()-1),&pm.gamma,1);
+							else if (p == "EPSAB") skip = read_num(line.substr(s+1,line.size()-1),&pm.eps_ab,1);
+							else if (p == "EPSLOSS") skip = read_num(line.substr(s+1,line.size()-1),&pm.eps_loss,1);
+							else if (p == "NITERCFE") skip = read_num(line.substr(s+1,line.size()-1),&pm.niterCFE,1);
+							else if (p == "CGTOL") skip = read_num(line.substr(s+1,line.size()-1),&pm.CG_tol,1);
 							else if (p == "NEDOS") skip = read_num(line.substr(s+1,line.size()-1),&pm.nedos,1);
+							else if (p == "ABMAX") skip = read_num(line.substr(s+1,line.size()-1),&pm.abmax,1);
 							else if (p == "SPINFLIP") skip = read_bool(line.substr(s+1,line.size()-1),pm.spin_flip);
 							else if (p == "AB") {
 								skip = read_num(line.substr(s+1,line.size()-1),abrange_temp,2);
 								for (int i = 0; i < 2; ++i) pm.ab_range[i] = abrange_temp[i];
+							}
+							else if (p == "INCIDENT") {
+								skip = read_num(line.substr(s+1,line.size()-1),incident_temp,3);
+								for (int i = 0; i < 3; ++i) pm.incident[i] = incident_temp[i];
+								pm.set_incident_points();
 							}
 							else if (p == "EM") skip = read_num(line.substr(s+1,line.size()-1),&pm.em_energy,1);
 							p = "";
@@ -438,6 +448,13 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	occupation(EX,exmin_ind,true);
 	wvfnc_weight(EX,exmin_ind,3);
 	cout << endl << "Total diagonalize run time: " << ed::format_duration(diag_duration) << endl << endl;
+
+	if (pm.abmax != -1) {
+		pm.ab_range[0] = ex_min_en - gs_en - 4;
+		pm.ab_range[1] = pm.ab_range[0] + pm.abmax;
+		cout << "======> NEW AB range: " << pm.ab_range[0] << ", " << pm.ab_range[1] << endl;
+	}
+
 	return;
 }
 
@@ -450,6 +467,56 @@ int main(int argc, char** argv){
 	// Reading and Checking input parameters
 	auto run_start = chrono::high_resolution_clock::now();
 	cout << "Reading files..." << endl;
+	// EZSparse<double> *mat = new EZSparse<double>();
+	// std::ifstream infile("../ResRaman/Ham.txt");
+    // if (!infile.is_open()) {
+    //     throw std::runtime_error("Unable to open file");
+    // }
+    // int N = 400;
+    // mat->malloc(N);
+    // for (int i = 0; i < N; ++i) {
+    //     for (int j = 0; j < N; ++j) {
+    //         double value;
+    //         infile >> value;
+    //         mat->fill_mat(i, j, value);
+    //     }
+    // }
+    // int nev = 10;
+    // auto eig = new double[nev]{0};
+	// auto eigvec = new double[N*nev]{0};
+	// ed_dsarpack(mat,eigvec,eig,N,nev);
+	// cout << "E0: " << eig[0] << endl;
+
+	// std::ifstream jxfile("../ResRaman/jxvec.dat");
+    // if (!jxfile.is_open()) {
+    //     throw std::runtime_error("Unable to open file");
+    // }
+    // vecc jxvec(N,0);
+    // for (int i = 0; i < N; ++i) {
+    //     string value;
+    //     jxfile >> value;
+    //     // cout << value << endl;
+    //     value.erase(0, 1);  // Remove '('
+    //     value.erase(value.size() - 1);  // Remove ')'
+    //     size_t plus_pos = value.find('+');
+    //     size_t minus_pos = value.find('-', 1);  // Start searching for '-' after the first character
+        
+    //     size_t pos = (plus_pos != std::string::npos) ? plus_pos : minus_pos;
+    //     double real = std::stod(value.substr(0, pos));
+    //     double imag = std::stod(value.substr(pos, value.size() - pos - 1));  // Remove 'j'
+    //     // cout << real << "," << imag << endl;
+    //     jxvec[i] = dcomp(real,imag);
+    //     // cout << jxvec[i] << endl;
+    // }
+    // int nedos = int(40/0.04)+1;
+	// vecd xas_aben(nedos,0), xas_int(nedos,0);
+	// for (int i = 0; i < nedos; ++i) xas_aben[i] = i * 0.1;
+	// // dcomp z = dcomp(-3.313594932617293,1);
+	// // auto midvec = BiCGS(mat,jxvec,z);
+	// // for (int i = 0; i < 400; ++i) cout << midvec[i] << "," << endl;
+    // ContFracExpan(mat,jxvec,eig[0],xas_aben,xas_int,0.1,150);
+    // write_XAS(xas_aben,xas_int,"test-jxvec.txt",false);
+	// return 0;
 
 	auto start = chrono::high_resolution_clock::now();
 	PM pm;
@@ -533,7 +600,13 @@ int main(int argc, char** argv){
 		cout << "Calculated effective delta: " << del + hparam.MLdelta << endl;
 	}
 	cout << "solver options: " <<  pm.spec_solver << endl;
-	if (pm.spec_solver == 4) cout << "Lanczos/BiCGS Methods" << endl;
+	if (pm.spec_solver == 4) {
+		cout << "Lanczos/BiCGS Methods" << endl;
+		cout << "absorption broadening: " << pm.eps_ab << endl;
+		cout << "loss broadening: " << pm.eps_loss << endl;
+		cout << "conjugate gradient tolerance: " << pm.CG_tol << endl;
+		cout << "CFE iterations: " << pm.niterCFE << endl;
+	}
 	else if (pm.RIXS) {
 		if (pm.eloss) cout << "	Using energy loss" << endl;
 		else cout << "	WARNING: All spectroscopy will be outputted as energy loss" << endl;
@@ -541,7 +614,7 @@ int main(int argc, char** argv){
 		if (pm.spec_solver == 1 || pm.spec_solver == 3)
 			cout << "	Output exact RIXS peaks" << endl;
 		if (pm.spec_solver == 2 || pm.spec_solver == 3)
-			cout << "	Evaluate K-H equation, Gamma: " << pm.gamma << endl;
+			cout << "	Evaluate K-H equation, Gamma: " << pm.eps_loss << endl;
 	}
 	cout << "photon edge: " << pm.edge << endl;
 	cout << "pvin: ";
@@ -549,10 +622,23 @@ int main(int argc, char** argv){
 	cout << endl << "pvout: ";
 	for (int i = 0; i < 3; ++i) cout << pm.pvout[i] << ", ";
 	cout << endl;
-	cout << "absorption range: ";
-	for (int i = 0; i < 2; ++i) cout << pm.ab_range[i] << ", ";
+	if (pm.abmax != -1) {
+		cout << "ABMAX (overriding AB): ";
+		cout << pm.abmax << endl;
+	} else {
+		cout << "absorption range: ";
+		for (int i = 0; i < 2; ++i) cout << pm.ab_range[i] << ", ";
+		cout << endl;
+	}
+	cout << "Loss energy (for RIXS): " << pm.em_energy << endl;
+
+	cout << "Incident (For solver = 4): ";
+	for (int i = 0; i < 3; ++i) cout << pm.incident[i] << ", ";
 	cout << endl;
-	cout << "emission range: " << pm.em_energy << endl;
+	cout << "Energy points: ";
+	if (pm.inc_e_points.size() != 0)
+		for (auto &inc_e : pm.inc_e_points) cout << inc_e << ", ";
+	cout << endl;
 
 	// Reading and Checking input parameters
 	auto stop = chrono::high_resolution_clock::now();
@@ -562,6 +648,7 @@ int main(int argc, char** argv){
 	process_hilbert_space(GS,EX,hparam,pm);
 	// Calculate Cross Sections
 	vector<double> pvin = pm.pvin, pvout = pm.pvout;
+
 	if (pm.XAS) {
 		for (size_t in = 0; in < 3; ++in) {
 			fill(pm.pvin.begin(), pm.pvin.end(), 0);

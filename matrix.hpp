@@ -46,9 +46,11 @@ public:
 	virtual void fill_mat(int lind, int rind, T elem) = 0;
 	virtual void malloc(int size) = 0;
 	virtual T* get_dense() = 0; // Call this carefully
+	virtual void reset_ham(T** arr) {return;};
 	virtual void mvmult(T* vec_in, T* vec_out, int N) = 0;
 	virtual void mvmult_cmplx(vecc& vec_in, vecc& vec_out) = 0; // Unfortunate implementation
 	virtual void clear_mat() = 0;
+	virtual void is_symmetric() = 0; // Only Support Dense Matrices
 	virtual int get_mat_size() = 0;
 	int get_mat_dim() {return this->size;};
 protected:
@@ -73,6 +75,9 @@ public:
 		ham = nullptr;
 		return _ham;
 	};
+	void reset_ham(T** arr) {
+		ham = return_uptr(arr);
+	}
 	void mvmult(T* vec_in, T* vec_out, int n) {
 		T* _ham = this->get_dense();
 		lpk_int N = n, lda = N, inc = 1;
@@ -84,6 +89,7 @@ public:
 	};
 	void mvmult_cmplx(vecc& vec_in, vecc& vec_out) {
         // specific case for complex vectors
+        #pragma omp parallel for //collapse(2)
         for (int i = 0; i < this->size; ++i) {
             vec_out[i] = dcomp(0); 
             for (int j = 0; j < this->size; ++j) {
@@ -97,6 +103,17 @@ public:
 		ham = nullptr;
 		delete [] _ham;
 		return;
+	}
+	void is_symmetric() {
+		for (int i = 0; i < this->size; ++i) {
+            for (int j = i+1; j < this->size; ++j) {
+            	if (std::abs(ham[i*this->size+j]-ham[j*this->size+i]) < TOL) {
+            		std::cout << "Entry different: " << i << "," << j << ", elem: " <<
+            			ham[i*this->size+j] << "," << ham[j*this->size+i];
+            	}
+            }
+        }
+        return;
 	}
 	int get_mat_size() {return this->size * this->size;};
 private:
@@ -132,32 +149,8 @@ public:
 	void mvmult(T* vec_in, T* vec_out, int N) {
 		this->sparse_mvmult(vec_in,vec_out);
 		return;
-		// #pragma omp parallel for
-		// for (int i = 0; i < this->size; ++i) vec_out[i] = 0;
-		// if (this->mat_type == "S") {
-		// 	#pragma omp parallel for default(shared)
-		// 	for (size_t e = 0; e < val.size(); ++e) {
-		// 		if (indexj[e] == indexi[e])
-		// 			#pragma omp atomic update
-		// 			vec_out[indexj[e]] += val[e] * vec_in[indexi[e]];
-		// 		else {
-		// 			#pragma omp atomic update
-		// 			vec_out[indexj[e]] += val[e] * vec_in[indexi[e]];
-		// 			#pragma omp atomic update
-		// 			vec_out[indexi[e]] += val[e] * vec_in[indexj[e]];
-		// 		}
-		// 	}
-		// } else {
-		// 	#pragma omp parallel for shared(vec_out)
-		// 	for (size_t e = 0; e < val.size(); ++e) {
-		// 		#pragma omp atomic update
-		// 		vec_out[indexj[e]] += val[e] * vec_in[indexi[e]];
-		// 	}
-		// }
-		// return;
 	};
 	void mvmult_cmplx(vecc& vec_in, vecc& vec_out) {
-		// std::cout << "MVMULT_CMPLX!" << indexi.size() << std::endl;
 		if (vec_in.size() != this->size or vec_out.size() != this->size) 
 			std::cout << "MVMULT_CMPLX matrix size mismatch!" << std::endl;
 		this->sparse_mvmult(vec_in.data(),vec_out.data());
@@ -169,6 +162,9 @@ public:
 		val = std::vector<T>();
 		return;
 	};
+	void is_symmetric() {
+		std::cout << "Can't check symmetric matrix now" << std::endl;
+	}
 	int get_mat_size() {return val.size();};
 private:
 	std::vector<size_t> indexi;

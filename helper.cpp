@@ -106,3 +106,21 @@ void ed::parse_num(std::string complex_string, dcomp& complex_num) {
 	complex_num = dcomp(real,imag);
 	return;
 }
+
+void ed::write_vecc(vecc vec, size_t x, size_t y, std::string file_dir, std::string delim) {
+	// Specifically write to python readable format
+	std::ofstream matfile;
+    matfile.open(file_dir);
+	for (int j = 0; j < y; ++j) {
+    	for (int i = 0; i < x; ++i) {
+    		double r = std::real(vec.at(i+x*j));
+    		double c = std::imag(vec.at(i+x*j));
+    		matfile << std::setprecision(5) << r;
+    		if (c >= 0) matfile << "+";
+    		matfile << std::setprecision(5) << c << "j";
+    		if (i < x-1) matfile << delim;
+    	}
+    	matfile << "\n";
+    }
+    matfile.close();
+};

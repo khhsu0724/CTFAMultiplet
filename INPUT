@@ -1,41 +1,40 @@
 &CONTROL
-	SO = 0 0 # TM p/d spin orbit coupling
-	#SC1 = 1.0 0 0 #F_0,2 for l = 1
-	SC2 = 0 0 0 0 1
-	#SC2EX = 6.55 0 0.125 0 0.025 # SC2 for excited state
-	#FG = 6.5 5.066 6.680 2.882 #F^0,G^1,F^2,G^2
-	FG = 0 0 0 0 #F^0,G^1
-	CF = 0 0 0 0 0
-	tpd = 0
-	tpp = 0
-	MLCT = 0
-	EFFDEL = True
-	HFSCALE = 0.8
-	tppsigma = True
-	DIAG = 4
-	EXNEV = 1500
-	GSNEV = 50
-	OVERWRITE = True # Overwrite photon file in the directory
+        SO = 9.76 # Spin orbit coupling (eV)
+        SC1 = 1.0 0 0.1 #F_0,2 for l = 1 
+        SC2 = 4.5 0 0.189453 0 0.013078
+        SC2EX = 4.5 0 0.202367 0 0.013981
+        FG = 4.5 4.315 5.807 2.454
+        HFscale = 1.0
+        CF = 0 0 1.2 1.2 1.2
+        tpd = 0.6 
+        tpp = 0 
+        MLCT = 3.5
+        TPDZR = 1
+        DIAG = 4
+        #EFFDEL = False 
+        EXNEV = 4500
+        GSNEV = 1000 
+        OVERWRITE = True # Overwrite photon file in the directory
 /
 &CELL
-	#Coordination = "oct" # Defaults to no coordination
-     #HYBMAT = “” # directory, Please see Cluster::get_inp_tmat()
-     #Coordination = “OCTAHEDRAL”
-     Sites = 1 # x,y,z, Defaults to 1 site
-     Holes = 4 # If this is read then &Atom’s will be skipped
+        Coordination = "Square Planar" # Defaults to no coordination
+        Sites = 1 # x,y,z, Defaults to 1 site
+        Holes = 3
 /
 &PHOTON
-    XAS = False
-    RIXS = False
-    pvin = 1 1 1
-    pvout = 1 1 1
-    Edge = L
-    Eloss = false
-    Solver = 3
-    NEDOS = 2000 # Number of bins for XAS/RIXS
-    AB = -25 25
-    EM = 15
-    # spinflip = true # RIXS spin flip
-/
-&HYB # Fill in information about hybdridization matrix
+        XAS = false
+        RIXS = true
+        #pvin = 1 1 1 
+        #pvout = 1 1 1  
+        pvin = 1 0 0  
+        pvout = 0 1 0  
+        epsloss = 1
+        epsab = 0.1
+        solver = 4
+        Edge = L  
+        NEDOS = 2000          # If XAS, number of bins for XAS. If RIXS, number of bins for loss energy
+        AB = -25 25           ## 2 values: range
+        ABMAX = 30            ## auto determine the start, overrides AB
+        INCIDENT = -1 1 2     ### start E, end E, number of points.
+        EM = 8                ### max_loss
 /

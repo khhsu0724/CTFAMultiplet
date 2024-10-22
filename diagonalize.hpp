@@ -160,12 +160,104 @@ void ContFracExpan(Matrix<T>* ham, const vecc& v0, double E0, vecd& specX, vecd&
 	return;
 }
 
+template <typename T>
+vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8, int max_iter = 2e4) {
+	// Modified from Eigen, without preconditioner
+	// See https://github.com/cryos/eigen/blob/master/Eigen/src/IterativeLinearSolvers/BiCGSTAB.h
+	int hsize = ham->get_mat_dim();
+	vecc r(hsize,0), r0(hsize,0), x(hsize,0), x0(hsize,0);
+	// for (int j = 0; j < hsize; ++j) // Compute r0 = b - Ax, here x is started with 0
+	// 	r[j] = b[j];
+	r = b;
+	r0 = r;
+	dcomp omega = 10.0, w_old = 0;
+	dcomp rho = 1.0, alpha = 1.0, rho_old = 1.0;
+    vecc v(hsize,0), p(hsize,0), h(hsize,0);
+    vecc s(hsize,0), t(hsize,0);
+    double r0sqnorm = ed::norm(r0,true);
+    int i = 0;
+    while (ed::norm(r,true) > CG_tol and i < max_iter) {
+    	// STEP 1: rho = (r0,r)
+    	omega = w_old; // This is necessary, but I don't know why
+    	if (i%50 == 0) {
+	    	std::cout << std::setprecision(15);
+	        std::cout << "iter: " << i << ", redisual: " << ed::norm(r,true) << std::endl;
+	    }
+    	rho  = 0;
+    	#pragma omp parallel for reduction (+:rho)
+		for (int j = 0; j < hsize; ++j) rho += std::conj(r0[j])*r[j];
+		// if (std::real(rho) < 1e-12) {
+		// 	std::cout << "New search direction cannot be found in BiCGStab" << std::endl;
+		// 	break;
+		// }
+		// std::cout << "rho: " << rho << std::endl;
+		if (i > 0) {
+			// STEP 2: beta = (rho_i/rho_i-1)(alpha/w)
+			dcomp beta = (rho/rho_old) * (alpha/omega);
+			// std::cout << "beta: " << beta << std::endl;
+			// STEP 3: p = r + beta(p-wv)
+			#pragma omp parallel for
+			for (int j = 0; j < hsize; ++j)
+	            p[j] = r[j] + beta * (p[j] - omega * v[j]);
+	    } else {
+	    	s = vecc(hsize,0);
+	    	p = r;
+	    }
+        // STEP 4: v = A*p
+        ham->mvmult_cmplx(p,v);  
+        #pragma omp parallel for
+        for (int j = 0; j < hsize; ++j)
+        	v[j] -= p[j]*z;
+        // STEP 5: alpha = rho/(r0,v)
+        dcomp rv = 0;
+        #pragma omp parallel for reduction (+:rv)
+		for (int j = 0; j < hsize; ++j) rv += std::conj(r0[j])*v[j];
+        alpha = rho/rv;
+		// std::cout << "alpha: " << alpha << std::endl;
+    	// STEP 6: h = x + alpha*p
+    	// #pragma omp parallel for
+		// for (int j = 0; j < hsize; ++j)
+        //     h[j] = x[j] + alpha * p[j];
+        // STEP 7: s = r - alpha*v
+    	#pragma omp parallel for
+		for (int j = 0; j < hsize; ++j)
+            r[j] -= alpha * v[j];
+        s = r;
+        // STEP 8: t = A*s
+        ham->mvmult_cmplx(s,t);  
+        #pragma omp parallel for
+        for (int j = 0; j < hsize; ++j)
+        	t[j] -= s[j]*z;
+        // STEP 9: w = (t,s)/(t,t)
+        dcomp omega = 0;
+        #pragma omp parallel for reduction (+:omega)
+		for (int j = 0; j < hsize; ++j) omega += std::conj(t[j])*s[j];
+		omega /= ed::norm(t,true);
+		// std::cout << "omega: " << omega << std::endl;
+		// STEP 10: x = h + w*s
+		#pragma omp parallel for
+        for (int j = 0; j < hsize; ++j)
+        	x[j] += alpha * p[j] + omega * s[j];
+        	// x[j] = h[j] + w * s[j];
+        // STEP 11: r = s -w*t
+        #pragma omp parallel for
+        for (int j = 0; j < hsize; ++j)
+        	r[j] -= omega * t[j];
+        rho_old = rho;
+        w_old = omega;
+        ++i;
+    }
+    std::cout << "CG finished with " << i << " iterations" << std::endl;
+    std::cout << "Ridisual: " << ed::norm(r,true) << std::endl;
+    if (i >= max_iter) std::cout << "CG not converged: " << ed::norm(r,true) << std::endl;
+    return x;
+}
 
 template <typename T>
 class Block  {
 private:
 	double Sz = 0, Jz = 0, K = 0;
-	double *_ham, *_eig, *_eigvec; // Implicit pointer that faciliates diagonalization
+	double *_ham, *_eig, *_eigvec, *_ham_copy; // Implicit pointer that faciliates diagonalization
 public:
 	size_t size, f_ind; // Accumulated first index of this Block
 	size_t nev;			// Number of eigenvalues
@@ -222,14 +314,17 @@ public:
 		if (option == 1 || option == 2) {
 			nev = size;
 			_ham = ham->get_dense();
+			if (!clear_mat) {
+				// lapack deletes hamiltonian, keeping it
+				_ham_copy = new double[size*size]{0};
+				#pragma omp parallel for 
+				for (int i = 0; i < size*size; ++i) _ham_copy[i] = _ham[i];
+				ham->reset_ham(&_ham_copy);
+			}
 			_eig = new double[nev]{0};
 			_eigvec = new double[size*nev]{0};
 			if (option == 1) ed_dgees(_ham,_eigvec,_eig,size);
 			else if (option == 2) ed_dsyevr(_ham,_eigvec,_eig,size);
-			// Sanity check for small matrices
-			// std::cout << "Diag size: " << size << std::endl;
-			// for (int i = 0; i < size; ++i) std::cout << _eig[i] << ", ";
-			// std::cout << std::endl;
 			eigvec = return_uptr<double>(&_eigvec);
 			eig = return_uptr<double>(&_eig);
 			delete [] _ham;
