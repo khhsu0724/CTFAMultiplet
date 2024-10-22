@@ -21,6 +21,15 @@
 #include <arpack.hpp>
 #endif
 
+#pragma omp declare reduction(+:dcomp:omp_out=omp_out+omp_in) initializer (omp_priv=omp_orig)
+// #pragma omp declare reduction(vec_dcomp_plus : std::vector<dcomp> : \
+// 		std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<dcomp>())) \
+// 		initializer(omp_priv = decltype(omp_orig)(omp_orig.size()))
+
+// #pragma omp declare reduction(complex_sum : dcomp : \
+// 		std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<dcomp>())) \
+// 		initializer(omp_priv = decltype(omp_orig)(omp_orig.size()))
+
 void ed_dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n);
 void ed_dsyev(double *_mat, double *_eigval, size_t n);
 void ed_dsyevr(double *_mat, double *_eigvec, double* _eigReal, size_t n);
@@ -93,6 +102,10 @@ void ed_dsarpack(Matrix<Real>* ham, Real *_eigvec, Real* _eigval, size_t n, size
 };
 #endif
 
+// std::complex<double> complex_sum(std::complex<double> a, std::complex<double> b) {
+//     return a + b;
+// }
+
 template <typename T>
 int Lanczos(Matrix<T>* ham, const vecc& v0, vecc& alpha, vecc& betha, int niter_CFE=150) {
 	// returns new niter_CFE value
@@ -162,7 +175,7 @@ void ContFracExpan(Matrix<T>* ham, const vecc& v0, double E0, vecd& specX, vecd&
 
 template <typename T>
 vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8, int max_iter = 2e4) {
-	// Modified from Eigen, without preconditioner
+	// Modified from Eigen, with diagonal preconditioner 1/(ham-z)
 	// See https://github.com/cryos/eigen/blob/master/Eigen/src/IterativeLinearSolvers/BiCGSTAB.h
 	int hsize = ham->get_mat_dim();
 	vecc r(hsize,0), r0(hsize,0), x(hsize,0), x0(hsize,0);
@@ -172,8 +185,8 @@ vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8, i
 	r0 = r;
 	dcomp omega = 10.0, w_old = 0;
 	dcomp rho = 1.0, alpha = 1.0, rho_old = 1.0;
-    vecc v(hsize,0), p(hsize,0), h(hsize,0);
-    vecc s(hsize,0), t(hsize,0);
+    vecc v(hsize,0), t(hsize,0), h(hsize,0);
+    vecc s(hsize,0), p(hsize,0), shat(hsize,0), phat(hsize,0);
     double r0sqnorm = ed::norm(r0,true);
     int i = 0;
     while (ed::norm(r,true) > CG_tol and i < max_iter) {
@@ -181,7 +194,9 @@ vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8, i
     	omega = w_old; // This is necessary, but I don't know why
     	if (i%50 == 0) {
 	    	std::cout << std::setprecision(15);
-	        std::cout << "iter: " << i << ", redisual: " << ed::norm(r,true) << std::endl;
+	        std::cout << "iter: " << i << ", redisual: " << ed::norm(r,true);
+	        if (i!=0) std::cout << ", s:" << ed::norm(s,true);
+	        std::cout << std::endl;
 	    }
     	rho  = 0;
     	#pragma omp parallel for reduction (+:rho)
@@ -203,11 +218,12 @@ vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8, i
 	    	s = vecc(hsize,0);
 	    	p = r;
 	    }
-        // STEP 4: v = A*p
-        ham->mvmult_cmplx(p,v);  
+        // STEP 4: v = A*p (adding precondition)
+        phat = ham->precond(p,z);
+        ham->mvmult_cmplx(phat,v);  
         #pragma omp parallel for
         for (int j = 0; j < hsize; ++j)
-        	v[j] -= p[j]*z;
+        	v[j] -= phat[j]*z;
         // STEP 5: alpha = rho/(r0,v)
         dcomp rv = 0;
         #pragma omp parallel for reduction (+:rv)
@@ -223,11 +239,20 @@ vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8, i
 		for (int j = 0; j < hsize; ++j)
             r[j] -= alpha * v[j];
         s = r;
-        // STEP 8: t = A*s
-        ham->mvmult_cmplx(s,t);  
+        if (ed::norm(s,true) <= CG_tol) {
+        	// Testing
+        	#pragma omp parallel for
+	        for (int j = 0; j < hsize; ++j)
+	        	x[j] += alpha*phat[j];
+        	std::cout << "s converged" << std::endl;
+        	break;
+        }
+        // STEP 8: t = A*s (adding preconditioning)
+        shat = ham->precond(s,z);
+        ham->mvmult_cmplx(shat,t);  
         #pragma omp parallel for
         for (int j = 0; j < hsize; ++j)
-        	t[j] -= s[j]*z;
+        	t[j] -= shat[j]*z;
         // STEP 9: w = (t,s)/(t,t)
         dcomp omega = 0;
         #pragma omp parallel for reduction (+:omega)
@@ -237,7 +262,7 @@ vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8, i
 		// STEP 10: x = h + w*s
 		#pragma omp parallel for
         for (int j = 0; j < hsize; ++j)
-        	x[j] += alpha * p[j] + omega * s[j];
+        	x[j] += alpha * phat[j] + omega * shat[j];
         	// x[j] = h[j] + w * s[j];
         // STEP 11: r = s -w*t
         #pragma omp parallel for
