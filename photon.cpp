@@ -670,10 +670,6 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 					basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm);
 					vecc dipole_vec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),gs_vec,blap);
 					// Perform BiCGS, solve for intermediate state
-					// ed::write_mat(exblk.ham->get_dense(),exblk.size,exblk.size,"./exham.dat");
-					// ed::write_vecc(dipole_vec,exblk.size,1,"./dpvec.dat");
-					// cout << "block size: " << exblk.size << ", Z: " << z << endl;
-					// exit(0);
 					vecc midvec = BiCGS(exblk.ham,dipole_vec,z,pm.CG_tol);
 					// De-excitation
 					if (pm.pvin != pm.pvout) {
@@ -871,13 +867,6 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 		RIXS_peak_occupation(GS,EX,vecd({20}),rixs_ab,rixs_em,rixs_peaks,gsi,pm,gs_en,"top",true);
 		write_RIXS(rixs_peaks,rixs_ab,rixs_em,pm.eloss,"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt");
 	} 
-	// if (pm.spec_solver == 4) {
-	// 	write_iter_RIXS(rixs_ab,rixs_em,rixs_peaks,
-	// 		"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt");
-	// }
 
-
-	return;
-	// END OF NEW IMPLEMENTATION
 	return;
 }

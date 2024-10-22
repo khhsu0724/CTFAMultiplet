@@ -32,7 +32,7 @@ struct PM {
 		else if (el) std::cout << "eloss will not be set if RIXS is turned off" << std::endl;
 		return;
 	}
-	void set_incident_points() {
+	void set_incident_points(bool reset = false, double gs_en = 0, double ex_en = 0) {
 		if (incident.size() != 3) {
 			std::cout << "Incident energy not set correctly!" << std::endl;
 			exit(1);
@@ -40,6 +40,29 @@ struct PM {
 		double start = incident.at(0);
 		double end = incident.at(1);
 		int num = incident.at(2);
+		if (num < -1) {
+			std::cout << "Incident[3] needs to >= -1" << std::endl;
+			exit(1);
+		}
+		if (num == -1) {
+			if (reset) {
+				std::cout << "New range: ";
+				vecd incident_copy(incident);
+				incident[0] = ex_en - gs_en;
+				incident[1] = ex_en - gs_en + incident_copy[0];
+				incident[2] = incident_copy[1];
+				std::cout << incident[0] << ", " << incident[1] << ", " << incident[2] << std::endl;
+				set_incident_points();
+			} else {
+				std::cout << "Warning: auto detect range" << std::endl;
+				std::cout << "Incident[1] = Energy range starting from lowest excitation " << std::endl;
+				std::cout << "Incident[2] = Number of points " << std::endl;
+				if (incident.at(0) <= 0 or incident.at(1) < 0) {
+					std::cout << "Range/Points needs to > 0" << std::endl;
+					exit(1);
+				}
+			}
+		}
 		if (num == 0) return;
 	    if (num == 1) {
 	        inc_e_points.push_back(start);
