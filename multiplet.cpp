@@ -10,7 +10,7 @@ double calc_U(double* gaunt1, double* gaunt2, const double* SC, int size) {
 	return u;
 }
 
-void calc_ham(Hilbert& hilbs, const HParam& hparam) {
+void calc_ham(Hilbert& hilbs, const HParam& hparam, bool nohyb) {
 	// Assemble Hamiltonian of the hilbert space
 	for (auto& blk : hilbs.hblks) {
 		if (hilbs.num_ch == 0) blk.malloc_ham(hparam.gs_diag_option);
@@ -23,7 +23,7 @@ void calc_ham(Hilbert& hilbs, const HParam& hparam) {
 	}
 	if (hilbs.CF_on) calc_CF(hilbs,&hparam.CF[0]);
 	if (hilbs.CV_on) calc_CV(hilbs,&hparam.FG[0]);
-	if (hilbs.HYB_on) calc_HYB(hilbs,hparam);
+	if (hilbs.HYB_on) calc_HYB(hilbs,hparam,nohyb);
 	return;
 }
 
@@ -187,7 +187,7 @@ void calc_CV(Hilbert& hilbs, const double* FG) {
 	return;
 }
 
-void calc_HYB(Hilbert& hilbs, const HParam& hparam) {
+void calc_HYB(Hilbert& hilbs, const HParam& hparam, bool nohyb) {
 	// Charge Transfer and Hybridization	
 	if (hilbs.cluster->no_HYB) return;
 	else hilbs.cluster->set_hyb_params(hparam);
@@ -195,7 +195,12 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam) {
 	int nco = hilbs.cluster->co_persite * hilbs.tot_site_num();
 	// HYBRIDIZATION is momentum dependent, need to rewrite code here
 	vecd hybmat = ed::make_blk_mat(hilbs.cluster->get_tmat_real(),hilbs.tot_site_num());
-	ed::write_vec(hybmat,nvo,nvo,"hybmat.txt");
+	// if (nohyb) {
+	// 	// Wipe out all non diagonal term if no hybridization is needed
+	// 	for (int i = 0; i < nvo*nvo; ++i) {
+	// 		if ()
+	// 	}
+	// }
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
 	// Loop through hyb matrix, TODO: Loop through each site
 	for (int i = 0; i < nvo; ++i) {

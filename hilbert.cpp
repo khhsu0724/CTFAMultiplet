@@ -187,6 +187,11 @@ void Hilbert::fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs)
 	return;
 }
 
+void Hilbert::print_bits(ulli state) {
+	// const int bitnum = (num_corb+num_vorb)*2;
+	cout << bitset<22>(state) << endl; // This is a bit crude
+}
+
 double Hilbert::Fsign(QN* op, ulli state, int opnum) {
 	// Calculate Fermion Sign Problem, return +1 or -1
 	int p = 0;
@@ -482,7 +487,7 @@ bindex Hilbert::sz_Hash(ulli s) {
 ulli Hilbert::sz_Hashback(bindex ind) {
 	// Hashback function that uses sz as main QN
 	int max_2sz = int(2*hblks.back().get_sz());
-	Block& blk = hblks[ind.first];
+	auto& blk = hblks[ind.first];
 	auto r = std::find_if(blk.rank.rbegin(), blk.rank.rend(),
 				[&](size_t e){return (e >= 0) && (ind.second >= e);});
 	if (r == blk.rank.rend()) r = blk.rank.rend() - 1;

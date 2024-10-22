@@ -45,11 +45,13 @@ inline bool operator!=(const QN& qn1, const QN& qn2) {
 struct HParam {
 	// Hilbert space parameters
 	double nedos = 0; // PHASE OUT
+	double HFscale = 1.0;
 	double MLdelta = 0, octJT = 1, sig_pi = 0.5;
 	double tpd = 0, tpp = 0, tpdz_ratio = 0.25;
+	bool tppsigma_on = false;
 	double SO[2]{0}, CF[5]{0};
 	double SC2[5]{0}, SC1[3]{0}, FG[4]{0}, SC2EX[5]{0};
-	int gs_diag_option, ex_diag_option = 2;
+	int gs_diag_option = 2, ex_diag_option = 2;
 	bool block_diag = true, HYB = true, effective_delta = true;
 	bool print_site_occ = false;
 	int ex_nev = 0, gs_nev = 0;
