@@ -52,6 +52,8 @@ public:
 	virtual void clear_mat() = 0;
 	virtual void is_symmetric() = 0; // Only Support Dense Matrices
 	virtual int get_mat_size() = 0;
+	// Diagonal preconditioner with (z-H_diag)^(-1)
+	virtual vecc precond(const vecc& vec_in, dcomp shift) = 0;
 	int get_mat_dim() {return this->size;};
 protected:
 	int size = 0;
@@ -115,6 +117,15 @@ public:
         }
         return;
 	}
+	vecc precond(const vecc& vec_in, dcomp shift) {
+		return vecc(vec_in);
+		vecc vec_out(this->size,0);
+		// Jacobi Precondition
+		#pragma omp parallel for
+		for (int i = 0; i < this->size; ++i) 
+			vec_out[i] = vec_in[i]/(ham[i*this->size+i]-shift);
+		return vec_out;
+	}
 	int get_mat_size() {return this->size * this->size;};
 private:
 	std::unique_ptr<T[]> ham;
@@ -164,6 +175,9 @@ public:
 	};
 	void is_symmetric() {
 		std::cout << "Can't check symmetric matrix now" << std::endl;
+	}
+	vecc precond(const vecc& vec_in, dcomp shift) {
+		return vecc(vec_in);
 	}
 	int get_mat_size() {return val.size();};
 private:
