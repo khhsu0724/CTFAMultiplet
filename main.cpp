@@ -605,7 +605,7 @@ int main(int argc, char** argv){
 	if (pm.inc_e_points.size() != 0)
 		for (auto &inc_e : pm.inc_e_points) cout << inc_e << ", ";
 	cout << endl;
-	exit(0);
+
 	if (pm.XAS) {
 		for (size_t in = 0; in < 3; ++in) {
 			fill(pm.pvin.begin(), pm.pvin.end(), 0);
