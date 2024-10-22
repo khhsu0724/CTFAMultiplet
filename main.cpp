@@ -168,9 +168,11 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 							else if (p == "FG") skip = read_num(line.substr(s+1,line.size()-1),hparam.FG,4);
 							else if (p == "CF") skip = read_num(line.substr(s+1,line.size()-1),hparam.CF,5);
 							else if (p == "HYB") skip = read_bool(line.substr(s+1,line.size()-1),hparam.HYB);
+							else if (p == "HFSCALE") skip = read_num(line.substr(s+1,line.size()-1),&hparam.HFscale,1);
 							else if (p == "TPD") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpd,1);
 							else if (p == "TPP") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpp,1);
 							else if (p == "TPDZR") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpdz_ratio,1);
+							else if (p == "TPPSIGMA") skip = read_bool(line.substr(s+1,line.size()-1),hparam.tppsigma_on);
 							else if (p == "OCTJT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.octJT,1);
 							else if (p == "MLCT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.MLdelta,1);
 							else if (p == "SIGPI") skip = read_num(line.substr(s+1,line.size()-1),&hparam.sig_pi,1);
@@ -197,6 +199,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 					bool skip = false;
 					double pvtmp[3]{0};
 					double abrange_temp[2]{0};
+					double incident_temp[3]{0};
 					for (int s = 0; s < line.size() && !skip; ++s) {
 						if (line[s] != ' ' && line[s] != '	' && line[s] != '=') p.push_back(line[s]);
 						else {
@@ -224,11 +227,23 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 								skip = read_bool(line.substr(s+1,line.size()-1),el);
 								pm.set_eloss(el);
 							}
+							// Spectroscopy solver, 1: Exact Solution, 2: Classic KH, 3: 1+2, 4 (To do): Cont FE, Biconj
+							else if (p == "SOLVER") skip = read_num(line.substr(s+1,line.size()-1),&pm.spec_solver,1);
+							else if (p == "EPSAB") skip = read_num(line.substr(s+1,line.size()-1),&pm.eps_ab,1);
+							else if (p == "EPSLOSS") skip = read_num(line.substr(s+1,line.size()-1),&pm.eps_loss,1);
+							else if (p == "NITERCFE") skip = read_num(line.substr(s+1,line.size()-1),&pm.niterCFE,1);
+							else if (p == "CGTOL") skip = read_num(line.substr(s+1,line.size()-1),&pm.CG_tol,1);
 							else if (p == "NEDOS") skip = read_num(line.substr(s+1,line.size()-1),&pm.nedos,1);
+							else if (p == "ABMAX") skip = read_num(line.substr(s+1,line.size()-1),&pm.abmax,1);
 							else if (p == "SPINFLIP") skip = read_bool(line.substr(s+1,line.size()-1),pm.spin_flip);
 							else if (p == "AB") {
 								skip = read_num(line.substr(s+1,line.size()-1),abrange_temp,2);
 								for (int i = 0; i < 2; ++i) pm.ab_range[i] = abrange_temp[i];
+							}
+							else if (p == "INCIDENT") {
+								skip = read_num(line.substr(s+1,line.size()-1),incident_temp,3);
+								for (int i = 0; i < 3; ++i) pm.incident[i] = incident_temp[i];
+								pm.set_incident_points();
 							}
 							else if (p == "EM") skip = read_num(line.substr(s+1,line.size()-1),&pm.em_energy,1);
 							p = "";
@@ -282,6 +297,7 @@ double calculate_effective_delta(const string& input_dir, HParam& hparam, const 
 		cout << "No ligands, skipping calculate delta" << endl;
 		return 0;
 	}
+	// Redo delta here, should not need to reset the values
 	calc_ham(GS,hparam);
 	// for (size_t g = 0; g < (GS.hblks.size()+1)/2; g++) {
 	for (size_t g = 0; g < GS.hblks.size(); g++) {
@@ -292,6 +308,38 @@ double calculate_effective_delta(const string& input_dir, HParam& hparam, const 
 	hparam.MLdelta = mlct;
 	hparam.gs_diag_option = diag_option;
 	return effective_delta(GS,2) - U_guess;
+}
+
+
+void dos_eigenenergy(Hilbert& hilbs, int num_eig, string dos_fname = "", string eig_fname = "") {
+	multistream dos_out(false,dos_fname,"w"); // Make sure that it clears the files
+	multistream eig_out(false,eig_fname,"w"); 
+	dos_out.set_mode("a");
+	eig_out.set_mode("a");
+	auto all_eig = hilbs.get_all_eigval(true);
+	auto unique_eig = ed::printDistinct(all_eig,0.0,all_eig.size(),false);
+	double gs_en = unique_eig[0];
+	for (int u = 0; u < unique_eig.size(); u++) {
+		vector<bindex> eigind;
+		for (auto & hblks : hilbs.hblks) {
+			for (size_t i = 0; i < hblks.nev; ++i) {
+				if (abs(hblks.eig[i]-unique_eig[u]) < TOL) {
+					eigind.push_back(bindex(&hblks-&hilbs.hblks[0],i));
+				}
+			}
+		}
+		dos_out << unique_eig[u] << " " << eigind.size() << endl;
+		if (u < num_eig) {
+			eig_out << "Eigen-energy number: " << u+1;
+			eig_out << ", energy (rel to gs): " << unique_eig[u] - gs_en << endl; 
+			eig_out << "Spin: " << abs(hilbs.hblks[eigind[0].first].get_sz()); 
+			eig_out << ", degeneracy: " << eigind.size() << endl;
+			eig_out << "------------------------------" << endl; 
+			occupation(hilbs,eigind,false,eig_fname,false);
+			eig_out << "------------------------------" << endl; 
+		}
+	}
+	return;
 }
 
 void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
@@ -312,10 +360,12 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 		if (pm.RIXS) hparam.gs_nev = 400;
 		else hparam.gs_nev = 10 * GS.tot_site_num();
 	}
+
+	bool clear_mat = !(pm.spec_solver == 4);
 	for (size_t g = 0; g < GS.hblks.size(); g++) {
 		start = chrono::high_resolution_clock::now();
 		cout << "Diagonalizing block number: " << g << ", matrix size: " << GS.hblks[g].size << endl;
-		GS.hblks[g].diagonalize(hparam.gs_nev);
+		GS.hblks[g].diagonalize(hparam.gs_nev,clear_mat);
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -338,10 +388,12 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	}}
 	if (GS.BLOCK_DIAG) cout << "Grounds State Spin Quantum Number (S): " << SDegen << endl;
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
-	occupation(GS,gsi,true);
+	occupation(GS,gsi,true,"");
+	occupation(GS,gsi,true,"",true);
 	wvfnc_weight(GS,gsi,3,true);
 	// auto all_eig = GS.get_all_eigval(true);
 	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
+	dos_eigenenergy(GS,20,"dos.txt","eig.txt");
 	cout << endl;
 
 	// Assemble Core Hole Hamiltonian
@@ -353,7 +405,6 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	stop = chrono::high_resolution_clock::now();
 	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
-
 	cout << "Diagonalizing Core-Hole Hamiltonian" << endl;
 	diag_start = chrono::high_resolution_clock::now();
 	if (!hparam.ex_nev) {
@@ -364,7 +415,16 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	for (size_t e = 0; e < EX.hblks.size(); e++) {
 		start = chrono::high_resolution_clock::now();
 		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
-		EX.hblks[e].diagonalize(hparam.ex_nev);
+		// Only need the lowest eigenvalue if using Lanczos
+		if (hparam.ex_nev > 0) {
+			if (pm.spec_solver == 4) EX.hblks[e].diagonalize(5,clear_mat);
+			else EX.hblks[e].diagonalize(hparam.ex_nev,clear_mat);
+		} else {
+			if (pm.spec_solver != 4) {
+				cout << "WARNING: EXNEV = 0" << endl;
+				exit(1);
+			} else cout << "skipping core-hole state diagonalization" << endl;
+		}
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 		cout << "Run time = " << duration.count() << " ms\n" << endl;
@@ -385,6 +445,9 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 			exmin_ind.push_back({i,j});
 		}
 	}}
+	if (pm.incident[2] == -1) pm.set_incident_points(true,gs_en,ex_min_en);
+	dos_eigenenergy(EX,10,"exdos.txt","exeig.txt");
+	wvfnc_weight(EX,exmin_ind,3,true);
 	// all_eig = EX.get_all_eigval(true);
 	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
 
@@ -393,6 +456,13 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	occupation(EX,exmin_ind,true);
 	wvfnc_weight(EX,exmin_ind,3);
 	cout << endl << "Total diagonalize run time: " << ed::format_duration(diag_duration) << endl << endl;
+
+	if (pm.abmax != -1) {
+		pm.ab_range[0] = ex_min_en - gs_en - 4;
+		pm.ab_range[1] = pm.ab_range[0] + pm.abmax;
+		cout << "======> NEW AB range: " << pm.ab_range[0] << ", " << pm.ab_range[1] << endl;
+	}
+
 	return;
 }
 
@@ -417,6 +487,11 @@ int main(int argc, char** argv){
 			throw invalid_argument("invalid FG input");
 	} else if (pm.edge != "L" && pm.edge != "L3") throw invalid_argument("invalid edge input: " + pm.edge);
 	// U = F^0 + 4*F^2 + 36*F^4
+	// Scaling Slater Parameters, without the bare Coulomb term
+	for (int i = 1; i < 3; ++i) hparam.SC[0][i] *= hparam.HFscale;
+	for (int i = 1; i < 5; ++i) hparam.SC[1][i] *= hparam.HFscale;
+	for (int i = 1; i < 5; ++i) hparam.SC2EX[i] *= hparam.HFscale;
+	for (int i = 1; i < 4; ++i) hparam.FG[i] *= hparam.HFscale;
 
 	Hilbert GS(IDIR,hparam,pm.edge.substr(0,1),false);
 	Hilbert EX(IDIR,hparam,pm.edge.substr(0,1),true);
@@ -440,26 +515,31 @@ int main(int argc, char** argv){
 		cout << "tpd = " << hparam.tpd; 
 		cout << ", tpp = " << hparam.tpp; 
 		if (GS.coord == "oct") cout << ", z distortion = " << hparam.octJT << endl; 
-		if (GS.coord != "ion") cout << ", sigma pi bond ratio = " << hparam.sig_pi << endl; 
+		if (GS.coord != "ion") {
+			cout << ", sigma pi bond ratio = " << hparam.sig_pi; 
+			if (hparam.tppsigma_on) cout << ", tppsigma on (only tppzpi!!!)" << endl; 
+			else cout << ", tppsigma off" << endl; 
+		}
 		else cout << endl;
 	} else cout << "Hybridization turned off" << endl; 
 
 	// Adjust Slater Condor Parameter
 
-	cout << "J1: " << 3*hparam.SC2[2]+20*hparam.SC2[4] << endl;
-	cout << "J2: " << 4*hparam.SC2[2]+15*hparam.SC2[4] << endl;
-	cout << "J3: " << 35*hparam.SC2[4] << endl;
-	cout << "J4: " << hparam.SC2[2]+30*hparam.SC2[4] << endl;
+	cout << "J1 (xz/yz-x2/xy): " << 3*hparam.SC2[2]+20*hparam.SC2[4] << endl;
+	cout << "J2 (z2-x2/xy): " << 4*hparam.SC2[2]+15*hparam.SC2[4] << endl;
+	cout << "J3 (x2-xy): " << 35*hparam.SC2[4] << endl;
+	cout << "J4 (z2-xz/yz): " << hparam.SC2[2]+30*hparam.SC2[4] << endl;
 
+	cout << "Racah Parameter, A: " << (hparam.SC2[0]-49*hparam.SC2[4]) << ", B: " << (hparam.SC2[2]-5*hparam.SC2[4]) << ", C: " << (35*hparam.SC2[4]) << endl;
 	hparam.SC[0][2] *= 25;
 	hparam.SC[1][2] *= 49;
 	hparam.SC[1][4] *= 441;
 	hparam.SC2EX[2] *= 49;
 	hparam.SC2EX[4] *= 441;
-	cout << "Ground State Udd: " << (hparam.SC2[0]-hparam.SC2[2]*2/63-hparam.SC2[4]*2/63);
-	cout << ", JH: " << (hparam.SC2[2]/14+hparam.SC2[4]/14*5/7) << endl; // Adjusted for real space Harmonics
-	cout << "Core-Hole State Udd: " << (hparam.SC2EX[0]-hparam.SC2EX[2]*2/63-hparam.SC2EX[4]*2/63);
-	cout << ", JH: " << (hparam.SC2EX[2]/14+hparam.SC2EX[4]/14*5/7);
+	cout << "Ground State Uavg: " << (hparam.SC2[0]+hparam.SC2[2]*2/63+hparam.SC2[4]*2/63);
+	cout << ", JH : " << (hparam.SC2[2]*2.5/49+hparam.SC2[4]*36/441) << " (Kanamori)"; // Adjusted for real space Harmonics
+	// cout << "Core-Hole State Udd: " << (hparam.SC2EX[0]-hparam.SC2EX[2]*2/63-hparam.SC2EX[4]*2/63);
+	// cout << ", JH: " << (hparam.SC2EX[2]/14+hparam.SC2EX[4]/14*5/7);
 	cout << ", Udp: " << (hparam.FG[0] - hparam.FG[1]/15 - hparam.FG[3]*3/70);
 	cout << ", Fdp: " << (hparam.FG[0] + hparam.FG[1]/15 + hparam.FG[3]*3/70) << endl;
 	cout << "GS Diagonalization Option: " << hparam.gs_diag_option << endl;
@@ -476,10 +556,22 @@ int main(int argc, char** argv){
 		double del = calculate_effective_delta(IDIR,hparam,pm);
 		cout << "Calculated effective delta: " << del + hparam.MLdelta << endl;
 	}
-	// exit(0);
-	if (pm.RIXS) {
-		if (pm.eloss) cout << "Using energy loss" << endl;
-		else cout << "using omega/omega" << endl;
+	cout << "solver options: " <<  pm.spec_solver << endl;
+	if (pm.spec_solver == 4) {
+		cout << "Lanczos/BiCGS Methods" << endl;
+		cout << "absorption broadening: " << pm.eps_ab << endl;
+		cout << "loss broadening: " << pm.eps_loss << endl;
+		cout << "conjugate gradient tolerance: " << pm.CG_tol << endl;
+		cout << "CFE iterations: " << pm.niterCFE << endl;
+	}
+	else if (pm.RIXS) {
+		if (pm.eloss) cout << "	Using energy loss" << endl;
+		else cout << "	WARNING: All spectroscopy will be outputted as energy loss" << endl;
+		pm.eloss = true;
+		if (pm.spec_solver == 1 || pm.spec_solver == 3)
+			cout << "	Output exact RIXS peaks" << endl;
+		if (pm.spec_solver == 2 || pm.spec_solver == 3)
+			cout << "	Evaluate K-H equation, Gamma: " << pm.eps_loss << endl;
 	}
 	cout << "photon edge: " << pm.edge << endl;
 	cout << "pvin: ";
@@ -487,21 +579,33 @@ int main(int argc, char** argv){
 	cout << endl << "pvout: ";
 	for (int i = 0; i < 3; ++i) cout << pm.pvout[i] << ", ";
 	cout << endl;
-	cout << "absorption range: ";
-	for (int i = 0; i < 2; ++i) cout << pm.ab_range[i] << ", ";
-	cout << endl;
-	cout << "emission range: " << pm.em_energy << endl;
+	if (pm.abmax != -1) {
+		cout << "ABMAX (overriding AB): ";
+		cout << pm.abmax << endl;
+	} else {
+		cout << "absorption range: ";
+		for (int i = 0; i < 2; ++i) cout << pm.ab_range[i] << ", ";
+		cout << endl;
+	}
+	cout << "Loss energy (for RIXS): " << pm.em_energy << endl;
 
-	if (!pm.XAS && !pm.RIXS) return 0; // Return if no photon methods
+	cout << "Incident (For solver = 4): ";
+	for (int i = 0; i < 3; ++i) cout << pm.incident[i] << ", ";
+	cout << endl;
 	// Reading and Checking input parameters
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Number of Holes: " << GS.num_vh << endl;
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
 	process_hilbert_space(GS,EX,hparam,pm);
-	// exit(0);
 	// Calculate Cross Sections
 	vector<double> pvin = pm.pvin, pvout = pm.pvout;
+
+	cout << "RIXS Energy points: ";
+	if (pm.inc_e_points.size() != 0)
+		for (auto &inc_e : pm.inc_e_points) cout << inc_e << ", ";
+	cout << endl;
+	exit(0);
 	if (pm.XAS) {
 		for (size_t in = 0; in < 3; ++in) {
 			fill(pm.pvin.begin(), pm.pvin.end(), 0);

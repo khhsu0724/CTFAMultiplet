@@ -25,13 +25,14 @@ public:
 	void read_inp_tmat(std::string inp_hyb_file) {this->inp_hyb_file = inp_hyb_file;};
 	void make_atlist(std::vector<Atom>& atlist, int num_vh, 
 						const std::vector<int>& sites);
-	void print_eigstate(const vecd& occ, std::string fname = "", int p = 5);
+	void print_eigstate(const vecd& occ, bool is_print = true, std::string fname = "", int p = 5);
 	vecc get_inp_tmat();
 	vecd get_tmat_real();
 protected:
 	int w = 12, num_sites = 1;
 	std::vector<std::string> orb_names;
 	bool print_all_sites = true; // If false program will print per_site
+	bool tppsigma_on = false;
 	bool check_tmat_all_real(const vecc& tmatreal);
 	vecc U_d() {
 		vecc U(5*5,0);

@@ -31,11 +31,14 @@ typedef std::vector<std::pair<ulli,ulli>> vpulli;
 class multistream {
 // Custom stream class that can direct output to cout & fstream
 public:
-	multistream(bool is_cout = true, std::string fname = "") {
+	multistream(bool is_cout = true, std::string fname = "", std::string mode = "a") {
 		this->skip_cout = !is_cout;
 		this->write_cout = is_cout;
 		this->write_file = !fname.empty();
-		if (write_file) file_stream = std::ofstream(fname);
+		this->fname = fname;
+		if (write_file) set_mode(mode);
+		// if (write_file && mode == "a") file_stream = std::ofstream(fname,std::ios_base::app);
+		// if (write_file && mode == "w") file_stream = std::ofstream(fname);
 	};
 	// for regular output of variables and stuff
 	template<typename T> multistream& operator<<(const T& input) {
@@ -51,8 +54,14 @@ public:
 		return *this;
 	}
 	void set_skip_cout(bool skip_cout) {this->skip_cout = skip_cout;};
+	void set_mode(std::string mode = "a") {
+		if (mode == "a") file_stream = std::ofstream(fname,std::ios_base::app);
+		if (mode == "b") file_stream = std::ofstream(fname,std::ios_base::binary);
+		if (mode == "w") file_stream = std::ofstream(fname);
+	}
 private:
 	std::ofstream file_stream;
+	std::string fname;
 	bool write_cout;
 	bool write_file;
 	bool skip_cout;
@@ -65,6 +74,8 @@ namespace ed {
 	void enum_states(std::vector<ulli>& states, ulli n, ulli k, ulli inc = 0, ulli s = 0);
 	ulli add_bits(ulli b1, ulli b2, int b1size, int b2size);
 	int count_bits(ulli b);
+	vecc vec_conj(vecc vin);
+	void write_vecc(vecc vec, size_t x, size_t y, std::string file_dir, std::string delim = " ");
 	vecc ctranspose(const vecc& mat, size_t m, size_t n);
 	std::vector<int> distribute(int num_h, int num_at);
 	std::string format_duration(std::chrono::milliseconds ms);
@@ -75,6 +86,7 @@ namespace ed {
 		try {
 			if (a.size() != b.size()) std::invalid_argument("different vector size for dot product");
 			T dp = 0;
+			#pragma omp parallel for
 			for (int i = 0; i < a.size(); ++i) dp += a[i]*b[i];
 			return dp;
 		} catch (const std::exception &ex) {
@@ -83,17 +95,21 @@ namespace ed {
 		}
 	};
 
-	template <typename T> double norm(std::vector<T>& vin) {
+	template <typename T> double norm(const std::vector<T>& vin, bool squared = false) {
 		double n = 0;
-		for (auto& v : vin) n += pow(abs(v),2);
-		return sqrt(n);
+		#pragma omp parallel for reduction (+:n)
+		for (int i = 0; i < vin.size(); ++i) n += pow(abs(vin[i]),2);
+		if (squared) return n;
+		else return sqrt(n);
 	};
 
 	template <typename T> void norm_vec(std::vector<T>& invec) {
 		double norm = 0;
-		for (auto & i : invec) norm += pow(abs(i),2);
+		#pragma omp parallel for reduction (+:norm)
+		for (int i = 0; i < invec.size(); ++i) norm += pow(abs(invec[i]),2);
 		norm = sqrt(norm);
-		for (auto & i : invec) i = i / norm;
+		#pragma omp parallel for
+		for (int i = 0; i < invec.size(); ++i) invec[i] = invec[i] / norm;
 	};
 
 	template <typename T> void norm_ev(T* ev, int n) {
