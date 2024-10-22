@@ -75,6 +75,7 @@ namespace ed {
 	ulli add_bits(ulli b1, ulli b2, int b1size, int b2size);
 	int count_bits(ulli b);
 	vecc vec_conj(vecc vin);
+	void write_vecc(vecc vec, size_t x, size_t y, std::string file_dir, std::string delim = " ");
 	vecc ctranspose(const vecc& mat, size_t m, size_t n);
 	std::vector<int> distribute(int num_h, int num_at);
 	std::string format_duration(std::chrono::milliseconds ms);
@@ -94,11 +95,12 @@ namespace ed {
 		}
 	};
 
-	template <typename T> double norm(const std::vector<T>& vin) {
+	template <typename T> double norm(const std::vector<T>& vin, bool squared = false) {
 		double n = 0;
 		#pragma omp parallel for reduction (+:n)
 		for (int i = 0; i < vin.size(); ++i) n += pow(abs(vin[i]),2);
-		return sqrt(n);
+		if (squared) return n;
+		else return sqrt(n);
 	};
 
 	template <typename T> void norm_vec(std::vector<T>& invec) {

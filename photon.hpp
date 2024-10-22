@@ -11,20 +11,45 @@ struct PM {
 	bool PE = false; // Photo Emission
 	bool eloss = true;
 	bool spin_flip = false;
-	int nedos = 0;
+	int nedos = 0, niterCFE = 150;
+	double CG_tol = 1e-8;
 	int spec_solver = 1; // 1 = exact, 2 = Classic K-H, 3 = both, 4 Lanczos/BiCGS
 	double em_energy = 15;
 	double gamma = 0.3;
+	double eps_ab = 0.1, eps_loss = 0.1;
+	double abmax = -1;
 	std::string edge;
 	std::vector<double> pvin, pvout, ab_range;
+	std::vector<double> incident, inc_e_points;
 	PM(): XAS(false), RIXS(false), PE(false), eloss(true) {
 		pvin = vecd(3,0);
 		pvout = vecd(3,0);
 		ab_range = vecd({-20,20});
+		incident = vecd({0,0,0});
 	};
 	void set_eloss(bool el) {
 		if (RIXS) eloss = el;
 		else if (el) std::cout << "eloss will not be set if RIXS is turned off" << std::endl;
+		return;
+	}
+	void set_incident_points() {
+		if (incident.size() != 3) {
+			std::cout << "Incident energy not set correctly!" << std::endl;
+			exit(1);
+		}
+		double start = incident.at(0);
+		double end = incident.at(1);
+		int num = incident.at(2);
+		if (num == 0) return;
+	    if (num == 1) {
+	        inc_e_points.push_back(start);
+	        return;
+	    }
+	    double step = (end - start) / (1.0*(num - 1));
+	    for (int i = 0; i < num; ++i) {
+	        inc_e_points.push_back(start + i * step);
+	    }
+	    return;
 	}
 };
 
@@ -60,7 +85,7 @@ void RIXS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd co
 void write_RIXS(vecd const& peaks, vecd const& ab, vecd const& em, bool eloss, 
 				std::string file_dir = "");
 void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm);
-vecc gen_dipole_state(Hilbert& GS, Hilbert& EX, const PM& pm, const bindex& gi
-						,size_t exi, const std::vector<blapIndex>& blap);
+vecc gen_dipole_state(Hilbert& GS, Hilbert& EX, const PM& pm, const bindex& inds, vecc vec_in, 
+						const std::vector<blapIndex>& blap, bool excite = true);
 
 #endif

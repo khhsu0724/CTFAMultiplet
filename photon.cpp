@@ -370,20 +370,6 @@ void write_XAS(vecd const& aben, vecd const& intensity, string file_dir, bool ex
 	return;
 }
 
-vecc gen_dipole_state(Hilbert& GS, Hilbert& EX, const PM& pm, const bindex& gi
-						,size_t exi, const vector<blapIndex>& blap) {
-	// Generate excited state with D|g>
-	size_t gbi = gi.first;
-	size_t gblk_size = GS.hblks[gbi].size;
-	vecc dpvec(EX.hblks[exi].size,0);
-	// cout << gi.second << ", " << exi << endl;
-	// cout << gblk_size << ", " << EX.hblks[exi].size << endl;
-	for (auto & b : blap) {
-		size_t gsind = gi.second*gblk_size+b.g;
-		dpvec[b.e] += GS.hblks[gbi].eigvec[gi.second*gblk_size+b.g] * b.blap;
-	}
-	return dpvec;
-}
 
 void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	// Note: different diagonalize routine might yield different results, 
@@ -416,16 +402,25 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	if (pm.spec_solver == 4) {
 		write_output = false;
 		// Lanczos solver
-		double minE = ex_en - gs_en - 1;
-		for (int i = 0; i < nedos; ++i) xas_aben[i] = minE + 20.0/nedos*i; // This should be changed with pm.abrange
+		for (int i = 0; i < nedos; ++i) xas_aben[i] = pm.ab_range[0] + pm.abmax/nedos*i;
 		for (auto &g  : gsi) {
-			cout << g.first << "," << g.second << endl;
+			size_t gblk_size =  GS.hblks[g.first].size;
 			for (auto &exblk : EX.hblks) {
 				size_t exblk_ind = &exblk-&EX.hblks[0];
+				vecc gs_vec(gblk_size,0);
+				#pragma omp parallel for
+				for (int i = 0; i < gblk_size; ++i) 
+					gs_vec[i] = dcomp(GS.hblks[g.first].eigvec[g.second*gblk_size+i],0);
 				basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm);
-				vecc dipole_vec = gen_dipole_state(GS,EX,pm,g,exblk_ind,blap);
+				vecc dipole_vec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),gs_vec,blap);
+		// for (auto &g  : gsi) {
+		// 	// cout << g.first << "," << g.second << endl;
+		// 	for (auto &exblk : EX.hblks) {
+		// 		size_t exblk_ind = &exblk-&EX.hblks[0];
+		// 		basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm);
+		// 		vecc dipole_vec = gen_dipole_state(GS,EX,pm,g,exblk_ind,blap);
 				// Perform Lanczos
-				ContFracExpan(exblk.ham,dipole_vec,gs_en,xas_aben,xas_int,0.1,150);
+				ContFracExpan(exblk.ham,dipole_vec,gs_en,xas_aben,xas_int,pm.eps_ab,pm.niterCFE);
 			}
 		}
 		cout << "Finish solving Lanczos!" << endl;
@@ -467,7 +462,7 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n";
 	cout << "Writing results..." << endl << endl;
-	write_XAS(xas_aben,xas_int,"XAS_"+pm.edge+"edge_"+pol_str(pm.pvin)+".txt");
+	write_XAS(xas_aben,xas_int,"XAS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"-test.txt",write_output);
 	return;
 }
 
@@ -576,10 +571,55 @@ void write_kh_RIXS(vecd const& rixsmat, vecd const& eloss, string file_dir) {
 	return;
 }
 
+void write_iter_RIXS(vecd const& rixs_ab, vecd const& rixs_loss, vecd const& rixs_int, 
+						string file_dir, bool write_init) {
+	// Write RIXS in absorption, eloss, intensity basis
+	int nedos = rixs_ab.size();
+	multistream mout;
+	if (write_init) {
+		mout = multistream(false,file_dir,"w");
+		mout << setw(18) << "absorption energy" << setw(18) << "energy loss";
+		mout << setw(18) << "intensity" << endl;
+	} else mout = multistream(false,file_dir,"a");
+	for (int x = 0; x < nedos; ++x) {
+		mout << rixs_ab[x] << setw(18) << " ";
+		mout << rixs_loss[x] << setw(18) << " ";
+		mout << rixs_int[x] << setw(18) << " ";
+		mout << endl;
+	}
+	return;
+}
+
+vecc gen_dipole_state(Hilbert& GS, Hilbert& EX, const PM& pm, const bindex& inds, vecc vec_in, 
+						const vector<blapIndex>& blap, bool excite) {
+	size_t gbi = inds.first, exi = inds.second;
+	if (excite) {
+		// Generate excited state with D|g>
+		if (vec_in.size() != GS.hblks[gbi].size) {
+			cout << "Block size mismatch in gen_dipole_state" << endl;
+			exit(1);
+		}
+		vecc dpvec(EX.hblks[exi].size,0);
+		for (auto & b : blap) {
+			dpvec[b.e] += vec_in[b.g] * b.blap;
+		}
+		return dpvec;
+	} else { // Generate excited state with D+|g>
+		if (vec_in.size() != EX.hblks[exi].size) {
+			cout << "Block size mismatch in gen_dipole_state (rev)" << endl;
+			exit(1);
+		}
+		vecc dpvec(GS.hblks[gbi].size,0);
+		for (auto & b : blap) {
+			dpvec[b.g] += vec_in[b.e] * conj(b.blap);
+		}
+		return dpvec;
+	}
+}
 
 void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	double beta = 0, hbar = 6.58e-16, nedos = pm.nedos, eloss_min = -2;
-	dcomp igamma(0,pm.gamma);
+	dcomp igamma(0,pm.eps_loss);
 
 	if (GS.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
 	if (EX.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
@@ -603,160 +643,218 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 		}
 	}} 
 
-	// Figure out energy levels for excited states within the spectra range
-	vecd exen;
-	for (auto &exblk : EX.hblks) {
-		exblk.init_einrange();
-		for (int ei = 0; ei < exblk.nev; ++ei) {
-			if (exblk.eig[ei] < gs_en + ab_emin || exblk.eig[ei] > gs_en + ab_emax) {
-				exblk.einrange[ei] = -1;
-				continue;
-			}
-			bool is_dup = false;
-			for (auto &ex : exen) {
-				if (abs(exblk.eig[ei] - ex) < TOL) {
-					is_dup = true;
-					break;
-				}
-			}
-			if (!is_dup) exen.push_back(exblk.eig[ei]);
-		}
-	}
-
-	sort(exen.begin(),exen.end());
-	if (exen.size() > 1) { // Skip this if there are less than 1 excited state
-		for (auto &exblk : EX.hblks) {
-		#pragma omp parallel for shared(exblk)
-		for (size_t ei = 0; ei < exblk.nev; ++ei) {
-			if (exblk.einrange[ei] == -1) continue;
-			exblk.einrange[ei] = ed::binary_search(exen,exblk.eig[ei],std::greater<double>(),
-					[&](double a, double b){return abs(a-b) < TOL;});
-		}}
-	}
-	// Calculate K-H frequency range
-	int n_min = round((exen[0]-gs_en-2-ab_emin)/(ab_emax-ab_emin)*nedos);
-	int n_max = round((exen[exen.size()-1]-gs_en+2-ab_emin)/(ab_emax-ab_emin)*nedos);
-	if (n_min < 0) n_min = 0;
-	if (n_max > nedos) n_max = nedos;
-
 	cout << "Calculating cross section..." << endl;
 	auto start = chrono::high_resolution_clock::now();
-
-	// Calculate and store <v|D|i>
-	vecd rixs_peaks_kh(nedos*nedos,0), rixs_em_kh(nedos,0);
-	vecd rixs_em(nedos,0),rixs_ab(nedos,0),rixs_peaks(nedos*nedos,0);
-	for (int i = 0; i < nedos; ++i) rixs_ab[i] = ab_emin + i*(ab_emax-ab_emin)/nedos;
-	vector<dcomp> rixskern(gsi.size()*EX.hsize,0); // This is very memory exhausive???
+	vecd rixs_em, rixs_ab, rixs_peaks, rixs_peaks_kh, rixs_em_kh;
 	vector<blapIndex> blap;
-	vector<bindex> peak_occ_ab, peak_occ_em; // Calculate peak occupation
-	cout << "Calculating <v|D|i>" << endl;
-	for (auto &exblk : EX.hblks) {
-		size_t last_gs_block = gsi[0].first;
-		basis_overlap(GS,EX,bindex(last_gs_block,&exblk-&EX.hblks[0]),blap,pm);
-		for (auto &g : gsi) {
-			auto& gsblk = GS.hblks[g.first];
-			// ed::print_progress((&exblk-&EX.hblks[0])*gsi.size()+(&g-&gsi[0])+1,EX.hblks.size()*gsi.size());
-			if (!GS.SO_on && !EX.SO_on && gsblk.get_sz() != exblk.get_sz()) continue;
-			if (g.first != last_gs_block) {
-				basis_overlap(GS,EX,bindex(g.first,&exblk-&EX.hblks[0]),blap,pm);
-				last_gs_block = g.first;
-			}	
-			int gs_num = (&g-&gsi[0]);
-			#pragma omp parallel for shared(rixskern) schedule(dynamic)
-			for (size_t ei = 0; ei < exblk.nev; ++ei) {
-				if (exblk.eig[ei]-gs_en < ab_emin || exblk.eig[ei]-gs_en > ab_emax) continue;
-				dcomp csvi = 0;
-				for (auto & b : blap) {
-					size_t gsind = g.second*gsblk.size+b.g;
-					size_t exind = ei*exblk.size+b.e;
-					csvi +=  gsblk.eigvec[gsind] * exblk.eigvec[exind] * b.blap;
+
+	if (pm.spec_solver == 4) {
+		// BiCGstab and Lanczos to solve RIXS spectra
+		// Solve for each incident energy, not super efficient
+		for (auto &ab_en: pm.inc_e_points) {
+			cout << "---------------Solving for incident energy: " << ab_en << "---------------" << endl;
+			dcomp z(gs_en+ab_en,-pm.eps_ab);
+			vecd rixs_ab_local(nedos,ab_en);
+			vecd rixs_em_local(nedos,0);
+			vecd rixs_peaks_local(nedos,0);
+			for (int i = 0; i < nedos; ++i) rixs_em_local[i] = -2 + (pm.em_energy+2)/nedos*i;
+			for (auto &g  : gsi) {
+				size_t gblk_size =  GS.hblks[g.first].size;
+				for (auto &exblk : EX.hblks) {
+					size_t exblk_ind = &exblk-&EX.hblks[0];
+					cout << "Block: " << g.first << ", " << exblk_ind << endl;
+					vecc gs_vec(gblk_size,0);
+					#pragma omp parallel for
+					for (int i = 0; i < gblk_size; ++i) 
+						gs_vec[i] = dcomp(GS.hblks[g.first].eigvec[g.second*gblk_size+i],0);
+					basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm);
+					vecc dipole_vec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),gs_vec,blap);
+					// Perform BiCGS, solve for intermediate state
+					// ed::write_mat(exblk.ham->get_dense(),exblk.size,exblk.size,"./exham.dat");
+					// ed::write_vecc(dipole_vec,exblk.size,1,"./dpvec.dat");
+					// cout << "block size: " << exblk.size << ", Z: " << z << endl;
+					// exit(0);
+					vecc midvec = BiCGS(exblk.ham,dipole_vec,z,pm.CG_tol);
+					// De-excitation
+					if (pm.pvin != pm.pvout) {
+						// cout << "redo overlap: cross polarization" << endl;
+						basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm,true);
+					}
+					midvec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),midvec,blap,false);
+					ContFracExpan(GS.hblks[g.first].ham,midvec,gs_en,rixs_em_local,rixs_peaks_local,
+									pm.eps_loss,pm.niterCFE);
 				}
-				if (abs(csvi) > TOL) rixskern[gs_num*EX.hsize+ei+exblk.f_ind] += csvi;
 			}
-			// Conjugate the <v|D|i> first
-			#pragma omp parallel for shared(rixskern) schedule(dynamic)
-			for (size_t r = 0; r < rixskern.size(); r++) {
-				rixskern[r] = conj(rixskern[r]);
+			bool write_init = (ab_en == pm.inc_e_points[0]);
+			// Write per absorption to save progress
+			write_iter_RIXS(rixs_ab_local,rixs_em_local,rixs_peaks_local,
+				"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt",write_init);
+			// if (rixs_em.size() == 0) {
+			// 	rixs_em = rixs_em_local;
+			// 	rixs_ab = rixs_ab_local;
+			// 	rixs_peaks = rixs_peaks_local;
+			// } else {
+			// 	rixs_em.insert(rixs_em.end(), rixs_em_local.begin(), rixs_em_local.end());
+			// 	rixs_ab.insert(rixs_ab.end(), rixs_ab_local.begin(), rixs_ab_local.end());
+			// 	rixs_peaks.insert(rixs_peaks.end(), rixs_peaks_local.begin(), rixs_peaks_local.end());
+			// }
+			cout << "---------------Done---------------" << endl;
+		}
+	} else {
+		// Figure out energy levels for excited states within the spectra range
+		rixs_em = vecd(nedos,0);
+		rixs_ab = vecd(nedos,0);
+		rixs_peaks = vecd(nedos*nedos,0);
+		vecd exen;
+		for (auto &exblk : EX.hblks) {
+			exblk.init_einrange();
+			for (int ei = 0; ei < exblk.nev; ++ei) {
+				if (exblk.eig[ei] < gs_en + ab_emin || exblk.eig[ei] > gs_en + ab_emax) {
+					exblk.einrange[ei] = -1;
+					continue;
+				}
+				bool is_dup = false;
+				for (auto &ex : exen) {
+					if (abs(exblk.eig[ei] - ex) < TOL) {
+						is_dup = true;
+						break;
+					}
+				}
+				if (!is_dup) exen.push_back(exblk.eig[ei]);
 			}
 		}
-	}
 
-	// NEW IMPLEMENTATION
-	// Loop through final states, calculate <f|D|v><v|D|i>, add to spectra
-	cout << endl << "Calculating <f|D|v><v|D|i>" << endl;
-	double gamma_tol = 6*pm.gamma;
-	double freq_step = (ab_emax-ab_emin)/nedos;
-	for (auto &fsblk : GS.hblks) {
-	for (auto &exblk : EX.hblks) {
-		if (!GS.SO_on && !EX.SO_on && fsblk.get_sz() != exblk.get_sz()) continue; // Spin order blocks
-		cout << "FS blk: " << &fsblk-&GS.hblks[0] << ", EX blk: " << &exblk-&EX.hblks[0] << endl;
-		basis_overlap(GS,EX,bindex(&fsblk-&GS.hblks[0],&exblk-&EX.hblks[0]),blap,pm,true);
-		for (size_t fi = 0; fi < fsblk.nev; ++fi) {
-			// ed::print_progress((double)fi+1,(double)fsblk.nev);
-			vector<dcomp> fDv = vector<dcomp>(exblk.nev,0);
-			double fs_en = fsblk.eig[fi];
-			if (fs_en-gs_en > pm.em_energy) continue;
-			// Calculate <f|D|v> for all v		
-			#pragma omp parallel for shared(fDv) schedule(dynamic)
+		sort(exen.begin(),exen.end());
+		if (exen.size() > 1) { // Skip this if there are less than 1 excited state
+			for (auto &exblk : EX.hblks) {
+			#pragma omp parallel for shared(exblk)
 			for (size_t ei = 0; ei < exblk.nev; ++ei) {
 				if (exblk.einrange[ei] == -1) continue;
-				dcomp csvf = 0;
-				for (size_t b = 0; b < blap.size(); ++b) {
-					size_t fsind = fi*fsblk.size+blap[b].g;
-					size_t exind = ei*exblk.size+blap[b].e;
-					csvf +=  fsblk.eigvec[fsind] * exblk.eigvec[exind] * blap[b].blap;
-				}
-				fDv[ei] = csvf;
-			}
-			// Calculate sum <f|D|v><v|D|i> for a pair of f,i
-			for (auto& g : gsi) {
-				int gs_num = &g-&gsi[0];
-				// precompute <f|D|v><v|D|i> for all v		
-				vector<dcomp> fDvvDi = vector<dcomp>(exblk.nev,0);
-				#pragma omp parallel for shared(fDvvDi,fDv,rixskern) schedule(dynamic)
+				exblk.einrange[ei] = ed::binary_search(exen,exblk.eig[ei],std::greater<double>(),
+						[&](double a, double b){return abs(a-b) < TOL;});
+			}}
+		}
+		// Calculate K-H frequency range
+		int n_min = round((exen[0]-gs_en-2-ab_emin)/(ab_emax-ab_emin)*nedos);
+		int n_max = round((exen[exen.size()-1]-gs_en+2-ab_emin)/(ab_emax-ab_emin)*nedos);
+		if (n_min < 0) n_min = 0;
+		if (n_max > nedos) n_max = nedos;
+
+		// Calculate and store <v|D|i>
+		rixs_peaks_kh = vecd(nedos*nedos,0);
+		rixs_em_kh = vecd(nedos,0);
+		for (int i = 0; i < nedos; ++i) rixs_ab[i] = ab_emin + i*(ab_emax-ab_emin)/nedos;
+		vector<dcomp> rixskern(gsi.size()*EX.hsize,0); // This is very memory exhausive???
+		vector<bindex> peak_occ_ab, peak_occ_em; // Calculate peak occupation
+		cout << "Calculating <v|D|i>" << endl;
+		for (auto &exblk : EX.hblks) {
+			size_t last_gs_block = gsi[0].first;
+			basis_overlap(GS,EX,bindex(last_gs_block,&exblk-&EX.hblks[0]),blap,pm);
+			for (auto &g : gsi) {
+				auto& gsblk = GS.hblks[g.first];
+				// ed::print_progress((&exblk-&EX.hblks[0])*gsi.size()+(&g-&gsi[0])+1,EX.hblks.size()*gsi.size());
+				if (!GS.SO_on && !EX.SO_on && gsblk.get_sz() != exblk.get_sz()) continue;
+				if (g.first != last_gs_block) {
+					basis_overlap(GS,EX,bindex(g.first,&exblk-&EX.hblks[0]),blap,pm);
+					last_gs_block = g.first;
+				}	
+				int gs_num = (&g-&gsi[0]);
+				#pragma omp parallel for shared(rixskern) schedule(dynamic)
 				for (size_t ei = 0; ei < exblk.nev; ++ei) {
-					// RIXSKERN already conjugated
-					fDvvDi[ei] += fDv[ei] * rixskern[gs_num*EX.hsize+ei+exblk.f_ind];
+					if (exblk.eig[ei]-gs_en < ab_emin || exblk.eig[ei]-gs_en > ab_emax) continue;
+					dcomp csvi = 0;
+					for (auto & b : blap) {
+						size_t gsind = g.second*gsblk.size+b.g;
+						size_t exind = ei*exblk.size+b.e;
+						csvi +=  gsblk.eigvec[gsind] * exblk.eigvec[exind] * b.blap;
+					}
+					if (abs(csvi) > TOL) rixskern[gs_num*EX.hsize+ei+exblk.f_ind] += csvi;
 				}
-				// Sweep through absorption frequency
-				if (pm.spec_solver == 2 || pm.spec_solver == 3) {
-					int eloss_ind = floor((fs_en-gs_en-eloss_min)/(pm.em_energy-eloss_min)*nedos);
-					rixs_em_kh[eloss_ind] = fs_en-gs_en;
-					#pragma omp parallel for shared(rixs_peaks_kh)
-					for (size_t n = n_min; n < n_max; ++n) {
-						dcomp intensity = 0;
-						double omega_in = ab_emin + n*freq_step;
-						// #pragma omp parallel for reduction(+:intensity)
-						for (size_t ei = 0; ei < exblk.nev; ++ei) {
-							if (abs(fDvvDi[ei]) < TOL) continue;
-							// if (abs(omega_in-(exblk.eig[ei]-gs_en))>gamma_tol) continue; 
-							intensity += fDvvDi[ei]/(omega_in-(exblk.eig[ei]-gs_en)+igamma);
-						}
-						rixs_peaks_kh[eloss_ind*nedos+n] += exp(-beta*gs_en)*pow(abs(intensity),2);
-					}
-				}
-				// Exact solution
-				if (pm.spec_solver == 1 || pm.spec_solver == 3) {
-					int eloss_ind = floor((fs_en-gs_en)/(pm.em_energy)*nedos);
-					rixs_em[eloss_ind] = fs_en-gs_en;
-					vector<dcomp> csum(exen.size(),0);
-					#pragma omp parallel for shared(fDvvDi,csum)
-					for (size_t ei = 0; ei < exblk.nev; ++ei) {
-						if (exblk.einrange[ei] == -1) continue;
-						csum[exblk.einrange[ei]] += fDvvDi[ei];
-					}
-					#pragma omp parallel for shared(rixs_ab,rixs_peaks)
-					for (size_t e = 0; e < exen.size(); e++) {
-						if (abs(csum[e]) < TOL) continue;
-						double ab_en = exen[e]-gs_en;
-						int abind = floor((ab_en-ab_emin)/(ab_emax-ab_emin)*nedos);
-						rixs_ab[abind] = ab_en;
-						rixs_peaks.at(eloss_ind*nedos+abind) += exp(-beta*gs_en)*pow(abs(csum[e]),2);
-					}
+				// Conjugate the <v|D|i> first
+				#pragma omp parallel for shared(rixskern) schedule(dynamic)
+				for (size_t r = 0; r < rixskern.size(); r++) {
+					rixskern[r] = conj(rixskern[r]);
 				}
 			}
 		}
-	}}
+
+		// NEW IMPLEMENTATION
+		// Loop through final states, calculate <f|D|v><v|D|i>, add to spectra
+		cout << endl << "Calculating <f|D|v><v|D|i>" << endl;
+		double gamma_tol = 6*pm.eps_loss;
+		double freq_step = (ab_emax-ab_emin)/nedos;
+		for (auto &fsblk : GS.hblks) {
+		for (auto &exblk : EX.hblks) {
+			if (!GS.SO_on && !EX.SO_on && fsblk.get_sz() != exblk.get_sz()) continue; // Spin order blocks
+			cout << "FS blk: " << &fsblk-&GS.hblks[0] << ", EX blk: " << &exblk-&EX.hblks[0] << endl;
+			basis_overlap(GS,EX,bindex(&fsblk-&GS.hblks[0],&exblk-&EX.hblks[0]),blap,pm,true);
+			for (size_t fi = 0; fi < fsblk.nev; ++fi) {
+				// ed::print_progress((double)fi+1,(double)fsblk.nev);
+				vector<dcomp> fDv = vector<dcomp>(exblk.nev,0);
+				double fs_en = fsblk.eig[fi];
+				if (fs_en-gs_en > pm.em_energy) continue;
+				// Calculate <f|D|v> for all v		
+				#pragma omp parallel for shared(fDv) schedule(dynamic)
+				for (size_t ei = 0; ei < exblk.nev; ++ei) {
+					if (exblk.einrange[ei] == -1) continue;
+					dcomp csvf = 0;
+					for (size_t b = 0; b < blap.size(); ++b) {
+						size_t fsind = fi*fsblk.size+blap[b].g;
+						size_t exind = ei*exblk.size+blap[b].e;
+						csvf +=  fsblk.eigvec[fsind] * exblk.eigvec[exind] * blap[b].blap;
+					}
+					fDv[ei] = csvf;
+				}
+				// Calculate sum <f|D|v><v|D|i> for a pair of f,i
+				for (auto& g : gsi) {
+					int gs_num = &g-&gsi[0];
+					// precompute <f|D|v><v|D|i> for all v		
+					vector<dcomp> fDvvDi = vector<dcomp>(exblk.nev,0);
+					#pragma omp parallel for shared(fDvvDi,fDv,rixskern) schedule(dynamic)
+					for (size_t ei = 0; ei < exblk.nev; ++ei) {
+						// RIXSKERN already conjugated
+						fDvvDi[ei] += fDv[ei] * rixskern[gs_num*EX.hsize+ei+exblk.f_ind];
+					}
+					// Sweep through absorption frequency
+					if (pm.spec_solver == 2 || pm.spec_solver == 3) {
+						int eloss_ind = floor((fs_en-gs_en-eloss_min)/(pm.em_energy-eloss_min)*nedos);
+						rixs_em_kh[eloss_ind] = fs_en-gs_en;
+						#pragma omp parallel for shared(rixs_peaks_kh)
+						for (size_t n = n_min; n < n_max; ++n) {
+							dcomp intensity = 0;
+							double omega_in = ab_emin + n*freq_step;
+							// #pragma omp parallel for reduction(+:intensity)
+							for (size_t ei = 0; ei < exblk.nev; ++ei) {
+								if (abs(fDvvDi[ei]) < TOL) continue;
+								// if (abs(omega_in-(exblk.eig[ei]-gs_en))>gamma_tol) continue; 
+								intensity += fDvvDi[ei]/(omega_in-(exblk.eig[ei]-gs_en)+igamma);
+							}
+							rixs_peaks_kh[eloss_ind*nedos+n] += exp(-beta*gs_en)*pow(abs(intensity),2);
+						}
+					}
+					// Exact solution
+					if (pm.spec_solver == 1 || pm.spec_solver == 3) {
+						int eloss_ind = floor((fs_en-gs_en)/(pm.em_energy)*nedos);
+						rixs_em[eloss_ind] = fs_en-gs_en;
+						vector<dcomp> csum(exen.size(),0);
+						#pragma omp parallel for shared(fDvvDi,csum)
+						for (size_t ei = 0; ei < exblk.nev; ++ei) {
+							if (exblk.einrange[ei] == -1) continue;
+							csum[exblk.einrange[ei]] += fDvvDi[ei];
+						}
+						#pragma omp parallel for shared(rixs_ab,rixs_peaks)
+						for (size_t e = 0; e < exen.size(); e++) {
+							if (abs(csum[e]) < TOL) continue;
+							double ab_en = exen[e]-gs_en;
+							int abind = floor((ab_en-ab_emin)/(ab_emax-ab_emin)*nedos);
+							rixs_ab[abind] = ab_en;
+							rixs_peaks.at(eloss_ind*nedos+abind) += exp(-beta*gs_en)*pow(abs(csum[e]),2);
+						}
+					}
+				}
+			}
+		}}
+	}
 
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -772,102 +870,14 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 		cout << endl;
 		RIXS_peak_occupation(GS,EX,vecd({20}),rixs_ab,rixs_em,rixs_peaks,gsi,pm,gs_en,"top",true);
 		write_RIXS(rixs_peaks,rixs_ab,rixs_em,pm.eloss,"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt");
-	}
+	} 
+	// if (pm.spec_solver == 4) {
+	// 	write_iter_RIXS(rixs_ab,rixs_em,rixs_peaks,
+	// 		"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt");
+	// }
+
 
 	return;
 	// END OF NEW IMPLEMENTATION
-
-	// OLD IMPLEMENTATION
-	cout << endl << "Calculating <f|D|v><v|D|i>" << endl;
-	for (auto &fsblk : GS.hblks) {
-	for (auto &exblk : EX.hblks) {	
-		if (!GS.SO_on && !EX.SO_on && fsblk.get_sz() != exblk.get_sz()) continue; // Spin order blocks
-		cout << "FS blk: " << &fsblk-&GS.hblks[0] << ", EX blk: " << &exblk-&EX.hblks[0] << endl;
-		basis_overlap(GS,EX,bindex(&fsblk-&GS.hblks[0],&exblk-&EX.hblks[0]),blap,pm,true);
-		for (size_t fi = 0; fi < fsblk.nev; ++fi) {
-			ed::print_progress((double)fi+1,(double)fsblk.nev);
-			if (pm.eloss) {if (fsblk.eig[fi]-gs_en > elm_max) continue;}
-			vector<dcomp> csum(gsi.size()*exen.size(),0);
-			bool is_gs = abs(fsblk.eig[fi]-gs_en) < TOL;
-			size_t gsind;
-			if (is_gs) gsind = distance(gsi.begin(), find(gsi.begin(), gsi.end(), bindex(&fsblk-&GS.hblks[0],fi)));
-			#pragma omp parallel for reduction (vec_dcomp_plus:csum) schedule(dynamic)
-			for (size_t ei = 0; ei < exblk.nev; ++ei) {
-				if (exblk.einrange[ei] == -1) continue; // Not in absorption range
-				if (!pm.eloss) {if (exblk.eig[ei]-fsblk.eig[fi] > elm_max || exblk.eig[ei]-fsblk.eig[fi] < elm_min) continue;}
-				// Breaks if no ground state connects with intermediate state
-				bool skip_ei = true;
-				for (size_t gi = 0; gi < gsi.size();++gi) {
-					if (abs(rixskern[gi*EX.hsize+ei+exblk.f_ind]) > TOL) {
-						skip_ei = false;
-						break;
-					}
-				}
-				if (skip_ei) continue;
-				// Calculate Cross Section
-				dcomp csvf = 0;
-				if (is_gs && pm.pvin == pm.pvout) csvf = rixskern[gsind*EX.hsize+ei+exblk.f_ind];
-				else {
-					for (size_t b = 0; b < blap.size(); ++b) {
-						size_t fsind = fi*fsblk.size+blap[b].g;
-						size_t exind = ei*exblk.size+blap[b].e;
-						csvf +=  fsblk.eigvec[fsind] * exblk.eigvec[exind] * blap[b].blap;
-					}
-				}
-				if (abs(csvf) < TOL) continue;
-				for (size_t gi = 0; gi < gsi.size(); ++gi) {
-					// if (&fsblk-&GS.hblks[0] != gsi[gi].first) {
-						// cout << "fsblk: " << &fsblk-&GS.hblks[0] << ", gsblk: " << gsi[gi].first << endl;
-						// continue;
-					// }
-					if (abs(rixskern[gi*EX.hsize+ei+exblk.f_ind]) < TOL) continue;
-					csum[gi*exen.size()+exblk.einrange[ei]] += conj(csvf) * rixskern[gi*EX.hsize+ei+exblk.f_ind];
-				}
-			}
-			 // Classical Implementation of Kramers-Heisenberg Equation
-	 		// Sweep through the absorption frequency
-	 		// for (int g = 0; g < gsi.size(); g++) {
-	 		// 	for (int ai = 0; ai < nedos; ++ai) {
-	 		// 		dcomp cs(0,0);
-				// 	for (int e = 0; e < exen.size(); e++) {
-				// 		if (abs(csum[g*exen.size()+e]) < TOL) continue;
-		 	// 			cs += csum[g*exen.size()+e]/(rixs_ab[ai]-exen[e]+gs_en-igamma);
-				// 	}
-				// 	int emind = round((rixs_ab[ai]-fsblk.eig[fi]+gs_en-em_emin)/(em_emax-em_emin)*nedos);
-				// 	rixs_em[emind] = rixs_ab[ai]-fsblk.eig[fi]+gs_en;
-				// 	int lossind = round((fsblk.eig[fi]-gs_en-el_min)/(el_max-el_min)*nedos);
-				// 	rixs_loss[lossind] = fsblk.eig[fi]-gs_en;
-				// 	if (fsblk.eig[fi]-gs_en > el_max) continue;
-				// 	rixs_peaks[lossind+ai*nedos] += exp(-beta*gs_en)*pow(abs(cs),2);
-				// }
-	 		// }
-	 		
-			for (size_t g = 0; g < gsi.size(); g++) {
-				for (size_t e = 0; e < exen.size(); e++) {
-					dcomp cs(0,0);
-					if (abs(csum[g*exen.size()+e]) < TOL) continue;
-					int abind = round((exen[e]-gs_en-ab_emin)/(ab_emax-ab_emin)*nedos);
-					int elmind;
-					rixs_ab[abind] = exen[e]-gs_en;
-					if (pm.eloss) {
-						elmind = round((fsblk.eig[fi]-gs_en)/elm_max*nedos);
-						rixs_em[elmind] = fsblk.eig[fi]-gs_en;
-					} else {
-						elmind = round((exen[e]-fsblk.eig[fi]-elm_min)/(elm_max-elm_min)*nedos);
-						rixs_em[elmind] = exen[e]-fsblk.eig[fi];
-					}
-					rixs_peaks[elmind*nedos+abind] += exp(-beta*gs_en)*pow(abs(csum[g*exen.size()+e]),2);
-				}
-			}
-		}
-	}}
-	// RIXS_peak_occupation(GS,EX,vecd({20}),rixs_ab,rixs_em,rixs_peaks,gsi,pm,gs_en,"top",true);
-
-	// auto stop = chrono::high_resolution_clock::now();
-	// auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-	// cout << "Run time = " << duration.count() << " ms\n";
-	// cout << "Writing results..." << endl << endl;
-	// write_RIXS(rixs_peaks,rixs_ab,rixs_em,pm.eloss,"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt");
-	// OLD IMPLEMENTATION
 	return;
 }
