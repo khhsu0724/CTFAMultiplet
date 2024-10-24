@@ -11,7 +11,7 @@ struct PM {
 	bool PE = false; // Photo Emission
 	bool eloss = true;
 	bool spin_flip = false;
-	int nedos = 0, niterCFE = 150;
+	int nedos = 1000, niterCFE = 150;
 	double CG_tol = 1e-8;
 	int spec_solver = 1; // 1 = exact, 2 = Classic K-H, 3 = both, 4 Lanczos/BiCGS
 	double em_energy = 15;
