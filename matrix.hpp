@@ -48,7 +48,7 @@ public:
 	virtual T* get_dense() = 0; // Call this carefully
 	virtual void reset_ham(T** arr) {return;};
 	virtual void mvmult(T* vec_in, T* vec_out, int N) = 0;
-	virtual void mvmult_cmplx(vecc& vec_in, vecc& vec_out) = 0; // Unfortunate implementation
+	virtual void mvmult_cmplx(const vecc& vec_in, vecc& vec_out) = 0; // Unfortunate implementation
 	virtual void clear_mat() = 0;
 	virtual void is_symmetric() = 0; // Only Support Dense Matrices
 	virtual int get_mat_size() = 0;
@@ -89,7 +89,7 @@ public:
 		this->ham = return_uptr<T>(&_ham);
 		return;
 	};
-	void mvmult_cmplx(vecc& vec_in, vecc& vec_out) {
+	void mvmult_cmplx(const vecc& vec_in, vecc& vec_out) {
         // specific case for complex vectors
         #pragma omp parallel for //collapse(2)
         for (int i = 0; i < this->size; ++i) {
@@ -123,7 +123,8 @@ public:
 		// Jacobi Precondition
 		#pragma omp parallel for
 		for (int i = 0; i < this->size; ++i) 
-			vec_out[i] = vec_in[i]/(ham[i*this->size+i]-shift);
+			vec_out[i] = vec_in[i] / (ham[i*this->size+i]);
+		///(ham[i*this->size+i]-shift);
 		return vec_out;
 	}
 	int get_mat_size() {return this->size * this->size;};
@@ -161,7 +162,7 @@ public:
 		this->sparse_mvmult(vec_in,vec_out);
 		return;
 	};
-	void mvmult_cmplx(vecc& vec_in, vecc& vec_out) {
+	void mvmult_cmplx(const vecc& vec_in, vecc& vec_out) {
 		if (vec_in.size() != this->size or vec_out.size() != this->size) 
 			std::cout << "MVMULT_CMPLX matrix size mismatch!" << std::endl;
 		this->sparse_mvmult(vec_in.data(),vec_out.data());
@@ -185,7 +186,7 @@ private:
 	std::vector<size_t> indexj;
 	std::vector<T> val;
 	template <typename U>
-	void sparse_mvmult(U* vec_in, U* vec_out) {
+	void sparse_mvmult(const U* vec_in, U* vec_out) {
 		// Question: OMP critical is slower, but works with complex instead like atomic..
 		#pragma omp parallel for
 		for (int i = 0; i < this->size; ++i) vec_out[i] = 0;

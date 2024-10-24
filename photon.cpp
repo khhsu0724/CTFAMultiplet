@@ -413,12 +413,6 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 					gs_vec[i] = dcomp(GS.hblks[g.first].eigvec[g.second*gblk_size+i],0);
 				basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm);
 				vecc dipole_vec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),gs_vec,blap);
-		// for (auto &g  : gsi) {
-		// 	// cout << g.first << "," << g.second << endl;
-		// 	for (auto &exblk : EX.hblks) {
-		// 		size_t exblk_ind = &exblk-&EX.hblks[0];
-		// 		basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm);
-		// 		vecc dipole_vec = gen_dipole_state(GS,EX,pm,g,exblk_ind,blap);
 				// Perform Lanczos
 				ContFracExpan(exblk.ham,dipole_vec,gs_en,xas_aben,xas_int,pm.eps_ab,pm.niterCFE);
 			}
@@ -462,7 +456,7 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n";
 	cout << "Writing results..." << endl << endl;
-	write_XAS(xas_aben,xas_int,"XAS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"-test.txt",write_output);
+	write_XAS(xas_aben,xas_int,"XAS_"+pm.edge+"edge_"+pol_str(pm.pvin)+".txt",write_output);
 	return;
 }
 
@@ -673,7 +667,6 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 					vecc midvec = BiCGS(exblk.ham,dipole_vec,z,pm.CG_tol);
 					// De-excitation
 					if (pm.pvin != pm.pvout) {
-						// cout << "redo overlap: cross polarization" << endl;
 						basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm,true);
 					}
 					midvec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),midvec,blap,false);
@@ -685,15 +678,6 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 			// Write per absorption to save progress
 			write_iter_RIXS(rixs_ab_local,rixs_em_local,rixs_peaks_local,
 				"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt",write_init);
-			// if (rixs_em.size() == 0) {
-			// 	rixs_em = rixs_em_local;
-			// 	rixs_ab = rixs_ab_local;
-			// 	rixs_peaks = rixs_peaks_local;
-			// } else {
-			// 	rixs_em.insert(rixs_em.end(), rixs_em_local.begin(), rixs_em_local.end());
-			// 	rixs_ab.insert(rixs_ab.end(), rixs_ab_local.begin(), rixs_ab_local.end());
-			// 	rixs_peaks.insert(rixs_peaks.end(), rixs_peaks_local.begin(), rixs_peaks_local.end());
-			// }
 			cout << "---------------Done---------------" << endl;
 		}
 	} else {
