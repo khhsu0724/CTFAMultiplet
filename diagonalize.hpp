@@ -95,12 +95,9 @@ void ed_dsarpack(Matrix<Real>* ham, Real *_eigvec, Real* _eigval, size_t n, size
 };
 #endif
 
-// std::complex<double> complex_sum(std::complex<double> a, std::complex<double> b) {
-//     return a + b;
-// }
-
 template <typename T>
 int Lanczos(Matrix<T>* ham, const vecc& v0, vecc& alpha, vecc& betha, int niter_CFE=150) {
+	// Lanczos iteration, obtains tridiagonal matrix alpha_i, beta_i. 
 	// returns new niter_CFE value
 	int hsize = ham->get_mat_dim();
 	// std::cout << "Hdim: " << hsize  << "," << v0.size() << std::endl;
@@ -167,16 +164,25 @@ void ContFracExpan(Matrix<T>* ham, const vecc& v0, double E0, vecd& specX, vecd&
 }
 
 template <typename T>
-vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8, int max_iter = 2e4) {
+vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8,
+				const vecc& x0 = vecc(), int max_iter = 2e4) {
+	// Solve (A-zI)x = b, where z is a complex number.
 	// Modified from Eigen, with diagonal preconditioner 1/(ham-z)
 	// See https://github.com/cryos/eigen/blob/master/Eigen/src/IterativeLinearSolvers/BiCGSTAB.h
 	int hsize = ham->get_mat_dim();
-	vecc r(hsize,0), r0(hsize,0), x(hsize,0), x0(hsize,0);
-	// for (int j = 0; j < hsize; ++j) // Compute r0 = b - Ax, here x is started with 0
-	// 	r[j] = b[j];
-	r = b;
+	vecc r(hsize,0), r0(hsize,0), x(hsize,0);
+	if (x0.size() != 0) {
+		std::cout << "There is initial guess" << std::endl;
+		ham->mvmult_cmplx(x0,r);  
+        #pragma omp parallel for
+        for (int j = 0; j < hsize; ++j)
+        	r[j] = b[j] - r[j] + x0[j]*z; // r = b - A*x_0 
+	} else r = b;
 	r0 = r;
-	dcomp omega = 10.0, w_old = 0;
+	// Do a conjugate first to save a bit of speed
+	#pragma omp parallel for
+	for (int j = 0; j < hsize; ++j) r0[j] = std::conj(r0[j]);
+	dcomp omega = 1.0, w_old = 1.0;
 	dcomp rho = 1.0, alpha = 1.0, rho_old = 1.0;
     vecc v(hsize,0), t(hsize,0), h(hsize,0);
     vecc s(hsize,0), p(hsize,0), shat(hsize,0), phat(hsize,0);
@@ -193,7 +199,7 @@ vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8, i
 	    }
     	rho  = 0;
     	#pragma omp parallel for reduction (+:rho)
-		for (int j = 0; j < hsize; ++j) rho += std::conj(r0[j])*r[j];
+		for (int j = 0; j < hsize; ++j) rho += r0[j]*r[j];
 		// if (std::real(rho) < 1e-12) {
 		// 	std::cout << "New search direction cannot be found in BiCGStab" << std::endl;
 		// 	break;
@@ -220,7 +226,7 @@ vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8, i
         // STEP 5: alpha = rho/(r0,v)
         dcomp rv = 0;
         #pragma omp parallel for reduction (+:rv)
-		for (int j = 0; j < hsize; ++j) rv += std::conj(r0[j])*v[j];
+		for (int j = 0; j < hsize; ++j) rv += r0[j]*v[j];
         alpha = rho/rv;
 		// std::cout << "alpha: " << alpha << std::endl;
     	// STEP 6: h = x + alpha*p

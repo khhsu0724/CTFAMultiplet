@@ -475,6 +475,7 @@ int main(int argc, char** argv){
 	// Reading and Checking input parameters
 	auto run_start = chrono::high_resolution_clock::now();
 	cout << "Reading files..." << endl;
+
 	auto start = chrono::high_resolution_clock::now();
 	PM pm;
 	HParam hparam; 
