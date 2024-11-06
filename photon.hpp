@@ -48,8 +48,8 @@ struct PM {
 			if (reset) {
 				std::cout << "New range: ";
 				vecd incident_copy(incident);
-				incident[0] = ex_en - gs_en;
-				incident[1] = ex_en - gs_en + incident_copy[0];
+				incident[0] = ex_en - gs_en - 1;
+				incident[1] = ex_en - gs_en + incident_copy[0] - 1;
 				incident[2] = incident_copy[1];
 				std::cout << incident[0] << ", " << incident[1] << ", " << incident[2] << std::endl;
 				set_incident_points();
