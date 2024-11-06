@@ -407,6 +407,9 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 			size_t gblk_size =  GS.hblks[g.first].size;
 			for (auto &exblk : EX.hblks) {
 				size_t exblk_ind = &exblk-&EX.hblks[0];
+				// No spin flip
+				if (!GS.SO_on && !EX.SO_on && GS.hblks[g.first].get_sz() != exblk.get_sz()) continue;
+				cout << "gsblk: " << g.first << ", exblk: " << &exblk-&EX.hblks[0] << endl;
 				vecc gs_vec(gblk_size,0);
 				#pragma omp parallel for
 				for (int i = 0; i < gblk_size; ++i) 
@@ -656,6 +659,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 				size_t gblk_size =  GS.hblks[g.first].size;
 				for (auto &exblk : EX.hblks) {
 					size_t exblk_ind = &exblk-&EX.hblks[0];
+					if (!GS.SO_on && !EX.SO_on && GS.hblks[g.first].get_sz() != exblk.get_sz()) continue;
 					cout << "Block: " << g.first << ", " << exblk_ind << endl;
 					vecc gs_vec(gblk_size,0);
 					#pragma omp parallel for
@@ -670,8 +674,12 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 						basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm,true);
 					}
 					midvec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),midvec,blap,false);
+					int niter_CFE_in = pm.niterCFE;
+					if (niter_CFE_in > GS.hblks[g.first].size/100) niter_CFE_in = GS.hblks[g.first].size/100;
+					if (niter_CFE_in < 20) niter_CFE_in = 20; 
+					cout << "Number of Lanczos Iteration: " << niter_CFE_in << endl;
 					ContFracExpan(GS.hblks[g.first].ham,midvec,gs_en,rixs_em_local,rixs_peaks_local,
-									pm.eps_loss,pm.niterCFE);
+									pm.eps_loss,niter_CFE_in);
 				}
 			}
 			bool write_init = (ab_en == pm.inc_e_points[0]);

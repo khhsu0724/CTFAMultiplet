@@ -167,7 +167,7 @@ public:
 			std::cout << "MVMULT_CMPLX matrix size mismatch!" << std::endl;
 		// OMP atomic update does not work well with complex vectors
 		// Here I need to use a terrible method to avoid this problem....
-		std::vector<SparseCmplx<T>> vec_out_cpy(vec_out.size(),0);
+		std::vector<SparseCmplx<T>> vec_out_cpy(vec_out.size(),0); 
 		this->sparse_mvmult(vec_in.data(),vec_out_cpy.data());
 		#pragma omp parallel for
 		for (int i = 0; i < vec_out.size(); ++i) {
