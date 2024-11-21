@@ -40,5 +40,4 @@ main
 ./DATA_DIR
 .DS_Store
 *.ipynb
-*.py
 *.zip
