@@ -8,7 +8,7 @@ This project provides a **charge transfer full atomic multiplet code** designed 
 - **OpenMP** 
 - **BLAS/LAPACK**
 - **MKL** (Optional)
-- **ARPACK** (Optional, but recommended) 
+- **ARPACK** 
 
 For detailed input cards, please refer to the **[Wiki](https://github.com/khhsu0724/CTFAMultiplet/wiki/Input-Parameters)**.
 
