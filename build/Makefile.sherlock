@@ -1,0 +1,42 @@
+# Compiler and flags for Sherlock
+# Before compiling, load these modules with ARPACK
+# module load arpack icc boost gcc/8.1.0
+CXX = icpc
+CXXFLAGS =  -std=c++1y -O3 -m64 -ffast-math -march=native
+CXXFLAGS += -fopenmp
+# If MKL is installed, comment first line and uncomment MKL directives
+#LDFLAGS += -llapack -lblas
+LDFLAGS += -liomp5 -lpthread -ldl -llapack -larpack -larpack
+### MKL directives
+# MKLFLAGS += -L${MKLROOT}/lib/intel64
+# MKLFLAGS += -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core
+
+# Directories
+SRC_DIR = ../src
+BUILD_DIR = .
+INCLUDE_DIR = $(SRC_DIR)
+
+# Source files and object files
+SRC = $(wildcard $(SRC_DIR)/*.cpp)
+OBJ = $(patsubst $(SRC_DIR)/%.cpp, $(BUILD_DIR)/%.o, $(SRC))
+
+# Header files (for dependency tracking)
+HEADERS = $(wildcard $(SRC_DIR)/*.hpp)
+
+# Target executable
+TARGET = ../main
+
+# Default target
+all: $(TARGET)
+
+# Link the executable
+$(TARGET): $(OBJ)
+	$(CXX) $(LDFLAGS) $(MKLFLAGS) -o $@ $^  -lm -lgfortran
+
+# Compile object files
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -I$(INCLUDE_DIR) -c $< -o $@
+
+# Clean up build files
+clean:
+	rm -f $(BUILD_DIR)/*.o $(BUILD_DIR)/$(TARGET)
