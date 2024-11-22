@@ -566,6 +566,7 @@ int main(int argc, char** argv){
 		cout << "calculated delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
 	} else {
 		cout << "delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
+		// Comment out to save time!
 		double del = calculate_effective_delta(IDIR,hparam,pm);
 		cout << "Calculated effective delta: " << del + hparam.MLdelta << endl;
 	}
