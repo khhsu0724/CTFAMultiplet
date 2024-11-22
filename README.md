@@ -9,8 +9,32 @@ This project provides a **charge transfer full atomic multiplet code** designed 
 - **BLAS/LAPACK**
 - **MKL** (Optional)
 - **ARPACK** 
+- **cmake** (Recommended)
 
 For detailed input cards, please refer to the **[Wiki](https://github.com/khhsu0724/CTFAMultiplet/wiki/Input-Parameters)**.
 
 ## Compile and running
-See **[this link](https://github.com/khhsu0724/CTFAMultiplet/wiki/Getting-Started#how-to-compile-this-code)**.
+[Arpack](https://github.com/opencollab/arpack-ng) is required for this code, enable iso_c_binding when installing. \
+To install the code:
+```
+$ git clone https://github.com/khhsu0724/CTFAMultiplet.git
+$ cd CTFAMultiplet/build
+$ cmake ..
+$ make
+$ ../main INPUT # To execute the code
+```
+
+For custom installed Arpack, cmake requires path to the installation directory via the *ARPACK_ROOT* variable:
+```
+$ cmake -DARPACK_ROOT=/path/to/arpack/ ..
+```
+
+Note that for sherlock, icpc compiler is needed instead of c++:
+```
+$ module load arpack icc boost gcc/8.1.0
+$ cmake -DCMAKE_CXX_COMPILER=icpc ..
+```
+
+There are also Makefile examples for: Linux, macOS, sherlock, perlmutter (NERSC) \
+Please contact the author if you run into issues compiling,\
+For more information see this [wiki](https://github.com/khhsu0724/CTFAMultiplet/wiki/Getting-Started) page

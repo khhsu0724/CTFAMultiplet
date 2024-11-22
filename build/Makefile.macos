@@ -26,7 +26,7 @@ OBJ = $(patsubst $(SRC_DIR)/%.cpp, $(BUILD_DIR)/%.o, $(SRC))
 HEADERS = $(wildcard $(SRC_DIR)/*.hpp)
 
 # Target executable
-TARGET = ../main
+TARGET = ./main-test
 
 # Default target
 all: $(TARGET)
