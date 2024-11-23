@@ -3,7 +3,7 @@
 #include <utility>
 #include <initializer_list>
 #include <map>
-#include <boost/functional/hash.hpp>
+#include <boost/functional/hash/hash.hpp>
 #include "gaunt.hpp"
 
 using namespace std;

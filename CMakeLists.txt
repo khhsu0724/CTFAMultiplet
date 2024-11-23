@@ -5,8 +5,9 @@ cmake_minimum_required(VERSION 3.15)
 project(CTFAMultiplet LANGUAGES CXX)
 
 # Compiler settings
-OPTION (MKL "Compiling with MKL" ON)
-OPTION (USE_OpenMP "Use OpenMP to enable <omp.h>" ON)
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,7 +22,7 @@ message("-- CXXFLAGS: ${CMAKE_CXX_FLAGS}")
 find_package(Boost REQUIRED)
 if (Boost_FOUND)
     message(STATUS "Boost found!")
-    message(STATUS "Include directory: ${Boost_INCLUDE_DIRS}")
+    message(STATUS "Include directory: ${Boost_INCLUDE_DIR}")
     message(STATUS "Libraries: ${Boost_LIBRARIES}")
 else()
     message(FATAL_ERROR "Boost not found. Please install Boost and try again.")
@@ -31,7 +32,7 @@ endif()
 #-------------------------------------------------------------------
 # Check OpenMP
 #-------------------------------------------------------------------
-if(APPLE AND USE_OpenMP)
+if(APPLE)
     if(CMAKE_C_COMPILER_ID MATCHES "Clang")
         set(OpenMP_C "${CMAKE_C_COMPILER}")
         set(OpenMP_C_FLAGS "-pedantic -Xclang -fopenmp -liomp5 -Wno-unused-command-line-argument")
@@ -50,9 +51,7 @@ if(APPLE AND USE_OpenMP)
     endif()
 endif()
 
-if(USE_OpenMP)
-  find_package(OpenMP REQUIRED)
-endif(USE_OpenMP)
+find_package(OpenMP REQUIRED)
 
 if (OPENMP_FOUND)
     # include_directories("${OPENMP_INCLUDES}")
@@ -94,13 +93,14 @@ else()
     find_library(ARPACK_LIBRARY
         NAMES arpack
         HINTS /usr/local/lib /opt/homebrew/lib /usr/lib /usr/local/Cellar/ /usr/local/opt/
-        HINTS /usr/lib/x86_64-linux-gnu/
+        HINTS /usr/lib/x86_64-linux-gnu/ $ENV{LD_LIBRARY_PATH}
     )
 
     find_path(ARPACK_INCLUDE_DIR
         NAMES arpack.h
         HINTS /usr/local/include /opt/homebrew/include /usr/include /usr/local/include/arpack 
-        HINTS /usr/include/arpack
+        HINTS /usr/include/arpack $ENV{CPATH} 
+        PATH_SUFFIXES arpack-ng # This is used for sherlock
     )
 
     # Verify that ARPACK was found
@@ -169,7 +169,7 @@ if(APPLE)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lomp")
 endif()
 add_executable(CTFAMultiplet ${SRC_FILES})
-set_target_properties(CTFAMultiplet PROPERTIES OUTPUT_NAME ../main)
+set_target_properties(CTFAMultiplet PROPERTIES OUTPUT_NAME ./main-test)
 
 #-------------------------------------------------------------------
 # Link Libraries
@@ -189,7 +189,7 @@ target_link_libraries(CTFAMultiplet
 target_include_directories(CTFAMultiplet 
     #PUBLIC $<IF:${MKL_FOUND},$<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>,> 
     PRIVATE
-    ${Boost_INCLUDE_DIRS}  # Boost headers
+    ${Boost_INCLUDE_DIR}  # Boost headers
     ${ARPACK_INCLUDE_DIR}  # ARPACK headers
 )
 
