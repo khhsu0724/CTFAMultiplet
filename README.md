@@ -15,7 +15,7 @@ For detailed input cards, please refer to the **[Wiki](https://github.com/khhsu0
 
 ## Compile and running
 [Arpack](https://github.com/opencollab/arpack-ng) is required for this code, enable iso_c_binding when installing. \
-To install the code:
+To install the code (with cmake):
 ```
 $ git clone https://github.com/khhsu0724/CTFAMultiplet.git
 $ cd CTFAMultiplet/build
