@@ -29,10 +29,12 @@ For custom installed Arpack, cmake requires path to the installation directory v
 $ cmake -DARPACK_ROOT=/path/to/arpack/ ..
 ```
 
-Note that for sherlock, icpc compiler is needed instead of c++:
+Note that for sherlock, icpc compiler is needed instead of c++. \
+Once in the build directory, issue these command: 
 ```
 $ module load arpack icc boost gcc/8.1.0
 $ cmake -DCMAKE_CXX_COMPILER=icpc ..
+$ make
 ```
 
 There are also Makefile examples for: Linux, macOS, sherlock, perlmutter (NERSC) \

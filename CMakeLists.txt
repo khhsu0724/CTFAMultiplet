@@ -22,7 +22,7 @@ message("-- CXXFLAGS: ${CMAKE_CXX_FLAGS}")
 find_package(Boost REQUIRED)
 if (Boost_FOUND)
     message(STATUS "Boost found!")
-    message(STATUS "Include directory: ${Boost_INCLUDE_DIR}")
+    message(STATUS "Include directory: ${Boost_INCLUDE_DIRS}")
     message(STATUS "Libraries: ${Boost_LIBRARIES}")
 else()
     message(FATAL_ERROR "Boost not found. Please install Boost and try again.")
@@ -35,7 +35,7 @@ endif()
 if(APPLE)
     if(CMAKE_C_COMPILER_ID MATCHES "Clang")
         set(OpenMP_C "${CMAKE_C_COMPILER}")
-        set(OpenMP_C_FLAGS "-pedantic -Xclang -fopenmp -liomp5 -Wno-unused-command-line-argument")
+        set(OpenMP_C_FLAGS "-pedantic -Xclang -fopenmp -Wno-unused-command-line-argument")
         set(OpenMP_C_LIB_NAMES "libomp" "libgomp" "libiomp5")
         set(OpenMP_libomp_LIBRARY ${OpenMP_C_LIB_NAMES})
         set(OpenMP_libgomp_LIBRARY ${OpenMP_C_LIB_NAMES})
@@ -55,10 +55,11 @@ find_package(OpenMP REQUIRED)
 
 if (OPENMP_FOUND)
     # include_directories("${OPENMP_INCLUDES}")
-    # link_directories("${OPENMP_LIBRARIES}"c)
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    # link_directories("${OPENMP_CXX_LIBRARIES}")
+    message(STATUS "OpenMP found!")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    message(STATUS "Include directory: ${OpenMP_INCLUDE_DIRS}")
+    message(STATUS "OMP Include directory: ${OpenMP_CXX_INCLUDE_DIRS}")
+    message(STATUS "OMP libraries: ${OpenMP_CXX_LIBRARIES}")
     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif(OPENMP_FOUND)
 
@@ -175,7 +176,6 @@ set_target_properties(CTFAMultiplet PROPERTIES OUTPUT_NAME ./main-test)
 # Link Libraries
 #-------------------------------------------------------------------
 target_link_libraries(CTFAMultiplet 
-    #PUBLIC $<IF:${MKL_FOUND},$<LINK_ONLY:MKL::MKL>,> 
     PRIVATE
     ${OpenMP_LIBRARIES}  # OpenMP libraries
     ${ARPACK_LIBRARY}    # ARPACK library
@@ -187,9 +187,8 @@ target_link_libraries(CTFAMultiplet
 # Include Directories
 #-------------------------------------------------------------------
 target_include_directories(CTFAMultiplet 
-    #PUBLIC $<IF:${MKL_FOUND},$<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>,> 
     PRIVATE
-    ${Boost_INCLUDE_DIR}  # Boost headers
+    ${Boost_INCLUDE_DIRS}  # Boost headers
     ${ARPACK_INCLUDE_DIR}  # ARPACK headers
 )
 

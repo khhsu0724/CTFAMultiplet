@@ -3,7 +3,13 @@
 #include <utility>
 #include <initializer_list>
 #include <map>
-#include <boost/functional/hash/hash.hpp>
+#if __has_include("boost/functional/hash.hpp")
+    #include <boost/functional/hash.hpp>
+#elif __has_include("boost/functional/hash/hash.hpp")
+    #include <boost/functional/hash/hash.hpp>
+#else
+    #error "boost/function/hash.h not found in specified paths"
+#endif
 #include "gaunt.hpp"
 
 using namespace std;
