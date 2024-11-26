@@ -1,7 +1,7 @@
 #ifndef DIAGONALIZE
 #define DIAGONALIZE
 #include "matrix.hpp"
-#include <omp.h>
+// #include <omp.h> # I don't think I use these
 #if defined __has_include && __has_include (<arpack/arpack.hpp>) 
 #if __APPLE__  //Disable some warning from MacOS
 #pragma GCC diagnostic push
