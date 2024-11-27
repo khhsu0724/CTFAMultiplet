@@ -11,10 +11,11 @@ This project provides a **charge transfer full atomic multiplet code** designed 
 - **ARPACK** 
 - **cmake** (Recommended)
 
-For detailed input cards, please refer to the **[Wiki](https://github.com/khhsu0724/CTFAMultiplet/wiki/Input-Parameters)**.
+[Arpack](https://github.com/opencollab/arpack-ng) is required for this code, enable iso_c_binding when installing. \
+Often, using [homebrew](https://brew.sh/) to install arpack is sufficient. \
+Before compiling this code, please make sure all required dependencies are properly installed.
 
 ## Compile and running
-[Arpack](https://github.com/opencollab/arpack-ng) is required for this code, enable iso_c_binding when installing. \
 To install the code (with cmake):
 ```
 $ git clone https://github.com/khhsu0724/CTFAMultiplet.git
@@ -39,4 +40,13 @@ $ make
 
 There are also Makefile examples for: Linux, macOS, sherlock, perlmutter (NERSC) \
 Please contact the author if you run into issues compiling,\
-For more information see this [wiki](https://github.com/khhsu0724/CTFAMultiplet/wiki/Getting-Started) page
+For more compiling information see this [wiki](https://github.com/khhsu0724/CTFAMultiplet/wiki/Getting-Started) page
+
+
+## INPUT cards
+The code reads in an *INPUT* file with any name that can be specified in the first argument after the executable:
+```
+$ ./main INPUT_FILE_NAME
+```
+The default file name is INPUT if none are specified.\
+For detailed input cards, please refer to the **[Wiki](https://github.com/khhsu0724/CTFAMultiplet/wiki/Input-Parameters)**.
