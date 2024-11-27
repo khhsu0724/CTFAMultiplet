@@ -5,7 +5,7 @@ This project provides a **charge transfer full atomic multiplet code** designed 
 ## Package Dependencies
 - **C++ Compiler**
 - **Boost**
-- **OpenMP** 
+- **OpenMP** (Optional)
 - **BLAS/LAPACK**
 - **MKL** (Optional)
 - **ARPACK** 
