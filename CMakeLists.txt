@@ -32,26 +32,7 @@ endif()
 #-------------------------------------------------------------------
 # Check OpenMP
 #-------------------------------------------------------------------
-if(APPLE)
-    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-        set(OpenMP_C "${CMAKE_C_COMPILER}")
-        set(OpenMP_C_FLAGS "-pedantic -Xclang -fopenmp -Wno-unused-command-line-argument")
-        set(OpenMP_C_LIB_NAMES "libomp" "libgomp" "libiomp5")
-        set(OpenMP_libomp_LIBRARY ${OpenMP_C_LIB_NAMES})
-        set(OpenMP_libgomp_LIBRARY ${OpenMP_C_LIB_NAMES})
-        set(OpenMP_libiomp5_LIBRARY ${OpenMP_C_LIB_NAMES})
-    endif()
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        set(OpenMP_CXX "${CMAKE_CXX_COMPILER}")
-        set(OpenMP_CXX_FLAGS "-pedantic -Xclang -fopenmp -Wno-unused-command-line-argument")
-        set(OpenMP_CXX_LIB_NAMES "libomp" "libgomp" "libiomp5")
-        set(OpenMP_libomp_LIBRARY ${OpenMP_CXX_LIB_NAMES})
-        set(OpenMP_libgomp_LIBRARY ${OpenMP_CXX_LIB_NAMES})
-        set(OpenMP_libiomp5_LIBRARY ${OpenMP_CXX_LIB_NAMES})
-    endif()
-endif()
-
-find_package(OpenMP REQUIRED)
+find_package(OpenMP COMPONENTS CXX)
 
 if (OPENMP_FOUND)
     # include_directories("${OPENMP_INCLUDES}")
@@ -61,6 +42,8 @@ if (OPENMP_FOUND)
     message(STATUS "OMP Include directory: ${OpenMP_CXX_INCLUDE_DIRS}")
     message(STATUS "OMP libraries: ${OpenMP_CXX_LIBRARIES}")
     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+else()
+    message(STATUS "OpenMP NOT found! No links will be made")
 endif(OPENMP_FOUND)
 
 
@@ -166,20 +149,17 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 #-------------------------------------------------------------------
 # Create the executable
 #-------------------------------------------------------------------
-if(APPLE)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lomp")
-endif()
 add_executable(CTFAMultiplet ${SRC_FILES})
-set_target_properties(CTFAMultiplet PROPERTIES OUTPUT_NAME ./main-test)
+set_target_properties(CTFAMultiplet PROPERTIES OUTPUT_NAME ../main)
 
 #-------------------------------------------------------------------
 # Link Libraries
 #-------------------------------------------------------------------
 target_link_libraries(CTFAMultiplet 
     PRIVATE
-    ${OpenMP_LIBRARIES}  # OpenMP libraries
     ${ARPACK_LIBRARY}    # ARPACK library
     ${LAPACK_LIBRARIES}  # LAPACK libraries (fallback)
+    OpenMP::OpenMP_CXX
 )
 
 
