@@ -15,13 +15,19 @@ For detailed input cards, please refer to the **[Wiki](https://github.com/khhsu0
 
 ## Compile and running
 [Arpack](https://github.com/opencollab/arpack-ng) is required for this code, enable iso_c_binding when installing. \
+
+If required libraries are not installed, Linux and Mac users can install them via *brew*:
+```
+$ brew install boost libomp arpack
+```
+
 To install the code (with cmake):
 ```
 $ git clone https://github.com/khhsu0724/CTFAMultiplet.git
 $ cd CTFAMultiplet/build
 $ cmake ..
 $ make
-$ ../main INPUT # To execute the code
+$ ../main ./test/INPUT # To execute the code
 ```
 
 For custom installed Arpack, cmake requires path to the installation directory via the *ARPACK_ROOT* variable:

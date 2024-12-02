@@ -159,7 +159,6 @@ target_link_libraries(CTFAMultiplet
     PRIVATE
     ${ARPACK_LIBRARY}    # ARPACK library
     ${LAPACK_LIBRARIES}  # LAPACK libraries (fallback)
-    OpenMP::OpenMP_CXX
 )
 
 
@@ -171,6 +170,12 @@ target_include_directories(CTFAMultiplet
     ${Boost_INCLUDE_DIRS}  # Boost headers
     ${ARPACK_INCLUDE_DIR}  # ARPACK headers
 )
+
+if (OPENMP_FOUND)
+    target_link_libraries(CTFAMultiplet 
+        PRIVATE OpenMP::OpenMP_CXX
+    )
+endif()
 
 if (MKL_FOUND)
     target_link_libraries(CTFAMultiplet 
