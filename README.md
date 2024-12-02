@@ -16,8 +16,6 @@ Often, using [homebrew](https://brew.sh/) to install arpack is sufficient. \
 Before compiling this code, please make sure all required dependencies are properly installed.
 
 ## Compile and running
-[Arpack](https://github.com/opencollab/arpack-ng) is required for this code, enable iso_c_binding when installing. \
-
 If required libraries are not installed, Linux and Mac users can install them via *brew*:
 ```
 $ brew install boost libomp arpack
