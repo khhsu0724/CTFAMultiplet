@@ -33,6 +33,7 @@
 main
 
 # Others
+!CMakeLists.txt
 *.txt
 ./XAS_DATA
 ./RIXS_DATA
