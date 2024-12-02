@@ -155,7 +155,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 						if (line[s] != ' ' && line[s] != '	' && line[s] != '=') p.push_back(line[s]);
 						else {
 							transform(p.begin(),p.end(),p.begin(),::toupper);
-							if (p == "SO") skip = read_num(line.substr(s+1,line.size()-1),hparam.SO,2,false);
+							if (p == "SO") skip = read_num(line.substr(s+1,line.size()-1),hparam.SO,3,false);
 							else if (p == "SC1") skip = read_num(line.substr(s+1,line.size()-1),hparam.SC[0],3);
 							else if (p == "SC2") {
 								skip = read_num(line.substr(s+1,line.size()-1),hparam.SC[1],5);
@@ -236,6 +236,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 							else if (p == "NEDOS") skip = read_num(line.substr(s+1,line.size()-1),&pm.nedos,1);
 							else if (p == "ABMAX") skip = read_num(line.substr(s+1,line.size()-1),&pm.abmax,1);
 							else if (p == "SPINFLIP") skip = read_bool(line.substr(s+1,line.size()-1),pm.spin_flip);
+							else if (p == "CROSS") skip = read_bool(line.substr(s+1,line.size()-1),pm.cross);
 							else if (p == "AB") {
 								skip = read_num(line.substr(s+1,line.size()-1),abrange_temp,2);
 								for (int i = 0; i < 2; ++i) pm.ab_range[i] = abrange_temp[i];
@@ -399,8 +400,13 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	// Assemble Core Hole Hamiltonian
 	cout << "Assembling Core Hole Hamiltonian..." << endl;
 	start = chrono::high_resolution_clock::now();
-	hparam.SC.pop_back();
-	hparam.SC.push_back(hparam.SC2EX);
+	if (pm.edge != "K") {
+		// Only use 2p5+3dn slater parameters for L edge
+		hparam.SC.pop_back();
+		hparam.SC.push_back(hparam.SC2EX);
+		// Also use new spin orbit coupling values
+		hparam.SO[1] = hparam.SO[2];
+	}
 	calc_ham(EX,hparam);
 	stop = chrono::high_resolution_clock::now();
 	duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -500,17 +506,23 @@ int main(int argc, char** argv){
 	cout << "Input parameters" << endl;
 	cout << "TM 2p Spin-Orbit Coupling: " << hparam.SO[0] << " eV" << endl;
 	cout << "TM 3d Spin-Orbit Coupling: " << hparam.SO[1] << " eV" << endl;
+	if (hparam.SO[2] < 0) hparam.SO[2] = hparam.SO[1];
+	cout << "TM 3d Spin-Orbit Coupling (for Core-Hole state): " << hparam.SO[1] << " eV" << endl;
 	cout << "SC1: ";
 	for (int i = 0; i < 3; ++i) cout << hparam.SC[0][i] << ", ";
 	cout << endl << "SC2 for GS: ";
 	for (int i = 0; i < 5; ++i) cout << hparam.SC[1][i] << ", ";
+
 	cout << endl << "SC2 for EX: ";
-	for (int i = 0; i < 5; ++i) cout << hparam.SC2EX[i] << ", ";
+	if (pm.edge == "K") for (int i = 0; i < 5; ++i) cout << hparam.SC[1][i] << ", ";
+	else for (int i = 0; i < 5; ++i) cout << hparam.SC2EX[i] << ", ";
+
 	cout << endl << "FG: ";
 	for (int i = 0; i < 4; ++i) cout << hparam.FG[i] << ", ";
 	cout << endl << "CF: ";
 	for (int i = 0; i < 5; ++i) cout << hparam.CF[i] << ", ";
 	cout << endl;
+
 	if (hparam.HYB) {
 		cout << "Hybridization turned on: "; 
 		cout << "tpd = " << hparam.tpd; 
@@ -554,6 +566,7 @@ int main(int argc, char** argv){
 		cout << "calculated delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
 	} else {
 		cout << "delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
+		// Comment out to save time!
 		double del = calculate_effective_delta(IDIR,hparam,pm);
 		cout << "Calculated effective delta: " << del + hparam.MLdelta << endl;
 	}
@@ -589,6 +602,7 @@ int main(int argc, char** argv){
 		cout << endl;
 	}
 	cout << "Loss energy (for RIXS): " << pm.em_energy << endl;
+	if (pm.RIXS && pm.cross) cout << "Cross polarization" << endl;
 
 	cout << "Incident (For solver = 4): ";
 	for (int i = 0; i < 3; ++i) cout << pm.incident[i] << ", ";
@@ -633,6 +647,10 @@ int main(int argc, char** argv){
 				cout << "(out): ";
 				for (auto e : pm.pvout) cout << (int)e << " ";
 				cout << endl;
+				if (pm.cross && in == out) {
+					cout << "Skipping same polarization..." << endl << endl;
+					continue;
+				}
 				if (if_photon_file_exist(pm.edge,work_dir,false,overwrite,pm.pvin,pm.pvout) && !overwrite) continue;
 				RIXS(GS,EX,pm);
 			}

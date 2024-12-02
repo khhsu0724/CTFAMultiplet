@@ -1,4 +1,4 @@
-# Compiler and flags for MacOS
+# Compiler and flags for NERSC supercomputers
 CXX = CC
 CXXFLAGS =  -std=c++1y -O3 -ffast-math
 CXXFLAGS += -fopenmp
