@@ -71,7 +71,7 @@ if (ARPACK_ROOT)
         message(STATUS "Found ARPACK include directory: ${ARPACK_INCLUDE_DIR}")
         message(STATUS "Found ARPACK library: ${ARPACK_LIBRARY}")
     else()
-        message(FATAL_ERROR "Invalid ARPACK_ROOT: ${ARPACK_ROOT}")
+        message(FATAL_ERROR "Invalid ARPACK_ROOT: ${ARPACK_ROOT}, can't locate lib or include directory")
     endif()
 else()
     find_library(ARPACK_LIBRARY
