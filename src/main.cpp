@@ -229,6 +229,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 							}
 							// Spectroscopy solver, 1: Exact Solution, 2: Classic KH, 3: 1+2, 4 (To do): Cont FE, Biconj
 							else if (p == "SOLVER") skip = read_num(line.substr(s+1,line.size()-1),&pm.spec_solver,1);
+							else if (p == "PRECOND") skip = read_num(line.substr(s+1,line.size()-1),&pm.precond,1);
 							else if (p == "EPSAB") skip = read_num(line.substr(s+1,line.size()-1),&pm.eps_ab,1);
 							else if (p == "EPSLOSS") skip = read_num(line.substr(s+1,line.size()-1),&pm.eps_loss,1);
 							else if (p == "NITERCFE") skip = read_num(line.substr(s+1,line.size()-1),&pm.niterCFE,1);

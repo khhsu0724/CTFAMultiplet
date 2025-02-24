@@ -15,6 +15,7 @@ struct PM {
 	int nedos = 1000, niterCFE = 150;
 	double CG_tol = 1e-8;
 	int spec_solver = 1; // 1 = exact, 2 = Classic K-H, 3 = both, 4 Lanczos/BiCGS
+	int precond = 0; // 0 = no preconditioner, 1 = supply initial guess from last incident e
 	double em_energy = 15;
 	double gamma = 0.3;
 	double eps_ab = 0.1, eps_loss = 0.1;
