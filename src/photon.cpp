@@ -654,6 +654,9 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 			vecd rixs_ab_local(nedos,ab_en);
 			vecd rixs_em_local(nedos,0);
 			vecd rixs_peaks_local(nedos,0);
+			// Using previous coverged vector as guess, use a vector with size = Hilbert space
+			vecc solved_vec;
+			if (pm.precond != 0) solved_vec = vecc(EX.hsize,0);
 			for (int i = 0; i < nedos; ++i) rixs_em_local[i] = -2 + (pm.em_energy+2)/nedos*i;
 			for (auto &g  : gsi) {
 				size_t gblk_size =  GS.hblks[g.first].size;
@@ -668,7 +671,14 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 					basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm);
 					vecc dipole_vec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),gs_vec,blap);
 					// Perform BiCGS, solve for intermediate state
-					vecc midvec = BiCGS(exblk.ham,dipole_vec,z,pm.CG_tol);
+					vecc guess_vec;
+					if (pm.precond != 0 && ab_en != pm.inc_e_points[0]) {
+						guess_vec = vecc(exblk.size,0);
+						std::copy(solved_vec.begin()+exblk.f_ind, 
+							solved_vec.begin()+exblk.f_ind+exblk.size, guess_vec.begin());
+					}
+					vecc midvec = BiCGS(exblk.ham,dipole_vec,z,pm.CG_tol,guess_vec);
+					if (pm.precond != 0) std::copy(midvec.begin(), midvec.end(), solved_vec.begin()+exblk.f_ind);
 					// De-excitation
 					if (pm.pvin != pm.pvout) {
 						basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm,true);
