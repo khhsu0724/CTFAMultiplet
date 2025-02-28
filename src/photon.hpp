@@ -12,6 +12,7 @@ struct PM {
 	bool eloss = true;
 	bool spin_flip = false;
 	bool cross = false;
+	bool skip_ch_diag = false;
 	int nedos = 1000, niterCFE = 150;
 	double CG_tol = 1e-8;
 	int spec_solver = 1; // 1 = exact, 2 = Classic K-H, 3 = both, 4 Lanczos/BiCGS

@@ -414,23 +414,27 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
 	cout << "Diagonalizing Core-Hole Hamiltonian" << endl;
 	diag_start = chrono::high_resolution_clock::now();
-	if (!hparam.ex_nev) {
+	if (pm.spec_solver != 4 && !hparam.ex_nev) {
 		if (pm.edge == "K") hparam.ex_nev = 200;
 		else if (pm.edge == "L3") hparam.ex_nev = 500;
 		else if (pm.edge == "L") hparam.ex_nev = 1500;
 	}
+
 	for (size_t e = 0; e < EX.hblks.size(); e++) {
 		start = chrono::high_resolution_clock::now();
 		cout << "Diagonalizing block number: " << e << ", matrix size: " << EX.hblks[e].size << endl;
+		cout << "Number of eigenvalues: " << hparam.ex_nev << endl;
 		// Only need the lowest eigenvalue if using Lanczos
 		if (hparam.ex_nev > 0) {
 			if (pm.spec_solver == 4) EX.hblks[e].diagonalize(5,clear_mat);
 			else EX.hblks[e].diagonalize(hparam.ex_nev,clear_mat);
 		} else {
 			if (pm.spec_solver != 4) {
+				// This will block out anycase where EXNEV <= 0 and Lanczos
 				cout << "WARNING: EXNEV = 0" << endl;
 				exit(1);
 			} else cout << "skipping core-hole state diagonalization" << endl;
+			pm.skip_ch_diag = true;
 		}
 		stop = chrono::high_resolution_clock::now();
 		duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
@@ -439,36 +443,43 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	diag_stop = chrono::high_resolution_clock::now();
 	diag_duration += chrono::duration_cast<chrono::milliseconds>(diag_stop - diag_start);
 	
-	double ex_min_en = EX.hblks[0].eig[0];
-	vector<bindex> exmin_ind;
-	for (auto &exb : EX.hblks) for (size_t i = 0; i < exb.nev; ++i) if (exb.eig[i] <= ex_min_en) ex_min_en = exb.eig[i];
-	SDegen = 0;
+	if (!pm.skip_ch_diag) {
+		double ex_min_en = EX.hblks[0].eig[0];
+		vector<bindex> exmin_ind;
+		for (auto &exb : EX.hblks) for (size_t i = 0; i < exb.nev; ++i) if (exb.eig[i] <= ex_min_en) ex_min_en = exb.eig[i];
+		SDegen = 0;
 
-	for (size_t i = 0; i < EX.hblks.size(); ++i) {
-	for (size_t j = 0; j < EX.hblks[i].nev; ++j) {
-		if (abs(EX.hblks[i].eig[j]-ex_min_en) < TOL) {
-			if (hparam.block_diag && abs(EX.hblks[i].get_sz()) >= SDegen) 
-				SDegen = abs(EX.hblks[i].get_sz());
-			exmin_ind.push_back({i,j});
+		for (size_t i = 0; i < EX.hblks.size(); ++i) {
+		for (size_t j = 0; j < EX.hblks[i].nev; ++j) {
+			if (abs(EX.hblks[i].eig[j]-ex_min_en) < TOL) {
+				if (hparam.block_diag && abs(EX.hblks[i].get_sz()) >= SDegen) 
+					SDegen = abs(EX.hblks[i].get_sz());
+				exmin_ind.push_back({i,j});
+			}
+		}}
+		if (pm.incident[2] == -1) pm.set_incident_points(true,gs_en,ex_min_en);
+		dos_eigenenergy(EX,10,"exdos.txt","exeig.txt");
+		wvfnc_weight(EX,exmin_ind,3,true);
+		// all_eig = EX.get_all_eigval(true);
+		// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
+
+		if (EX.BLOCK_DIAG) cout << "Core-Hole Ground State Spin Quantum Number (S): " << SDegen << endl;
+		cout << "Calculating Occupation (with degeneracy): " << exmin_ind.size() << endl;
+		occupation(EX,exmin_ind,true);
+		wvfnc_weight(EX,exmin_ind,3);
+
+		if (pm.abmax != -1) {
+			pm.ab_range[0] = ex_min_en - gs_en - 4;
+			pm.ab_range[1] = pm.ab_range[0] + pm.abmax;
+			cout << "======> NEW AB range: " << pm.ab_range[0] << ", " << pm.ab_range[1] << endl;
+		} else cout << "======> OLD AB range: " << pm.ab_range[0] << ", " << pm.ab_range[1] << endl;
+	} else {
+		if (pm.XAS && pm.abmax != -1) {
+			cerr << "Needs (parameter) AB if core-hole diagonalize is skipped" << endl;
+			exit(1);
 		}
-	}}
-	if (pm.incident[2] == -1) pm.set_incident_points(true,gs_en,ex_min_en);
-	dos_eigenenergy(EX,10,"exdos.txt","exeig.txt");
-	wvfnc_weight(EX,exmin_ind,3,true);
-	// all_eig = EX.get_all_eigval(true);
-	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
-
-	if (EX.BLOCK_DIAG) cout << "Core-Hole Ground State Spin Quantum Number (S): " << SDegen << endl;
-	cout << "Calculating Occupation (with degeneracy): " << exmin_ind.size() << endl;
-	occupation(EX,exmin_ind,true);
-	wvfnc_weight(EX,exmin_ind,3);
-	cout << endl << "Total diagonalize run time: " << ed::format_duration(diag_duration) << endl << endl;
-
-	if (pm.abmax != -1) {
-		pm.ab_range[0] = ex_min_en - gs_en - 4;
-		pm.ab_range[1] = pm.ab_range[0] + pm.abmax;
-		cout << "======> NEW AB range: " << pm.ab_range[0] << ", " << pm.ab_range[1] << endl;
 	}
+	cout << endl << "Total diagonalize run time: " << ed::format_duration(diag_duration) << endl << endl;
 
 	return;
 }
@@ -617,10 +628,6 @@ int main(int argc, char** argv){
 	// Calculate Cross Sections
 	vector<double> pvin = pm.pvin, pvout = pm.pvout;
 
-	cout << "RIXS Energy points: ";
-	if (pm.inc_e_points.size() != 0)
-		for (auto &inc_e : pm.inc_e_points) cout << inc_e << ", ";
-	cout << endl;
 
 	if (pm.XAS) {
 		for (size_t in = 0; in < 3; ++in) {
@@ -635,6 +642,15 @@ int main(int argc, char** argv){
 		}
 	}
 	if (pm.RIXS) {
+		if (pm.inc_e_points.size() != 0) {
+			cout << "RIXS Energy points: ";
+			for (auto &inc_e : pm.inc_e_points) cout << inc_e << ", ";
+		} else {
+			cout << "No RIXS energy points, check your input" << endl;
+			cout << "* If EXNEV = 0, then the -1 option on the 3rd argument is no longer available" << endl;
+			return 0;
+		}
+		cout << endl;
 		for (size_t in = 0; in < 3; ++in) {
 			fill(pm.pvin.begin(), pm.pvin.end(), 0);
 			if (pvin[in]) pm.pvin[in] = 1;
