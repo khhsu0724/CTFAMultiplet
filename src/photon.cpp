@@ -378,9 +378,11 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	double beta = 0, nedos = pm.nedos;//, racah_B = (SC[2]/49) - (5*SC[4]/441);
 
 	if (GS.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
-	if (EX.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
-	double gs_en = GS.hblks[0].eig[0];
-	double ex_en = EX.hblks[0].eig[0];
+	double gs_en = GS.hblks[0].eig[0], ex_en;
+	if (!pm.skip_ch_diag) {
+		if (EX.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
+		ex_en = EX.hblks[0].eig[0];
+	}
 	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.nev; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
 	vector<bindex> gsi; // index for ground state
 	// Calculate Partition function
@@ -403,7 +405,8 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	if (pm.spec_solver == 4) {
 		write_output = false;
 		// Lanczos solver
-		for (int i = 0; i < nedos; ++i) xas_aben[i] = pm.ab_range[0] + pm.abmax/nedos*i;
+		for (int i = 0; i < nedos; ++i) 
+			xas_aben[i] = pm.ab_range[0] + (pm.ab_range[1]-pm.ab_range[0])/nedos*i;
 		for (auto &g  : gsi) {
 			size_t gblk_size =  GS.hblks[g.first].size;
 			for (auto &exblk : EX.hblks) {
@@ -620,7 +623,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	dcomp igamma(0,pm.eps_loss);
 
 	if (GS.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
-	if (EX.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
+	if (!pm.skip_ch_diag and EX.hblks[0].eig == nullptr) throw runtime_error("Hamiltonian not diagonalized");
 
 	double gs_en = GS.hblks[0].eig[0];
 	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.nev; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
@@ -649,12 +652,15 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	if (pm.spec_solver == 4) {
 		// BiCGstab and Lanczos to solve RIXS spectra
 		// Solve for each incident energy, not super efficient
+		vecc solved_vec;
+		if (pm.precond != 0) solved_vec = vecc(EX.hsize,0);
 		for (auto &ab_en: pm.inc_e_points) {
 			cout << "---------------Solving for incident energy: " << ab_en << "---------------" << endl;
 			dcomp z(gs_en+ab_en,-pm.eps_ab);
 			vecd rixs_ab_local(nedos,ab_en);
 			vecd rixs_em_local(nedos,0);
 			vecd rixs_peaks_local(nedos,0);
+			// Using previous coverged vector as guess, use a vector with size = Hilbert space
 			for (int i = 0; i < nedos; ++i) rixs_em_local[i] = -2 + (pm.em_energy+2)/nedos*i;
 			for (auto &g  : gsi) {
 				size_t gblk_size =  GS.hblks[g.first].size;
@@ -669,7 +675,14 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 					basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm);
 					vecc dipole_vec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),gs_vec,blap);
 					// Perform BiCGS, solve for intermediate state
-					vecc midvec = BiCGS(exblk.ham,dipole_vec,z,pm.CG_tol);
+					vecc guess_vec;
+					if (pm.precond != 0 && ab_en != pm.inc_e_points[0]) {
+						guess_vec = vecc(exblk.size,0);
+						std::copy(solved_vec.begin()+exblk.f_ind, 
+							solved_vec.begin()+exblk.f_ind+exblk.size, guess_vec.begin());
+					}
+					vecc midvec = BiCGS(exblk.ham,dipole_vec,z,pm.CG_tol,guess_vec);
+					if (pm.precond != 0) std::copy(midvec.begin(), midvec.end(), solved_vec.begin()+exblk.f_ind);
 					// De-excitation
 					if (pm.pvin != pm.pvout) {
 						basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm,true);
