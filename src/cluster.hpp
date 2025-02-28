@@ -88,8 +88,7 @@ public:
 	vecc get_tmat();
 private:
 	double tpd_sig_pi = 0.5; // This needed to be checked
-	double tpp_sig_pi_1 = 0;
-	double tpp_sig_pi_2 = 0;
+	double tpp_sig_pi = 0;
 };
 
 #endif
