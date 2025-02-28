@@ -242,6 +242,7 @@ double effective_delta(Hilbert& hilbs, int ligNum, bool is_print) {
 			}
 		}
 	}
+	if (firstLh[1]) cout << "Warning: dL energy not set, check effective_delta" << endl;
 	if (is_print) cout << "Effective delta: " << dL - d << ", d energy: " << d << ", dL energy: " << dL << endl;
 	return dL - d;
 }

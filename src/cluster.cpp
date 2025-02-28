@@ -195,8 +195,8 @@ vecc SquarePlanar::get_operator_mat() {
 };
 
 vecc SquarePlanar::get_tmat() {
+	// TODO: Change the hybridization matrix consistent with Oct definition
 	// The ratio of tpd bonds can be tweaked individually
-	// double tpdz = 0.25*tpd, tpdxy = tpd*sig_pi/4, tpdxz = tpd*sig_pi, tpdyz = tpd*sig_pi;
 	double tpdz = tpd*tpdz_ratio, tpdxy = tpd*sig_pi, tpdxz = tpd*sig_pi, tpdyz = tpd*sig_pi;
 	double tpppi = 0*tpp, tppsigma = tpp, tppzpi = 0*tpp; // Introduces tppzpi
 	double kx = PI/2, ky = PI/2, kz = 0; // momentum at (pi,pi) for hole language
@@ -270,25 +270,32 @@ vecc Octahedral::get_operator_mat() {
 };
 
 vecc Octahedral::get_tmat() {
-	double tpdz = 0.25*tpd, tpdxy = tpd*tpd_sig_pi, tpdxz = tpd*tpd_sig_pi, tpdyz = tpd*tpd_sig_pi;
+	double tpdz = tpd/sqrt(3.0), tpdxy = tpd*tpd_sig_pi, tpdxz = tpd*tpd_sig_pi, tpdyz = tpd*tpd_sig_pi;
 	// tpp_pi_1 is pxy/pyy type overlaps, tpp_pi_2 is pzy/pxy type overlaps
-	double tpppi_1 = tpp_sig_pi_1*tpp, tppsigma = tpp, tpppi_2 = tpp_sig_pi_2*tpp;
+	double vppsigma = tpp, vpppi = tpp*tpp_sig_pi;
+	double tppsigma_1 = 0.5*(vppsigma+vpppi), tppsigma_2 = 0.5*(vppsigma-vpppi), tpppi = vpppi;
 	double kx = PI/2, ky = PI/2, kz = PI/2; // relative oxygen positionss
 	double sx = 2*sin(kx), sy = 2*sin(ky), sz = 2*sin(kz);
 	double cx = 2*cos(kx), cy = 2*cos(ky), cz = 2*sin(kz);
-	double d = octJT;
+	// double d = octJT;
+	double d = 1;
 	std::cout << "tpd modulation: " << pow(d,-4) << ", tpp modulation: " << pow(d,-3) << std::endl;
+	cout << "tpd: " << tpd << ", tdpz: " << tpdz << ", tpdxy: " << tpdxy << ", tpdxz: " << tpdxz;
+	cout << ", tpdyz: " << tpdyz << endl;
+	cout << "tpp: " << tpp << ", vppsigma: " << vppsigma << ", vpppi: " << vpppi << endl;
+	cout << "tppsigma 1: " << tppsigma_1 << ", tppsigma 2: " << tppsigma_2 << ", tpppi: " << tpppi << endl;
 	int nvo = vo_persite;
 	vecc tmat(nvo*nvo,0);
+
 	tmat[0*nvo+5] = {0,-tpd*sx};
 	tmat[5*nvo+0] = -tmat[0*nvo+5];
 	tmat[0*nvo+9] = {0,tpd*sy};
 	tmat[9*nvo+0] =  -tmat[0*nvo+9];
-	tmat[1*nvo+5] = {0,-tpdz*sx};
+	tmat[1*nvo+5] = {0,tpdz*sx};
 	tmat[5*nvo+1] = -tmat[1*nvo+5];
-	tmat[1*nvo+9] = {0,-tpdz*sy};
+	tmat[1*nvo+9] = {0,tpdz*sy};
 	tmat[9*nvo+1] =  -tmat[1*nvo+9];
-	tmat[1*nvo+13] = {0,tpd*sz*pow(d,-4)}; // Modulate the strength?	
+	tmat[1*nvo+13] = {0,-tpd*sz*pow(d,-4)}; // Modulate the strength?	
 	tmat[13*nvo+1] =  -tmat[1*nvo+13];
 	tmat[2*nvo+6] = {0,tpdxy*sx};
 	tmat[6*nvo+2] = -tmat[2*nvo+6];
@@ -303,22 +310,22 @@ vecc Octahedral::get_tmat() {
 	tmat[4*nvo+12] = {0,tpdyz*sz*pow(d,-4)};
 	tmat[12*nvo+4] =  -tmat[4*nvo+12];
 	tmat[5*nvo+5] = tmat[6*nvo+6] = tmat[7*nvo+7] = del;
-	tmat[5*nvo+8] = tmat[8*nvo+5] = {-tpppi_1*cx*cy,0};
-	tmat[5*nvo+9] = tmat[9*nvo+5] = {tppsigma*sx*sy,0};
-	tmat[5*nvo+11] = tmat[11*nvo+5] = {-tpppi_1*cx*cz,0};
-	tmat[5*nvo+13] = tmat[13*nvo+5] = {tppsigma*sx*sz*pow(d,-3),0};
-	tmat[6*nvo+8] = tmat[8*nvo+6] = {tppsigma*sx*sy,0};
-	tmat[6*nvo+9] = tmat[9*nvo+6] = {-tpppi_1*cx*cy,0};
-	tmat[6*nvo+12] = tmat[12*nvo+6] = {-tpppi_2*cx*cz,0};
-	tmat[7*nvo+10] = tmat[10*nvo+7] = {-tpppi_2*cx*cy,0};
-	tmat[7*nvo+11] = tmat[11*nvo+7] = {tppsigma*sx*sz*pow(d,-3),0};
-	tmat[7*nvo+13] = tmat[13*nvo+7] = {-tpppi_1*cx*cz,0};
+	tmat[5*nvo+8] = tmat[8*nvo+5] = {-tppsigma_1*cx*cy,0};
+	tmat[5*nvo+9] = tmat[9*nvo+5] = {tppsigma_2*sx*sy,0};
+	tmat[5*nvo+11] = tmat[11*nvo+5] = {-tppsigma_1*cx*cz,0};
+	tmat[5*nvo+13] = tmat[13*nvo+5] = {tppsigma_2*sx*sz*pow(d,-3),0};
+	tmat[6*nvo+8] = tmat[8*nvo+6] = {tppsigma_2*sx*sy,0};
+	tmat[6*nvo+9] = tmat[9*nvo+6] = {-tppsigma_1*cx*cy,0};
+	tmat[6*nvo+12] = tmat[12*nvo+6] = {tpppi*cx*cz,0};
+	tmat[7*nvo+10] = tmat[10*nvo+7] = {tpppi*cx*cy,0};
+	tmat[7*nvo+11] = tmat[11*nvo+7] = {tppsigma_2*sx*sz*pow(d,-3),0};
+	tmat[7*nvo+13] = tmat[13*nvo+7] = {-tppsigma_1*cx*cz,0};
 	tmat[8*nvo+8] = tmat[9*nvo+9] = tmat[10*nvo+10] = del;
-	tmat[8*nvo+11] = tmat[11*nvo+8] = {-tpppi_2*cy*cz,0};
-	tmat[9*nvo+12] = tmat[12*nvo+9] = {-tpppi_1*cy*cz,0};
-	tmat[9*nvo+13] = tmat[13*nvo+9] = {tppsigma*sy*sz*pow(d,-3),0};
-	tmat[10*nvo+12] = tmat[12*nvo+10] = {tppsigma*sy*sz*pow(d,-3),0};
-	tmat[10*nvo+13] = tmat[13*nvo+10] = {-tpppi_1*cy*cz,0};
+	tmat[8*nvo+11] = tmat[11*nvo+8] = {tpppi*cy*cz,0};
+	tmat[9*nvo+12] = tmat[12*nvo+9] = {-tppsigma_1*cy*cz,0};
+	tmat[9*nvo+13] = tmat[13*nvo+9] = {tppsigma_2*sy*sz*pow(d,-3),0};
+	tmat[10*nvo+12] = tmat[12*nvo+10] = {tppsigma_2*sy*sz*pow(d,-3),0};
+	tmat[10*nvo+13] = tmat[13*nvo+10] = {-tppsigma_1*cy*cz,0};
 	tmat[11*nvo+11] = tmat[12*nvo+12] = tmat[13*nvo+13] = del;
 	return tmat;
 };
