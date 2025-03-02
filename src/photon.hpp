@@ -2,6 +2,7 @@
 #include <complex>
 #include <chrono>
 #include "hilbert.hpp"
+#include "gaunt.hpp"
 #ifndef PHOTON
 #define PHOTON
 

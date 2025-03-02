@@ -139,6 +139,7 @@ vecd Cluster::get_tmat_real() {
 
 bool Cluster::check_tmat_all_real(const vecc& tmat) {
 	for (auto& t : tmat) {
+		// cout << t << endl;
 		if (abs(t.imag()) > TOL) return false;
 	}
 	return true;
@@ -154,6 +155,7 @@ Ion::Ion(std::string edge) : Cluster(edge) {
 	tm_per_site = 1;
 	no_HYB = true;
 	orb_names = {"dx2","dz2","dxy","dxz","dyz"};
+	cluster_name = "ion";
 	return;
 };
 
@@ -169,6 +171,7 @@ SquarePlanar::SquarePlanar(std::string edge) : Cluster(edge) {
 	no_HYB = false;
 	orb_names = {"dx2","dz2","dxy","dxz","dyz",
 				"pxx","pxy","pxz","pyx","pyy","pyz"};
+	cluster_name = "Square Planar";
 	return;
 };
 
@@ -243,6 +246,7 @@ Octahedral::Octahedral(std::string edge) : Cluster(edge) {
 	orb_names = {"dx2","dz2","dxy","dxz","dyz",
 				"pxx","pxy","pxz","pyx","pyy",
 				"pyz","pzx","pzy","pzz"};
+	cluster_name = "Octahedral";
 	return;
 };
 

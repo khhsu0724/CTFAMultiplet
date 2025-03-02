@@ -4,7 +4,7 @@
 #include <bitset>
 #include <regex>
 #include <fstream>
-#include "multiplet.hpp"
+#include "interaction.hpp"
 #include "photon.hpp"
 
 #ifdef WINDOWS
@@ -376,6 +376,7 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	auto diag_stop = chrono::high_resolution_clock::now();
 	auto diag_duration = chrono::duration_cast<chrono::milliseconds>(diag_stop - diag_start);
 
+	dos_eigenenergy(GS,20,"dos.txt","eig.txt");
 	double gs_en = GS.hblks[0].eig[0];
 	vector<bindex> gsi;
 	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.nev; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
@@ -393,10 +394,9 @@ void process_hilbert_space(Hilbert& GS, Hilbert& EX, HParam& hparam, PM& pm) {
 	cout << "Calculating Occupation (with degeneracy): " << gsi.size() << endl;
 	occupation(GS,gsi,true,"");
 	occupation(GS,gsi,true,"",true);
-	wvfnc_weight(GS,gsi,3,true);
+	wvfnc_weight(GS,gsi,6,true);
 	// auto all_eig = GS.get_all_eigval(true);
 	// ed::printDistinct(all_eig,0.0,all_eig.size(),true);
-	dos_eigenenergy(GS,20,"dos.txt","eig.txt");
 	cout << endl;
 
 	// Assemble Core Hole Hamiltonian
@@ -515,7 +515,6 @@ int main(int argc, char** argv){
 
 	Hilbert GS(IDIR,hparam,pm.edge.substr(0,1),false);
 	Hilbert EX(IDIR,hparam,pm.edge.substr(0,1),true);
-
 	cout << "Input parameters" << endl;
 	cout << "TM 2p Spin-Orbit Coupling: " << hparam.SO[0] << " eV" << endl;
 	cout << "TM 3d Spin-Orbit Coupling: " << hparam.SO[1] << " eV" << endl;
@@ -571,7 +570,9 @@ int main(int argc, char** argv){
 	hparam.SC2EX[2] *= 49;
 	hparam.SC2EX[4] *= 441;
 
+	// The definition comes from here: https://arxiv.org/pdf/1206.3533, might not be super accurate
 	cout << "Ground State Uavg: " << (hparam.SC2[0]+hparam.SC2[2]*2/63+hparam.SC2[4]*2/63);
+	cout << "Core-Hole State Uavg: " << (hparam.SC2[0]+hparam.SC2EX[2]*2/63+hparam.SC2EX[4]*2/63);
 	cout << ", JH : " << (hparam.SC2[2]*2.5/49+hparam.SC2[4]*36/441) << " (Kanamori)"; // Adjusted for real space Harmonics
 	// cout << "Core-Hole State Udd: " << (hparam.SC2EX[0]-hparam.SC2EX[2]*2/63-hparam.SC2EX[4]*2/63);
 	// cout << ", JH: " << (hparam.SC2EX[2]/14+hparam.SC2EX[4]/14*5/7);
@@ -581,17 +582,21 @@ int main(int argc, char** argv){
 	cout << "EX Diagonalization Option: " << hparam.ex_diag_option << endl;
 
 	// Calculate Delta or Effective Delta
-	if (hparam.effective_delta) {
-		cout << "effective delta: " << hparam.MLdelta << endl; 
-		double del = calculate_effective_delta(IDIR,hparam,pm);
-		hparam.MLdelta = hparam.MLdelta - del;
-		cout << "calculated delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
+	if (GS.cluster->lig_per_site) {
+		if (hparam.effective_delta) {
+			cout << "effective delta: " << hparam.MLdelta << endl; 
+			double del = calculate_effective_delta(IDIR,hparam,pm);
+			hparam.MLdelta = hparam.MLdelta - del;
+			cout << "calculated delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
+		} else {
+			cout << "delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
+			// Comment out to save time!
+			// double del = calculate_effective_delta(IDIR,hparam,pm);
+			// cout << "Calculated effective delta: " << del + hparam.MLdelta << endl;
+		}
 	} else {
-		cout << "delta (used in Hamiltonian): " << hparam.MLdelta << endl; 
-		// Comment out to save time!
-		// double del = calculate_effective_delta(IDIR,hparam,pm);
-		// cout << "Calculated effective delta: " << del + hparam.MLdelta << endl;
-	}
+		cout << "No ligands, delta not calculated" << endl;
+	} 
 	cout << "solver options: " <<  pm.spec_solver << endl;
 	if (pm.spec_solver == 4) {
 		cout << "Lanczos/BiCGS Methods" << endl;

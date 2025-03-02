@@ -1,8 +1,8 @@
 #include "hilbert.hpp"
 #include "diagonalize.hpp"
 #include "gaunt.hpp"
-#ifndef MULTIPLET
-#define MULTIPLET
+#ifndef INTERACTION
+#define INTERACTION
 
 double calc_U(double* gaunt1, double* gaunt2, const double* SC, int size);
 void calc_ham(Hilbert& hilbs, const HParam& hparam, bool nohyb = false);
@@ -12,6 +12,8 @@ void calc_CF(Hilbert& hilbs, const double* CF);
 void calc_SO(Hilbert& hilbs, const double lambda, int l_in);
 void calc_CV(Hilbert& hilbs, const double* FG);
 void calc_HYB(Hilbert& hilbs, const HParam& hparam, bool nohyb);
-
+void calc_phonon(Hilbert& hilbs, const HParam& hparam);
+void calc_holestein(Hilbert& hilbs, const HParam& hparam);
+void calc_breathing(Hilbert& hilbs, const HParam& hparam);
 
 #endif

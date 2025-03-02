@@ -283,14 +283,17 @@ private:
 	double Sz = 0, Jz = 0, K = 0;
 	double *_ham, *_eig, *_eigvec, *_ham_copy; // Implicit pointer that faciliates diagonalization
 public:
-	size_t size, f_ind; // Accumulated first index of this Block
+	size_t size, fermion_hsize; 
+	size_t f_ind; // Accumulated first index of this Block
 	size_t nev;			// Number of eigenvalues
+	size_t phonon_hsize = 1; // Repeat the fermionic part n times
 	int diag_option;
 
 	Matrix<T>* ham;
 	uptrd eig, eigvec;
 	std::vector<int> einrange;
 	std::vector<ulli> rank; // rank keeps some rank information for faster hashing
+
 	Block(double Sz, double Jz, double K, size_t size, size_t f_ind_in = 0,
 		std::vector<ulli> rank_in = std::vector<ulli>(0)):
 		Sz(Sz), Jz(Jz), K(K), size(size), f_ind(f_ind_in) {
@@ -300,7 +303,9 @@ public:
 		rank = std::move(rank_in);
 	};
 	
-	Block(Block<T>&& blk) : Sz(blk.Sz), Jz(blk.Jz), K(blk.K), size(blk.size), f_ind(blk.f_ind), nev(blk.nev) {
+	Block(Block<T>&& blk) : Sz(blk.Sz), Jz(blk.Jz), K(blk.K), size(blk.size), 
+							f_ind(blk.f_ind), nev(blk.nev), fermion_hsize(blk.fermion_hsize), 
+							phonon_hsize(blk.phonon_hsize) {
 		// This is a bit odd, should I copy or move?
 		ham = std::move(blk.ham);
 		eig = std::move(blk.eig);
@@ -315,6 +320,11 @@ public:
 	double get_sz() {return Sz;};
 	double get_jz() {return Jz;};
 	double get_k() {return K;};	
+	void set_phonon_hsize(int phonon_hsize_in) {
+		phonon_hsize = phonon_hsize_in;
+		fermion_hsize = size/phonon_hsize;
+		return;
+	}
 	void malloc_ham(int diag_option) {
 		// If matrix is too large, automatically use arpack
 		if (size >= 1e5) {

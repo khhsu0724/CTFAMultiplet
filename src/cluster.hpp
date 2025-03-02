@@ -8,7 +8,7 @@ public:
 	int vo_persite = 0, co_persite = 0;
 	int lig_per_site = 0, tm_per_site = 0;
 	bool no_HYB;
-	std::string edge, inp_hyb_file = "";
+	std::string edge, cluster_name = "", inp_hyb_file = "";
 	virtual void set_hyb_params(const HParam& hparam) {return;};
 	// Converts spherical harmonics to real space basis, per site
 	virtual vecc get_seph2real_mat() = 0;
@@ -23,13 +23,14 @@ public:
 	void set_print_site(bool print_site_occ) {this->print_all_sites = print_site_occ;};
 	void set_num_sites(int _num_sites) {this->num_sites = _num_sites;};
 	void read_inp_tmat(std::string inp_hyb_file) {this->inp_hyb_file = inp_hyb_file;};
+	void print_cluster_name() {std::cout << "Cluster: " << cluster_name << std::endl;};
 	void make_atlist(std::vector<Atom>& atlist, int num_vh, 
 						const std::vector<int>& sites);
 	void print_eigstate(const vecd& occ, bool is_print = true, std::string fname = "", int p = 5);
 	vecc get_inp_tmat();
 	vecd get_tmat_real();
 protected:
-	int w = 12, num_sites = 1;
+	int w = PRINT_WIDTH, num_sites = 1;
 	std::vector<std::string> orb_names;
 	bool print_all_sites = true; // If false program will print per_site
 	bool tppsigma_on = false;
@@ -88,7 +89,7 @@ public:
 	vecc get_tmat();
 private:
 	double tpd_sig_pi = 0.5; // This needed to be checked
-	double tpp_sig_pi = 0;
+	double tpp_sig_pi = 0.5;
 };
 
 #endif

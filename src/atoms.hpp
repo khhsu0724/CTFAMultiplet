@@ -2,6 +2,28 @@
 #ifndef ATOMS
 #define ATOMS
 
+struct HParam {
+	// Hilbert space parameters
+	double nedos = 0; // PHASE OUT
+	double HFscale = 1.0;
+	double MLdelta = 0, octJT = 1, sig_pi = 0.5;
+	double tpd = 0, tpp = 0, tpdz_ratio = 0.25;
+	bool tppsigma_on = false;
+	double SO[3]{0}, CF[5]{0};
+	double SC2[5]{0}, SC1[3]{0}, FG[4]{0}, SC2EX[5]{0};
+	int gs_diag_option = 2, ex_diag_option = 2;
+	bool block_diag = true, HYB = true, effective_delta = true;
+	bool print_site_occ = false;
+	int ex_nev = 0, gs_nev = 0;
+	std::vector<double*> SC;
+	HParam() {
+		SO[2] = -1; // Set this to -1 for checking
+		SC.emplace_back(SC1);
+		SC.emplace_back(SC2);
+	};
+	// Copy constructor??
+};
+
 inline int conv_lchar(char orb) {
 	try {
 		if (orb == 's') return 0;
@@ -40,28 +62,6 @@ inline bool operator<(const QN& qn1, const QN& qn2) {
 inline bool operator!=(const QN& qn1, const QN& qn2) {
 	if (qn1.spin == qn2.spin && qn1.ml == qn2.ml && qn1.order == qn2.order) return false;
 	return true;
-};
-
-struct HParam {
-	// Hilbert space parameters
-	double nedos = 0; // PHASE OUT
-	double HFscale = 1.0;
-	double MLdelta = 0, octJT = 1, sig_pi = 0.5;
-	double tpd = 0, tpp = 0, tpdz_ratio = 0.25;
-	bool tppsigma_on = false;
-	double SO[3]{0}, CF[5]{0};
-	double SC2[5]{0}, SC1[3]{0}, FG[4]{0}, SC2EX[5]{0};
-	int gs_diag_option = 2, ex_diag_option = 2;
-	bool block_diag = true, HYB = true, effective_delta = true;
-	bool print_site_occ = false;
-	int ex_nev = 0, gs_nev = 0;
-	std::vector<double*> SC;
-	HParam() {
-		SO[2] = -1; // Set this to -1 for checking
-		SC.emplace_back(SC1);
-		SC.emplace_back(SC2);
-	};
-	// Copy constructor??
 };
 
 struct Atom {

@@ -17,13 +17,18 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 	CF_on = !ed::is_zero_arr(hparam.CF,5);
 	CV_on = (is_ex && !ed::is_zero_arr(hparam.FG,4));
 	cluster->set_print_site(hparam.print_site_occ);
+	assign_phonon();
+	// Calculate Hilbert space size
 	if (hparam.block_diag && !hparam.SO[1]) BLOCK_DIAG = !(edge == "L" && is_ex) || !hparam.SO[0];
 	int hv = num_vorb/2, hc = num_corb/2;
-	this->hsize = ed::choose(num_vorb,num_vh) * ed::choose(num_corb,num_ch);
+	if (this->have_phonon()) phonon_hsize = phonon_modes->get_pn_hsize();
+	this->hsize = ed::choose(num_vorb,num_vh) * ed::choose(num_corb,num_ch) * phonon_hsize;
+	cout << "phonon hilbert space size: " << phonon_hsize << ", hsize: " << this->hsize << endl;
 	if (num_vh > num_vorb) throw invalid_argument("too many holes from input");
 	size_t bfind = 0;
 	if (BLOCK_DIAG) {
 		// Sz ordered blocks, when spin orbit coupling is not on
+		// cout << "BLOCK DIAG" << endl;
 		SO_on = false;
 		hashfunc = &Hilbert::sz_Hash;
 		hbfunc = &Hilbert::sz_Hashback;
@@ -40,8 +45,8 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 				int vsu = (sz+max_2sz)/2 - ed::count_bits(c>>hc);
 				c = ed::next_perm(c);
 				if (vsd < 0 || vsu < 0) continue;
-				rank[i] = blksize;
-				blksize += ed::choose(hv,vsd) * ed::choose(hv,vsu);
+				rank[i] = blksize/phonon_hsize; // Rank is fermionic hashing
+				blksize += ed::choose(hv,vsd) * ed::choose(hv,vsu) * phonon_hsize;
 			}
 			hblks.emplace_back(double(sz)/2,0,0,blksize,bfind,rank);
 			bfind += blksize;
@@ -68,7 +73,7 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 		}
 		// Calculate block size
 		vector<int> blk_size((max_2jz-min_2jz)/2+1,0);
-		for (int i = 0; i < hspace.size(); ++i) blk_size[(jz2_arr[i]-min_2jz)/2] += 1;
+		for (int i = 0; i < hspace.size(); ++i) blk_size[(jz2_arr[i]-min_2jz)/2] += phonon_hsize;
 		// Make Blocks
 		hblks.reserve(blk_size.size());
 		for (int j = min_2jz; j <= max_2jz; j += 2) {
@@ -85,11 +90,23 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 		}		
 	}
 	else {
+		cout << "NORM DIAG" << endl;
 		hashfunc = &Hilbert::norm_Hash;
 		hbfunc = &Hilbert::norm_Hashback;
 		hblks.emplace_back(0,0,0,this->hsize);
 	}
-	// DEBUG
+	for (auto & hblk : hblks) hblk.set_phonon_hsize(phonon_hsize);
+	// DEBUG: repeating n times per phonon mode
+	// phonon_modes->check_pn_hspace();
+	// vector<pn_op> pnops;
+	// pnops.push_back(pn_op(1,false));
+	// pnops.push_back(pn_op(1,true));
+	// phonon_modes->gen_pair_pn_index(pnops);
+	// cout << endl << "LOWERING: " << endl;
+	// pnops.clear();
+	// pnops.push_back(pn_op(0,false));
+	// phonon_modes->gen_pair_pn_index(pnops);
+	// exit(0);
 	// vector<ulli> hspace = enum_hspace();
 	// if (is_ex) cout << "excited state" << endl;
 	// else cout << "groud state" << endl;
@@ -101,10 +118,12 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 	// }
 	// cout << "ATOMS: " << endl;
 	// for (auto & at : atlist) cout << at.atname << ", " << at.is_lig << endl;
+	// exit(0);
 	// DEBUG
+	return;
 }
 
-Hilbert::Hilbert(const Hilbert &hilbs, int vh_mod) {
+Hilbert::Hilbert(const Hilbert &hilbs, int vh_mod, int pnhsize) {
 	// Copy constructor, vh_mod can be used for dummy hilbert spaces
 	num_vh = hilbs.num_vh + vh_mod;
 	num_ch = hilbs.num_ch;
@@ -123,8 +142,12 @@ Hilbert::Hilbert(const Hilbert &hilbs, int vh_mod) {
 	edge = hilbs.edge;
 	atlist = hilbs.atlist;
 	sites = hilbs.sites;
+	// I think I should copy the phonons here
+	if (pnhsize == 0) phonon_hsize = hilbs.phonon_hsize;
+	else phonon_hsize = pnhsize;
 	if (!vh_mod) cout << "USING COPY CONSTRUCTOR IS NOT ADVISED" << endl;
-	hsize = ed::choose(num_vorb,num_vh) * ed::choose(num_corb,num_ch);
+	hsize = ed::choose(num_vorb,num_vh) * ed::choose(num_corb,num_ch) * phonon_hsize;
+
 	assign_cluster(coord);
 	// This is not great, we should be able to specify Hash function?
 	hashfunc = &Hilbert::norm_Hash;
@@ -133,6 +156,13 @@ Hilbert::Hilbert(const Hilbert &hilbs, int vh_mod) {
 	return;
 }
 
+// Enumerate all possible bit state in the fermionic Hilbert space, 
+// with the inclusion any existing core/valence state 
+// (vmod changes many valence states are included)
+// Important: inc_val should be input as a binary with !!2*nvo!! digits
+//.           same with inc_core. The code will split these up and 
+//			  combine these to a binary that can is in the Hilbert space
+//			  See interaction.cpp->holestein for a simple example
 vector<ulli> Hilbert::enum_hspace(ulli inc_val, ulli inc_core, int vmod, int cmod) {
 	vector<ulli> val,core,hspace;
 	ed::enum_states(val,num_vorb,num_vh+vmod,inc_val);
@@ -140,7 +170,6 @@ vector<ulli> Hilbert::enum_hspace(ulli inc_val, ulli inc_core, int vmod, int cmo
 	for (auto &c : core) for (auto &v : val) hspace.emplace_back(ed::add_bits(v,c,num_vorb,num_corb));
 	return hspace;
 }
-
 
 // Using 2^n representation to calculate quantumn number, convert to binary
 // and +1/2 spin to -1/2. Angular momentum comes first, hole language
@@ -178,12 +207,54 @@ vpulli Hilbert::match(int snum, QN* lhs, QN* rhs) {
 }
 
 void Hilbert::fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs) {
-	// Find block index for lhs and rhs
+	// Find block index for lhs and rhs (lhs and rhs are the fermionic part)
+	// repeat this for the bosonic part
 	bindex lind = Hash(lhs);
 	bindex rind = Hash(rhs);
-	if (lind.first == rind.first) 
-		hblks[lind.first].ham->fill_mat(lind.second,rind.second,matelem);
-	else throw out_of_range("invalid block matrix element entry");
+	if (lind.first == rind.first) {
+		int fermion_hsize = hblks[lind.first].fermion_hsize;
+		for (int i = 0; i < hblks[lind.first].phonon_hsize; ++i) {
+			hblks[lind.first].ham->fill_mat(lind.second+i*fermion_hsize,
+											rind.second+i*fermion_hsize,matelem);
+		}
+	} else throw out_of_range("invalid block matrix element entry");
+	return;
+}
+
+void Hilbert::fill_hblk_pn(double const& matelem, bindex const& lind_pn, bindex const& rind_pn,
+							ulli const& lhs_fm, ulli const& rhs_fm) {
+	// Find block index for lhs and rhs for phonon part
+	// lhs_pn and rhs_pn is for phonon, lhs_fm and rhs_fm is for fermion
+	// !!!!! PHONON BLOCKS ARE NOT IMPLEMENTED !!!!!
+	int ipn = lind_pn.second;
+	int jpn = rind_pn.second;
+	if (lhs_fm != 0 && rhs_fm != 0) {
+		bindex lind_fm = Hash(lhs_fm);
+		bindex rind_fm = Hash(rhs_fm);
+		// print_bits(lhs_fm);
+		// print_bits(rhs_fm);
+		int ifm = lind_fm.second;
+		int jfm = rind_fm.second;
+		// cout << "SIZE: " << hblks[lind_fm.first].size << "," << hblks[lind_fm.first].fermion_hsize << endl;
+		if (lind_fm.first == rind_fm.first) {
+			// cout << "pnind: " << ipn << "," << jpn << ", fmind: " << ifm << "," << jfm << endl;
+			int fermion_hsize = hblks[lind_fm.first].fermion_hsize;
+			hblks[lind_fm.first].ham->fill_mat(ifm+ipn*fermion_hsize,
+												jfm+jpn*fermion_hsize,matelem);
+		} else throw out_of_range("invalid block matrix element entry");
+
+	} else {
+		// No fermionic term, go through all fermionic basis state
+		if (lhs_fm != 0 || rhs_fm != 0)
+			throw out_of_range("invalid fermionic basis state for matrix element entry");
+		for (auto& blk : hblks) {
+			int fermion_hsize = blk.fermion_hsize;
+			for (int ifm = 0; ifm < fermion_hsize; ++ifm) {
+				blk.ham->fill_mat(ifm+ipn*fermion_hsize,ifm+jpn*fermion_hsize,
+									matelem);
+			}
+		}
+	}
 	return;
 }
 
@@ -271,6 +342,32 @@ void Hilbert::assign_cluster(string input) {
 		coord = "oct"; 
 		cluster = new Octahedral(edge);
 	} else throw invalid_argument("unavailable coordination");
+	return;
+}
+
+void Hilbert::assign_phonon() {
+	// Ideally this should be read from a separate &PHONON tag
+	if (cluster == NULL or cluster->lig_per_site == 0) {
+		cout << "Cannot have phonon modes" << endl;
+		return;
+	}
+	phonon_modes = new PhononModes(this->cluster);
+	Phonon_Param pn1;
+	pn1.omega = 0.055;
+	pn1.h_orb_i = veci({5});
+	pn1.g_h = 0.06;
+	// pn1.b_orb_ij.push_back({std::make_pair<int,int>(0,5)});
+	// pn1.g_b = 10;
+	phonon_modes->addPhonon(8,pn1);
+	// // Phonon_Param pn2;
+	// // pn2.omega = 2;
+	// // phonon_modes->addPhonon(4,pn2);
+	// // Phonon_Param pn3;
+	// // pn3.omega = 2;
+	// // phonon_modes->addPhonon(1,1,pn3);
+	phonon_modes->hashfunc = &PhononModes::norm_Hash;
+	phonon_modes->hbfunc = &PhononModes::norm_Hashback;
+	return;
 }
 
 void Hilbert::read_from_file(string file_dir) {
@@ -443,6 +540,7 @@ bindex Hilbert::norm_Hash(ulli s) {
 
 ulli Hilbert::norm_Hashback(bindex ind) {
 	// Hash function that convert index to state in bitset
+	ind.second = ind.second % hblks[ind.first].fermion_hsize;
 	size_t edchoose = ed::choose(num_vorb,num_vh);
 	size_t cind = ind.second / edchoose, ch = num_ch;
 	size_t vind = ind.second % edchoose, vh = num_vh;
@@ -486,6 +584,7 @@ bindex Hilbert::sz_Hash(ulli s) {
 
 ulli Hilbert::sz_Hashback(bindex ind) {
 	// Hashback function that uses sz as main QN
+	ind.second = ind.second % hblks[ind.first].fermion_hsize;
 	int max_2sz = int(2*hblks.back().get_sz());
 	auto& blk = hblks[ind.first];
 	auto r = std::find_if(blk.rank.rbegin(), blk.rank.rend(),
@@ -534,6 +633,7 @@ bindex Hilbert::jz_Hash(ulli s) {
 
 ulli Hilbert::jz_Hashback(bindex ind) {
 	// Hashback function that uses jz as main QN
+	ind.second = ind.second % hblks[ind.first].fermion_hsize;
 	return hblks[ind.first].rank[ind.second];
 
 }

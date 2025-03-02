@@ -1,5 +1,6 @@
 #include "diagonalize.hpp"
 #include "cluster.hpp"
+#include "phonon.hpp"
 #ifndef HILBERT
 #define HILBERT
 
@@ -7,12 +8,13 @@
 class Hilbert {
 public:
 	// TODO: make some of the variables private
-	size_t hsize = 1;
-	int num_at = 0, at_per_site = 0;
+	size_t hsize = 1, phonon_hsize = 1;
+	int num_at = 0, at_per_site = 0; // !!num_phonons includes no phonon
 	int val_ati = 0, val_ind = 0; // Index/Orbital index of first valence atom
 	int num_ch = 0, num_vh = 0, num_corb = 0, num_vorb = 0; // This is number of orbital*2 (number of electron sites)
 	bool SO_on = false, CV_on = false, CF_on = false, HYB_on = false;
 	bool is_ex, BLOCK_DIAG = false;
+	bool have_phonon() {return phonon_modes != NULL;};
 	std::string coord = "none", edge, inp_hyb_file;
 	std::vector<Atom> atlist; // atlist is ordered
 	std::vector<Block<double>> hblks;
@@ -22,10 +24,11 @@ public:
 	Hashptr hashfunc;
 	HBptr hbfunc;
 	Cluster* cluster = NULL;
+	PhononModes* phonon_modes = NULL;
 
 public:
 	Hilbert() {};
-	Hilbert(const Hilbert &hilbs, int vh_mod = 0);
+	Hilbert(const Hilbert &hilbs, int vh_mod = 0, int pnhsize=0);
 	~Hilbert() {};
 	explicit Hilbert(std::string file_dir, const HParam& hparam, // HParam referenced from atoms.hpp
 						std::string edge, bool is_ex = false);
@@ -33,6 +36,8 @@ public:
 	ulli qn2ulli(int snum, QN* qn, bool only_val = false, bool only_core = false);
 	vpulli match(int snum, QN* lhs, QN* rhs);
 	void fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs);
+	void fill_hblk_pn(double const& matelem, bindex const& lind_pn, bindex const& rind_pn,
+								ulli const& lhs_fm = 0, ulli const& rhs_fm = 0);
 	void print_bits(ulli state);
 	double Fsign(QN* op, ulli state, int opnum);
 	double Fsign(ulli* op, ulli state, int opnum);
@@ -44,6 +49,7 @@ public:
 
 	// Functions for input file parsing and initialize
 	void assign_cluster(std::string input);
+	void assign_phonon();
 	void read_from_file(std::string file_dir);
 
 	// Nice Collection of Hash Functions

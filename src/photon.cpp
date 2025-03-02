@@ -1,6 +1,5 @@
 #include <complex>
 #include <bitset>
-#include "multiplet.hpp"
 #include "photon.hpp"
 
 // This file handles calculating cross section/Occupation/CI configuration
@@ -41,8 +40,10 @@ vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print, string 
 	for (auto& blk : hilbs.hblks) if (blk.eigvec == nullptr) throw runtime_error("matrix not diagonalized for occupation");
 	int nvo = hilbs.cluster->vo_persite, nco = hilbs.cluster->co_persite;
 	vecc U = hilbs.cluster->get_seph2real_mat();
-	vector<double> occ_totsu(nvo,0), occ_totsd(nvo,0);
+	vector<double> occ_totsu(nvo,0), occ_totsd(nvo,0), occ_totpn;
+	// How do I print phonons????
 	Hilbert minus_1vh(hilbs,-1);
+	int m1fhsize = minus_1vh.hsize/minus_1vh.phonon_hsize;
 	int gs_count = 0;
 	for (auto &s  : si) {
 		auto& blk = hilbs.hblks[s.first];
@@ -58,22 +59,41 @@ vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print, string 
 					double sj = blk.eigvec[s.second*blk.size+j];
 					if (abs(sj) < TOL) continue;
 					// Operate on spin up and spin down
+					int pn_ind = j / blk.fermion_hsize;
 					ulli op_state = hilbs.Hashback(bindex(s.first,j));
 					ulli opsu = BIG1 << (ci+nco), opsd = BIG1 << (ci+2*nco+nvo);
 					if (opsu & op_state) {
 						bindex ind = minus_1vh.Hash(op_state-opsu);
 						int fsgn = hilbs.Fsign(&opsu,op_state,1);
-						wvfncsu[ind.second] += fsgn*sj*U[c*nvo+ci];
+						wvfncsu[ind.second+m1fhsize*pn_ind] += fsgn*sj*U[c*nvo+ci];
 					}
 					if (opsd & op_state) {
 						bindex ind = minus_1vh.Hash(op_state-opsd);
 						int fsgn = hilbs.Fsign(&opsd,op_state,1);
-						wvfncsd[ind.second] += fsgn*sj*U[c*nvo+ci];
+						wvfncsd[ind.second+m1fhsize*pn_ind] += fsgn*sj*U[c*nvo+ci];
 					}
 				}
 			}
 			for (auto &w : wvfncsu) occ_totsu[c] += abs(pow(w,2));
 			for (auto &w : wvfncsd) occ_totsd[c] += abs(pow(w,2));
+		}
+		if (hilbs.have_phonon()) {
+			occ_totpn = vector<double>(hilbs.phonon_modes->get_unique_modes(),0);
+			vector<double> wvfncpn(blk.size,0);
+			int bfsize = blk.fermion_hsize;
+			for (size_t i = 0; i < hilbs.phonon_modes->get_unique_modes(); i++) {
+				// Iterate through a^dag,a
+				vector<pn_op> pnops;
+				pnops.push_back(pn_op(i,false));
+				pnops.push_back(pn_op(i,true));
+				vector<pn_pair> entries = hilbs.phonon_modes->gen_pair_pn_index(pnops);
+				for (auto& e : entries) {
+					int ipn = e.lhs.second;
+					int jpn = e.rhs.second;
+					for (size_t ifm = 0; ifm < bfsize; ++ifm) 
+						occ_totpn[i] += e.prefac*abs(pow(blk.eigvec[s.second*blk.size+(ifm+jpn*bfsize)],2));
+				}
+			}
 		}
 	}
 	vector<double> occ_tot(nvo,0);
@@ -81,6 +101,7 @@ vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print, string 
 		occ_totsu[i] = occ_totsu[i]/gs_count;
 		occ_totsd[i] = occ_totsd[i]/gs_count;
 	}
+	for (auto& pn : occ_totpn) pn = pn/gs_count;
 	for (int i = 0; i < nvo; ++i) occ_tot[i] = occ_totsd[i] + occ_totsu[i];
 	if (spin_res) {
 		// cout << "Spin up: " << endl;
@@ -90,91 +111,10 @@ vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print, string 
 	} else {
 		hilbs.cluster->print_eigstate(occ_tot,is_print,fname);
 	}
-	return occ_tot;
-}
-
-
-vecd occupation_test(Hilbert& hilbs, const vector<bindex>& si, bool is_print) {
-	// Calculation occupation of orbitals, only valid when matrix is diagonalized
-	for (auto& blk : hilbs.hblks) if (blk.eigvec == nullptr) throw runtime_error("matrix not diagonalized for occupation");
-	int nvo = hilbs.cluster->vo_persite * hilbs.tot_site_num();
-	int nco = hilbs.cluster->co_persite * hilbs.tot_site_num();
-	// cout << "NVO: " << nvo << ", NCO:" << nco << endl;
-	vecc U = ed::make_blk_mat(hilbs.cluster->get_seph2real_mat(),hilbs.tot_site_num());
-	vector<double> occ_totc(nvo,0);
-	Hilbert minus_1vh(hilbs,-1);
-	// cout << "hilbs: " << hilbs.hsize << ", minus_vh hsize:" << minus_1vh.hsize << endl;
-	for (auto &s  : si) {
-		auto& blk = hilbs.hblks[s.first];
-		// cout << s.first << ", " << s.second << endl;
-		// double norm = 0;
-		// for (size_t x = 0; x < blk.size; ++x) {
-		// 	// cout << blk.eigvec[s.second*blk.size+x] << endl;
-		// 	norm += pow(blk.eigvec[s.second*blk.size+x],2);
-		// }
-		// cout << "Norm: " << norm << endl;
-		// Pick an operator
-		for (size_t c = 0; c < nvo; ++c) {
-			vecc wvfnc(minus_1vh.hsize,0);
-			for (size_t ci = 0; ci < nvo; ++ci) {
-				if (abs(U[c*nvo+ci]) < TOL) continue;
-				for (size_t j = 0; j < blk.size; ++j) {
-					double sj = blk.eigvec[s.second*blk.size+j];
-					if (abs(sj) < TOL) continue;
-					// Operate on spin up and spin down
-					for (int sud = nco; sud <= 2*(nco+nvo); sud += nco+nvo) {
-						ulli op_state = hilbs.Hashback(bindex(s.first,j)), op;
-						if (BIG1 << (ci+sud) & op_state) op = BIG1<<(ci+sud);
-						else continue;
-						// cout << "opstate: " << bitset<32>(op_state) << ", op: " << bitset<32>(op) << ", minus: " <<  bitset<32>(op_state-op) << endl;
-						bindex ind = minus_1vh.norm_Hash(op_state-op);
-						int fsgn = hilbs.Fsign(&op,op_state,1);
-						wvfnc[ind.second] += fsgn*sj*U[c*nvo+ci];
-					}
-				}
-			}
-			for (auto &w : wvfnc) occ_totc[c] += abs(pow(w,2))/si.size();
-		}
-		// if (is_print) hilbs.cluster->print_eigstate(occ_totc);
+	if (hilbs.have_phonon()) {
+		hilbs.phonon_modes->print_phonons_occuptation(occ_totpn,is_print,fname);
 	}
-	// if (is_print) hilbs.cluster->print_eigstate(occ_totc);
-
-	//DEBUG
-	// U = hilbs.cluster->get_seph2real_mat();
-	// cout << "DEBUGGGG NVO: " << nvo << ", NCO:" << nco << " U size: " << U.size()  << endl;
-	// occ_totc = vecd(nvo,0);
-	// for (auto &s  : si) {
-	// 	auto& blk = hilbs.hblks[s.first];
-	// 	// Pick an operator
-	// 	for (size_t site = 0; site < hilbs.tot_site_num()*5; site+=5) {
-	// 		for (size_t c = 0; c < 5; ++c) {
-	// 			vecc wvfnc(minus_1vh.hsize,0);
-	// 			for (size_t ci = 0; ci < 5; ++ci) {
-	// 				if (abs(U[c*5+ci]) < TOL) continue;
-	// 				for (size_t j = 0; j < blk.size; ++j) {
-	// 					double sj = blk.eigvec[s.second*blk.size+j];
-	// 					if (abs(sj) < TOL) continue;
-	// 					// Operate on spin up and spin down
-	// 					for (int sud = nco; sud <= 2*(nco+nvo); sud += nco+nvo) {
-	// 						ulli op_state = hilbs.Hashback(bindex(s.first,j)), op = 0;
-	// 						if (BIG1 << (ci+sud+site) & op_state) op = BIG1<<(ci+sud+site);
-	// 						else continue;
-	// 						bindex ind = minus_1vh.norm_Hash(op_state-op);
-	// 						double fsgn = hilbs.Fsign(&op,op_state,1);
-	// 						wvfnc[ind.second] += fsgn*sj*U[c*5+ci];
-	// 					}
-	// 				}
-	// 				for (auto &w : wvfnc) occ_totc[c+site] += abs(pow(w,2))/si.size();
-	// 			}
-	// 		}
-	// 	}
-	// 	if (is_print) hilbs.cluster->print_eigstate(occ_totc);
-	// }
-	// DEBUG
-
-
-	if (is_print) hilbs.cluster->print_eigstate(occ_totc);
-	return occ_totc;
+	return occ_tot;
 }
 
 vector<double> wvfnc_weight(Hilbert& hilbs, const vector<bindex>& si, int ligNum, bool print) {
@@ -198,8 +138,9 @@ vector<double> wvfnc_weight(Hilbert& hilbs, const vector<bindex>& si, int ligNum
 		}
 	}
 	if (print) {
-		cout << "Ground State composition";
+		cout << "State composition";
 		for (size_t i = 0; i <= ligNum; ++i) {
+			if (abs(dLweight[i]) < 0.01) continue;
 			cout << ", d" << 10-hilbs.num_vh+i;
 			if (i == 1) cout << "L: ";
 			else if (i > 1) cout << "L" << i << ": ";
@@ -231,7 +172,7 @@ double effective_delta(Hilbert& hilbs, int ligNum, bool is_print) {
 
 		vector<double> dLweight = wvfnc_weight(hilbs,gei,ligNum,false);
 		for (size_t i = 0; i <= ligNum; ++i) {
-			if (firstLh[i] && dLweight[i] > TOL) { //Cases where different dn states mix
+			if (firstLh[i] && dLweight[i] > 1e-4) { //Cases where different dn states mix
 				if (i == 0) d = distinct[e];
 				if (i == 1) dL = distinct[e];
 				firstLh[i] = false;
@@ -292,6 +233,10 @@ void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, vector<blapIndex>& bla
 	#pragma omp parallel for shared(blap,gslist,exslist) collapse(2)
 	for (size_t g = 0; g < gsblk_size; g++) {
 		for (size_t e = 0; e < exblk_size; e++) {
+			int g_pn_ind = g/GS.hblks[gbi].fermion_hsize;
+			int e_pn_ind = e/EX.hblks[exi].fermion_hsize;
+			if (g_pn_ind != e_pn_ind) continue;
+			// If not the same phonon block continue
 			ulli gs = gslist.at(g), exs = exslist.at(e);
 			ulli ch = exs - (gs & exs), vh = gs - (gs & exs);
 			int coi = EX.orbind(ch), voi = GS.atlist[coi].vind;
@@ -413,7 +358,7 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 				size_t exblk_ind = &exblk-&EX.hblks[0];
 				// No spin flip
 				if (!GS.SO_on && !EX.SO_on && GS.hblks[g.first].get_sz() != exblk.get_sz()) continue;
-				cout << "gsblk: " << g.first << ", exblk: " << &exblk-&EX.hblks[0] << endl;
+				// cout << "gsblk: " << g.first << ", exblk: " << &exblk-&EX.hblks[0] << endl;
 				vecc gs_vec(gblk_size,0);
 				#pragma omp parallel for
 				for (int i = 0; i < gblk_size; ++i) 

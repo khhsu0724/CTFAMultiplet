@@ -1,8 +1,8 @@
 #include <stdlib.h>
-#include "multiplet.hpp"
+#include "interaction.hpp"
 
 using namespace std;
-// Includes multiplet interaction
+// Includes multiplet interaction (and phonons)
 
 double calc_U(double* gaunt1, double* gaunt2, const double* SC, int size) {
 	double u = 0;
@@ -24,6 +24,7 @@ void calc_ham(Hilbert& hilbs, const HParam& hparam, bool nohyb) {
 	if (hilbs.CF_on) calc_CF(hilbs,&hparam.CF[0]);
 	if (hilbs.CV_on) calc_CV(hilbs,&hparam.FG[0]);
 	if (hilbs.HYB_on) calc_HYB(hilbs,hparam,nohyb);
+	if (hilbs.have_phonon()) calc_phonon(hilbs,hparam);
 	return;
 }
 
@@ -133,7 +134,7 @@ void calc_SO(Hilbert& hilbs, const double lambda, int l_in) {
 		// Only TM 2p/3d core orbitals get spin orbit coupling for now
 		if (l != l_in || hilbs.atlist[i].is_lig) continue;
 		for (int ml = -l; ml <= l; ++ml) {
-			// longitudinal phonon
+			// longitudinal mode
 			for (auto spin : {-0.5,0.5}) {
 				QN qn(ml,spin,i);
 				vpulli entries = hilbs.match(1,&qn,&qn);
@@ -141,7 +142,7 @@ void calc_SO(Hilbert& hilbs, const double lambda, int l_in) {
 				double matelem = -lambda * spin * ml;
 				for (auto& e : entries) hilbs.fill_hblk(matelem,e.first,e.second);
 			}
-			// transverse phonon
+			// transverse mode
 			if (ml < l) {
 				QN qn1(ml+1,-0.5,i), qn2(ml,0.5,i);
 				vpulli entries = hilbs.match(1,&qn1,&qn2);
@@ -195,12 +196,6 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam, bool nohyb) {
 	int nco = hilbs.cluster->co_persite * hilbs.tot_site_num();
 	// HYBRIDIZATION is momentum dependent, need to rewrite code here
 	vecd hybmat = ed::make_blk_mat(hilbs.cluster->get_tmat_real(),hilbs.tot_site_num());
-	// if (nohyb) {
-	// 	// Wipe out all non diagonal term if no hybridization is needed
-	// 	for (int i = 0; i < nvo*nvo; ++i) {
-	// 		if ()
-	// 	}
-	// }
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
 	// Loop through hyb matrix, TODO: Loop through each site
 	for (int i = 0; i < nvo; ++i) {
@@ -211,6 +206,9 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam, bool nohyb) {
 			ulli lhssd_shift = (incsd-lhssd) << nco, rhssd_shift = (incsd-rhssd) << nco;	
 			ulli lhssu = BIG1 << (i+nvo), rhssu = BIG1 << (j+nvo), incsu = (rhssu|lhssu);
 			ulli lhssu_shift = (incsu-lhssu) << (2*nco), rhssu_shift = (incsu-rhssu) << (2*nco);
+			// The logic here is: find c^dag_i c_j, generate list of states that includes both 
+			// i & j. to get bra and ket you simply subtract bit i,j from the common state
+			// Essentially: c_i|I> = c_j|J>
 			QN qnlu, qnru, qnld, qnrd;
 			int atlist_ind = 0;
 			for (auto& at : hilbs.atlist) {
@@ -248,6 +246,115 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam, bool nohyb) {
 				if (e.first == e.second) hilbs.fill_hblk(hybmat[i*nvo+j],e.first,e.second);
 				else hilbs.fill_hblk(hybmat[i*nvo+j]*hilbs.Fsign(&qnlu,e.first,1)*hilbs.Fsign(&qnru,e.second,1),
 									 e.first,e.second);
+			}
+		}
+	}
+	return;
+}
+
+void calc_phonon(Hilbert& hilbs, const HParam& hparam) {
+	// This function iterate all phonon Hilbert space to find non-zero matrix elements
+	// It is different than electronic part where we find matrix elements using operators
+	for (int i = 0; i < hilbs.phonon_modes->get_unique_modes(); ++i) {
+		// 		 +	
+		// H = wb b  
+		//		 i i 
+		auto& phonon = hilbs.phonon_modes->phonons[i];
+		vector<pn_op> pnops;
+		pnops.push_back(pn_op(i,false));
+		pnops.push_back(pn_op(i,true));
+		vector<pn_pair> entries = hilbs.phonon_modes->gen_pair_pn_index(pnops);
+		for (auto& e : entries) {
+			double freq = phonon->pnParam.omega;
+			// hilbs.phonon_modes->print_phonon(e.lhs);
+			// hilbs.phonon_modes->print_phonon(e.rhs);
+			// cout << "Frequency: " << freq*e.prefac << endl;
+			hilbs.fill_hblk_pn(freq*e.prefac,e.lhs,e.rhs);
+		}
+	}
+	// exit(0);
+	// Holestein type
+	calc_holestein(hilbs,hparam);
+	// Breathing type
+	calc_breathing(hilbs,hparam);
+	return;
+}
+
+// Holestein term, modulate density terms
+// 			 +
+// H = gn  (b + b )
+//       is  i   i
+void calc_holestein(Hilbert& hilbs, const HParam& hparam) {
+	int nvo = hilbs.cluster->vo_persite * hilbs.tot_site_num();
+	int nco = hilbs.cluster->co_persite * hilbs.tot_site_num();
+	for (int i = 0; i < hilbs.phonon_modes->get_unique_modes(); ++i) {
+		auto& phonon = hilbs.phonon_modes->phonons[i];
+		double g_h = phonon->pnParam.g_h;
+		if (phonon->is_holestein()) {
+			bool is_raise = true;
+			while (is_raise) {
+				vector<pn_op> pnops;
+				pnops.push_back(pn_op(i,is_raise));
+				vector<pn_pair> pn_entries = hilbs.phonon_modes->gen_pair_pn_index(pnops);
+				for (auto& pne : pn_entries) {
+				for (auto & orbi : phonon->pnParam.h_orb_i) {
+					// Spin down
+					ulli sd_bit = BIG1 << orbi;
+					auto fm_entries = hilbs.enum_hspace(sd_bit,0,0,0);
+					for (auto & fme : fm_entries) 
+						hilbs.fill_hblk_pn(g_h*pne.prefac,pne.lhs,pne.rhs,fme,fme);
+					// Spin up
+					ulli su_bit = BIG1 << (nvo+orbi);
+					fm_entries = hilbs.enum_hspace(su_bit,0,0,0);
+					for (auto & fme : fm_entries) 
+						hilbs.fill_hblk_pn(g_h*pne.prefac,pne.lhs,pne.rhs,fme,fme);
+				}}
+				is_raise = false;
+			}
+		}
+	}
+	return;
+}
+
+// Breathing mode, modulates hopping terms
+// 			  +    +
+// H = gQP  (c c)(b + b )
+//        is  j k  i   i
+void calc_breathing(Hilbert& hilbs, const HParam& hparam) {
+	int nvo = hilbs.cluster->vo_persite * hilbs.tot_site_num();
+	int nco = hilbs.cluster->co_persite * hilbs.tot_site_num();
+	for (int i = 0; i < hilbs.phonon_modes->get_unique_modes(); ++i) {
+		auto& phonon = hilbs.phonon_modes->phonons[i];
+		double g_b = phonon->pnParam.g_b;
+		if (phonon->is_breathing()) {
+			bool is_raise = true;
+			while (is_raise) {
+				vector<pn_op> pnops;
+				pnops.push_back(pn_op(i,is_raise));
+				vector<pn_pair> pn_entries = hilbs.phonon_modes->gen_pair_pn_index(pnops);
+				for (auto& pne : pn_entries) {
+				for (auto & orbij : phonon->pnParam.b_orb_ij) {
+					// Spin down
+					int i = orbij.first, j = orbij.second;
+					ulli lhssd = BIG1 << i, rhssd = BIG1 << j, incsd = (rhssd|lhssd);
+					ulli lhssd_shift = (incsd-lhssd) << nco, rhssd_shift = (incsd-rhssd) << nco;	
+					vector<ulli> match_entries = hilbs.enum_hspace(incsd,0,ed::count_bits(incsd)-1,0);
+					for (auto &me : match_entries)  {
+						ulli fmi_bit = me-lhssd_shift, fmj_bit = me-rhssd_shift;
+						hilbs.fill_hblk_pn(g_b*pne.prefac*hilbs.Fsign(&lhssd,fmi_bit,1)*hilbs.Fsign(&incsd,fmj_bit,1),
+											pne.lhs,pne.rhs,fmi_bit,fmj_bit);
+					}
+					// Spin up
+					ulli lhssu = BIG1 << (i+nvo), rhssu = BIG1 << (j+nvo), incsu = (rhssu|lhssu);
+					ulli lhssu_shift = (incsu-lhssu) << (2*nco), rhssu_shift = (incsu-rhssu) << (2*nco);
+					match_entries = hilbs.enum_hspace(incsu,0,ed::count_bits(incsu)-1,0);
+					for (auto &me : match_entries) {
+						ulli fmi_bit = me-lhssu_shift, fmj_bit = me-rhssu_shift;
+						hilbs.fill_hblk_pn(g_b*pne.prefac*hilbs.Fsign(&lhssu,fmi_bit,1)*hilbs.Fsign(&incsu,fmj_bit,1),
+											pne.lhs,pne.rhs,fmi_bit,fmj_bit);
+					}
+				}}
+				is_raise = false;
 			}
 		}
 	}

@@ -17,8 +17,10 @@
 
 #define TOL 1E-7
 #define PRINT_TOL 1E-4
+#define PRINT_WIDTH 12
 #define PI 3.141592653589793238462643383279502884L
 typedef std::complex<double> dcomp;
+typedef std::vector<int> veci;
 typedef std::vector<double> vecd;
 typedef std::vector<std::complex<double>> vecc;
 typedef unsigned long long int ulli;
