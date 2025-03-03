@@ -1,0 +1,40 @@
+&CONTROL
+        SO = 8.199 0.059 0.074 # Spin Orbit Coupling
+        SC1 = 1.0 0 0.1 #F_0,2 for l = 1 
+        SC2 = 4.5 0 12.042 0 7.534
+        SC2EX = 4.5 0 12.817 0 8.023
+        FG = 4.5 5.563 7.445 3.165
+        HFscale = 0.80
+        CF = 0 0 0.7 0.7 0.7
+        tpd = 1.1
+        sigpi = 0.40
+        tpp = 0 
+        #TPDZR = 1.0
+        MLCT = 16.8196
+        DIAG = 4
+        EFFDEL = False 
+        EXNEV = 10
+        GSNEV = 10 
+        OVERWRITE = True # Overwrite photon file in the directory
+/
+&CELL
+        Coordination = "Octahedral" # Defaults to no coordination
+        Sites = 1 # x,y,z, Defaults to 1 site
+        Holes = 5 
+/
+&PHOTON
+        XAS = false
+        RIXS = true
+        CROSS = True
+        epsloss = 0.2
+        epsab = 0.25
+        solver = 4
+        Edge = L
+        NEDOS = 2000          # If XAS, number of bins for XAS. If RIXS, number of bins for loss energy
+        AB = -25 25           ## 2 values: range
+        ABMAX = 30            ## auto determine the start, overrides AB
+        INCIDENT = -5.4 1.2 65      ### From first feature how much energy, nu  points, telling program that we are using this.
+        EM = 10               ### max_loss
+	pvin = 1 1 1
+	pvout = 1 1 1
+/
