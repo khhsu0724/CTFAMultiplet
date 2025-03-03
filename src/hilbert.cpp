@@ -17,7 +17,7 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 	CF_on = !ed::is_zero_arr(hparam.CF,5);
 	CV_on = (is_ex && !ed::is_zero_arr(hparam.FG,4));
 	cluster->set_print_site(hparam.print_site_occ);
-	assign_phonon();
+	assign_phonon(file_dir);
 	// Calculate Hilbert space size
 	if (hparam.block_diag && !hparam.SO[1]) BLOCK_DIAG = !(edge == "L" && is_ex) || !hparam.SO[0];
 	int hv = num_vorb/2, hc = num_corb/2;
@@ -97,16 +97,6 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 	}
 	for (auto & hblk : hblks) hblk.set_phonon_hsize(phonon_hsize);
 	// DEBUG: repeating n times per phonon mode
-	// phonon_modes->check_pn_hspace();
-	// vector<pn_op> pnops;
-	// pnops.push_back(pn_op(1,false));
-	// pnops.push_back(pn_op(1,true));
-	// phonon_modes->gen_pair_pn_index(pnops);
-	// cout << endl << "LOWERING: " << endl;
-	// pnops.clear();
-	// pnops.push_back(pn_op(0,false));
-	// phonon_modes->gen_pair_pn_index(pnops);
-	// exit(0);
 	// vector<ulli> hspace = enum_hspace();
 	// if (is_ex) cout << "excited state" << endl;
 	// else cout << "groud state" << endl;
@@ -345,26 +335,14 @@ void Hilbert::assign_cluster(string input) {
 	return;
 }
 
-void Hilbert::assign_phonon() {
+void Hilbert::assign_phonon(string file_dir) {
 	// Ideally this should be read from a separate &PHONON tag
 	if (cluster == NULL or cluster->lig_per_site == 0) {
 		cout << "Cannot have phonon modes" << endl;
 		return;
 	}
 	phonon_modes = new PhononModes(this->cluster);
-	Phonon_Param pn1;
-	pn1.omega = 0.055;
-	pn1.h_orb_i = veci({5});
-	pn1.g_h = 0.06;
-	// pn1.b_orb_ij.push_back({std::make_pair<int,int>(0,5)});
-	// pn1.g_b = 10;
-	phonon_modes->addPhonon(8,pn1);
-	// // Phonon_Param pn2;
-	// // pn2.omega = 2;
-	// // phonon_modes->addPhonon(4,pn2);
-	// // Phonon_Param pn3;
-	// // pn3.omega = 2;
-	// // phonon_modes->addPhonon(1,1,pn3);
+	phonon_modes->read_phonon_from_input(file_dir);
 	phonon_modes->hashfunc = &PhononModes::norm_Hash;
 	phonon_modes->hbfunc = &PhononModes::norm_Hashback;
 	return;

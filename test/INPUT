@@ -19,7 +19,13 @@
 &CELL
         Coordination = "sqpl" # Defaults to no coordination
         Sites = 1 # x,y,z, Defaults to 1 site
-        Holes = 5
+        Holes = 4
+/
+&PHONON
+    PN = 5 0.055 # 10 modes, omega = 0.3 following line are modes
+    h 0.06 5 # h: holestein mode, g_h, orbital index
+    # Takes the first frequency value per mode
+    # you can have has any number of coupling in a mode"
 /
 &PHOTON
         XAS = true

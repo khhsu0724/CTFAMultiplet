@@ -1,5 +1,9 @@
 #include "helper.hpp"
 
+void stot(std::string p, double& tgt) {tgt = stod(p);};
+void stot(std::string p, float& tgt) {tgt = stof(p);};
+void stot(std::string p, int& tgt) {tgt = stoi(p);};
+
 size_t ed::choose(size_t n, size_t k) {
 	if (k > n) return 0;
 	if (!k) return 1;
@@ -124,3 +128,53 @@ void ed::write_vecc(vecc vec, size_t x, size_t y, std::string file_dir, std::str
     }
     matfile.close();
 };
+
+
+bool ed::read_bool(std::string line, bool& tgt) {
+	try {
+		std::string p;
+		bool skip = false;
+		for (int s = 0; s < line.size() && !skip; ++s) {
+			if (line[s] == '#') skip = true;
+			else if (line[s] == '=') p = "";
+			else if (line[s] != ',' && line[s] != ' ' && line[s] != '	') p.push_back(line[s]);
+			else if (regex_match(p,std::regex(".*[a-zA-Z]+.*"))) {
+				transform(p.begin(),p.end(),p.begin(),::toupper);
+				if (p == "TRUE") tgt = true;
+				else if (p == "FALSE") tgt = false;
+				else throw std::invalid_argument("Invalid input (True/False)");
+			} else if (p.size() != 0) throw std::invalid_argument("Invalid input (True/False)");
+			else p = "";
+		}
+		if (p.size() != 0 && regex_match(p,std::regex(".*[a-zA-Z]+.*"))) {
+			transform(p.begin(),p.end(),p.begin(),::toupper);
+			if (p == "TRUE") tgt = true;
+			else if (p == "FALSE") tgt = false;
+			else throw std::invalid_argument("Invalid input (True/False)");
+		}
+	} catch (const std::exception &ex) {
+		std::cerr << ex.what() << "\n";
+		exit(1);
+	}
+	return true;
+};
+
+std::vector<std::string> ed::read_arb(std::string line) {
+	// Read in arbitrarty things, as long as it get rids things after comment
+	// Return vector of strings, separated by space
+	std::vector<std::string> outline;
+	std::istringstream stream(line);
+    std::string token;
+	try { 
+		while (stream >> token) {
+	        if (token.find('#') != std::string::npos) break;
+	        // std::cout << token << "_";
+	        outline.push_back(token);
+	    }
+	} catch (const std::exception &ex) {
+		std::cerr << ex.what() << "\n";
+		exit(1);
+	}
+	return outline;
+}
+

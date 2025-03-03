@@ -11,6 +11,8 @@
 #include <numeric>
 #include <memory>
 #include <chrono>
+#include <regex>
+#include <sstream>
 // #include <mpi.h>
 #ifndef HELPER
 #define HELPER
@@ -29,6 +31,10 @@ typedef std::pair<size_t,size_t> bindex;
 typedef std::vector<std::pair<ulli,ulli>> vpulli;
 #define BIG1 ulli(1)
 
+
+void stot(std::string p, double& tgt);
+void stot(std::string p, float& tgt);
+void stot(std::string p, int& tgt);
 
 class multistream {
 // Custom stream class that can direct output to cout & fstream
@@ -83,6 +89,41 @@ namespace ed {
 	std::string format_duration(std::chrono::milliseconds ms);
 	void print_progress(double frac, double all);
 	void parse_num(std::string complex_string, dcomp& complex_num);
+	bool read_bool(std::string line, bool& tgt);
+	std::vector<std::string> read_arb(std::string line);
+
+	template<typename T> 
+	bool read_num(std::string line, T* tgt, int pnum, std::string p = "", bool fix_pnum = true) {
+		try {
+			std::string p;
+			bool skip = false;
+			int ncnt = 0;
+			for (int s = 0; s < line.size() && !skip; ++s) {
+				if (line[s] == '#') skip = true;
+				else if (line[s] == '=') p = "";
+				else if (line[s] != ',' && line[s] != ' ' && line[s] != '	') p.push_back(line[s]);
+				else if (regex_match(p,std::regex(R"(^([+-]?(?:[[:d:]]+\.?|[[:d:]]*\.[[:d:]]+))(?:[Ee][+-]?[[:d:]]+)?$)"))) {
+					if (ncnt < pnum) stot(p,tgt[ncnt]);
+					else throw std::invalid_argument("Too many input parameter: "+p);
+					ncnt++;
+					p = "";
+				} else if (p.size() != 0) throw std::invalid_argument("Invalid number");
+				else p = "";
+			}
+			if (p.size() != 0 && regex_match(p,std::regex(R"(^([+-]?(?:[[:d:]]+\.?|[[:d:]]*\.[[:d:]]+))(?:[Ee][+-]?[[:d:]]+)?$)"))) {
+				if (ncnt < pnum) stot(p,tgt[ncnt]);
+				else throw std::invalid_argument("Too many input parameter: "+p);
+				ncnt++;
+				p = "";
+			}
+			if (fix_pnum && ncnt != pnum) throw std::invalid_argument("Wrong number of input parameter: "+p);
+		} catch (const std::exception &ex) {
+			std::cout << "p: " << p << std::endl;
+			std::cerr << ex.what() << "\n";
+			exit(0);
+		}
+		return true;
+	}
 
 	template <typename T> T dot(std::vector<T> a, std::vector<T> b) {
 		try {

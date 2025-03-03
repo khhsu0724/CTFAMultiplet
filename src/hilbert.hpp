@@ -49,7 +49,7 @@ public:
 
 	// Functions for input file parsing and initialize
 	void assign_cluster(std::string input);
-	void assign_phonon();
+	void assign_phonon(std::string file_dir);
 	void read_from_file(std::string file_dir);
 
 	// Nice Collection of Hash Functions

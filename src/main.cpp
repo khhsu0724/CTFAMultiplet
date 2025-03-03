@@ -2,7 +2,7 @@
 #include <ctime> 
 #include <stdlib.h>
 #include <bitset>
-#include <regex>
+// #include <regex>
 #include <fstream>
 #include "interaction.hpp"
 #include "photon.hpp"
@@ -69,72 +69,6 @@ void tb() {
 	}
 }
 
-void stot(string p, double& tgt) {tgt = stod(p);};
-void stot(string p, float& tgt) {tgt = stof(p);};
-void stot(string p, int& tgt) {tgt = stoi(p);};
-
-template<typename T> 
-bool read_num(string line, T* tgt, int pnum, string p = "", bool fix_pnum = true) {
-	try {
-		string p;
-		bool skip = false;
-		int ncnt = 0;
-		for (int s = 0; s < line.size() && !skip; ++s) {
-			if (line[s] == '#') skip = true;
-			else if (line[s] == '=') p = "";
-			else if (line[s] != ',' && line[s] != ' ' && line[s] != '	') p.push_back(line[s]);
-			else if (regex_match(p,regex(R"(^([+-]?(?:[[:d:]]+\.?|[[:d:]]*\.[[:d:]]+))(?:[Ee][+-]?[[:d:]]+)?$)"))) {
-				if (ncnt < pnum) stot(p,tgt[ncnt]);
-				else throw invalid_argument("Too many input parameter: "+p);
-				ncnt++;
-				p = "";
-			} else if (p.size() != 0) throw invalid_argument("Invalid number");
-			else p = "";
-		}
-		if (p.size() != 0 && regex_match(p,regex(R"(^([+-]?(?:[[:d:]]+\.?|[[:d:]]*\.[[:d:]]+))(?:[Ee][+-]?[[:d:]]+)?$)"))) {
-			if (ncnt < pnum) stot(p,tgt[ncnt]);
-			else throw invalid_argument("Too many input parameter: "+p);
-			ncnt++;
-			p = "";
-		}
-		if (fix_pnum && ncnt != pnum) throw invalid_argument("Wrong number of input parameter: "+p);
-	} catch (const exception &ex) {
-		cout << "p: " << p << endl;
-		cerr << ex.what() << "\n";
-		exit(0);
-	}
-	return true;
-}
-
-bool read_bool(string line, bool& tgt) {
-	try {
-		string p;
-		bool skip = false;
-		for (int s = 0; s < line.size() && !skip; ++s) {
-			if (line[s] == '#') skip = true;
-			else if (line[s] == '=') p = "";
-			else if (line[s] != ',' && line[s] != ' ' && line[s] != '	') p.push_back(line[s]);
-			else if (regex_match(p,regex(".*[a-zA-Z]+.*"))) {
-				transform(p.begin(),p.end(),p.begin(),::toupper);
-				if (p == "TRUE") tgt = true;
-				else if (p == "FALSE") tgt = false;
-				else throw invalid_argument("Invalid input (True/False)");
-			} else if (p.size() != 0) throw invalid_argument("Invalid input (True/False)");
-			else p = "";
-		}
-		if (p.size() != 0 && regex_match(p,regex(".*[a-zA-Z]+.*"))) {
-			transform(p.begin(),p.end(),p.begin(),::toupper);
-			if (p == "TRUE") tgt = true;
-			else if (p == "FALSE") tgt = false;
-			else throw invalid_argument("Invalid input (True/False)");
-		}
-	} catch (const exception &ex) {
-		cerr << ex.what() << "\n";
-		exit(1);
-	}
-	return true;
-}
-
 void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 	string line;
 	ifstream input(IDIR);
@@ -156,38 +90,38 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 						if (line[s] != ' ' && line[s] != '	' && line[s] != '=') p.push_back(line[s]);
 						else {
 							transform(p.begin(),p.end(),p.begin(),::toupper);
-							if (p == "SO") skip = read_num(line.substr(s+1,line.size()-1),hparam.SO,3,p=p,false);
-							else if (p == "SC1") skip = read_num(line.substr(s+1,line.size()-1),hparam.SC[0],3,p=p);
+							if (p == "SO") skip = ed::read_num(line.substr(s+1,line.size()-1),hparam.SO,3,p=p,false);
+							else if (p == "SC1") skip = ed::read_num(line.substr(s+1,line.size()-1),hparam.SC[0],3,p=p);
 							else if (p == "SC2") {
-								skip = read_num(line.substr(s+1,line.size()-1),hparam.SC[1],5,p=p);
-								if (!SC2EX_read) read_num(line.substr(s+1,line.size()-1),hparam.SC2EX,5,p=p);
+								skip = ed::read_num(line.substr(s+1,line.size()-1),hparam.SC[1],5,p=p);
+								if (!SC2EX_read) ed::read_num(line.substr(s+1,line.size()-1),hparam.SC2EX,5,p=p);
 							}
 							else if (p == "SC2EX") {
 								SC2EX_read = true;
-								skip = read_num(line.substr(s+1,line.size()-1),hparam.SC2EX,5,p=p);
+								skip = ed::read_num(line.substr(s+1,line.size()-1),hparam.SC2EX,5,p=p);
 							}
-							else if (p == "FG") skip = read_num(line.substr(s+1,line.size()-1),hparam.FG,4,p=p);
-							else if (p == "CF") skip = read_num(line.substr(s+1,line.size()-1),hparam.CF,5,p=p);
-							else if (p == "HYB") skip = read_bool(line.substr(s+1,line.size()-1),hparam.HYB);
-							else if (p == "HFSCALE") skip = read_num(line.substr(s+1,line.size()-1),&hparam.HFscale,1,p=p);
-							else if (p == "TPD") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpd,1,p=p);
-							else if (p == "TPP") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpp,1,p=p);
-							else if (p == "TPDZR") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpdz_ratio,1,p=p);
-							// else if (p == "TPPSIGMA") skip = read_bool(line.substr(s+1,line.size()-1),hparam.tppsigma_on);
-							else if (p == "OCTJT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.octJT,1,p=p);
-							else if (p == "MLCT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.MLdelta,1,p=p);
-							else if (p == "SIGPI") skip = read_num(line.substr(s+1,line.size()-1),&hparam.sig_pi,1,p=p);
-							else if (p == "EFFDEL") skip = read_bool(line.substr(s+1,line.size()-1),hparam.effective_delta);
-							else if (p == "BLOCK") skip = read_bool(line.substr(s+1,line.size()-1),hparam.block_diag);
-							else if (p == "GSDIAG") skip = read_num(line.substr(s+1,line.size()-1),&hparam.gs_diag_option,1,p=p);
-							else if (p == "EXDIAG") skip = read_num(line.substr(s+1,line.size()-1),&hparam.ex_diag_option,1,p=p);
-							else if (p == "SITEOCC") skip = read_bool(line.substr(s+1,line.size()-1),hparam.print_site_occ);
-							else if (p == "OVERWRITE") skip = read_bool(line.substr(s+1,line.size()-1),overwrite);
-							else if (p == "GSNEV") skip = read_num(line.substr(s+1,line.size()-1),&hparam.gs_nev,1,p=p);
-							else if (p == "EXNEV") skip = read_num(line.substr(s+1,line.size()-1),&hparam.ex_nev,1,p=p);
+							else if (p == "FG") skip = ed::read_num(line.substr(s+1,line.size()-1),hparam.FG,4,p=p);
+							else if (p == "CF") skip = ed::read_num(line.substr(s+1,line.size()-1),hparam.CF,5,p=p);
+							else if (p == "HYB") skip = ed::read_bool(line.substr(s+1,line.size()-1),hparam.HYB);
+							else if (p == "HFSCALE") skip = ed::read_num(line.substr(s+1,line.size()-1),&hparam.HFscale,1,p=p);
+							else if (p == "TPD") skip = ed::read_num(line.substr(s+1,line.size()-1),&hparam.tpd,1,p=p);
+							else if (p == "TPP") skip = ed::read_num(line.substr(s+1,line.size()-1),&hparam.tpp,1,p=p);
+							else if (p == "TPDZR") skip = ed::read_num(line.substr(s+1,line.size()-1),&hparam.tpdz_ratio,1,p=p);
+							// else if (p == "TPPSIGMA") skip = ed::read_bool(line.substr(s+1,line.size()-1),hparam.tppsigma_on);
+							else if (p == "OCTJT") skip = ed::read_num(line.substr(s+1,line.size()-1),&hparam.octJT,1,p=p);
+							else if (p == "MLCT") skip = ed::read_num(line.substr(s+1,line.size()-1),&hparam.MLdelta,1,p=p);
+							else if (p == "SIGPI") skip = ed::read_num(line.substr(s+1,line.size()-1),&hparam.sig_pi,1,p=p);
+							else if (p == "EFFDEL") skip = ed::read_bool(line.substr(s+1,line.size()-1),hparam.effective_delta);
+							else if (p == "BLOCK") skip = ed::read_bool(line.substr(s+1,line.size()-1),hparam.block_diag);
+							else if (p == "GSDIAG") skip = ed::read_num(line.substr(s+1,line.size()-1),&hparam.gs_diag_option,1,p=p);
+							else if (p == "EXDIAG") skip = ed::read_num(line.substr(s+1,line.size()-1),&hparam.ex_diag_option,1,p=p);
+							else if (p == "SITEOCC") skip = ed::read_bool(line.substr(s+1,line.size()-1),hparam.print_site_occ);
+							else if (p == "OVERWRITE") skip = ed::read_bool(line.substr(s+1,line.size()-1),overwrite);
+							else if (p == "GSNEV") skip = ed::read_num(line.substr(s+1,line.size()-1),&hparam.gs_nev,1,p=p);
+							else if (p == "EXNEV") skip = ed::read_num(line.substr(s+1,line.size()-1),&hparam.ex_nev,1,p=p);
 							else if (p == "DIAG") {
 								// Generic Diagonalize Option
-								skip = read_num(line.substr(s+1,line.size()-1),&hparam.gs_diag_option,1);
+								skip = ed::read_num(line.substr(s+1,line.size()-1),&hparam.gs_diag_option,1);
 								hparam.ex_diag_option = hparam.gs_diag_option;
 							}
 							p = "";
@@ -205,14 +139,14 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 						if (line[s] != ' ' && line[s] != '	' && line[s] != '=') p.push_back(line[s]);
 						else {
 							transform(p.begin(),p.end(),p.begin(),::toupper);
-							if (p == "XAS") skip = read_bool(line.substr(s+1,line.size()-1),pm.XAS);
-							else if (p == "RIXS") skip = read_bool(line.substr(s+1,line.size()-1),pm.RIXS);
+							if (p == "XAS") skip = ed::read_bool(line.substr(s+1,line.size()-1),pm.XAS);
+							else if (p == "RIXS") skip = ed::read_bool(line.substr(s+1,line.size()-1),pm.RIXS);
 							else if (p == "PVIN") {
-								skip = read_num(line.substr(s+1,line.size()-1),pvtmp,3);
+								skip = ed::read_num(line.substr(s+1,line.size()-1),pvtmp,3,p=p);
 								for (int i = 0; i < 3; ++i) pm.pvin[i] = pvtmp[i];
 							}
 							else if (p == "PVOUT") {
-								skip = read_num(line.substr(s+1,line.size()-1),pvtmp,3);
+								skip = ed::read_num(line.substr(s+1,line.size()-1),pvtmp,3,p=p);
 								for (int i = 0; i < 3; ++i) pm.pvout[i] = pvtmp[i];
 							}
 							else if (p == "EDGE") {
@@ -225,30 +159,30 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 							}
 							else if (p == "ELOSS") {
 								bool el;
-								skip = read_bool(line.substr(s+1,line.size()-1),el);
+								skip = ed::read_bool(line.substr(s+1,line.size()-1),el);
 								pm.set_eloss(el);
 							}
 							// Spectroscopy solver, 1: Exact Solution, 2: Classic KH, 3: 1+2, 4 (To do): Cont FE, Biconj
-							else if (p == "SOLVER") skip = read_num(line.substr(s+1,line.size()-1),&pm.spec_solver,1,p=p);
-							else if (p == "PRECOND") skip = read_num(line.substr(s+1,line.size()-1),&pm.precond,1,p=p);
-							else if (p == "EPSAB") skip = read_num(line.substr(s+1,line.size()-1),&pm.eps_ab,1,p=p);
-							else if (p == "EPSLOSS") skip = read_num(line.substr(s+1,line.size()-1),&pm.eps_loss,1,p=p);
-							else if (p == "NITERCFE") skip = read_num(line.substr(s+1,line.size()-1),&pm.niterCFE,1,p=p);
-							else if (p == "CGTOL") skip = read_num(line.substr(s+1,line.size()-1),&pm.CG_tol,1,p=p);
-							else if (p == "NEDOS") skip = read_num(line.substr(s+1,line.size()-1),&pm.nedos,1,p=p);
-							else if (p == "ABMAX") skip = read_num(line.substr(s+1,line.size()-1),&pm.abmax,1,p=p);
-							else if (p == "SPINFLIP") skip = read_bool(line.substr(s+1,line.size()-1),pm.spin_flip);
-							else if (p == "CROSS") skip = read_bool(line.substr(s+1,line.size()-1),pm.cross);
+							else if (p == "SOLVER") skip = ed::read_num(line.substr(s+1,line.size()-1),&pm.spec_solver,1,p=p);
+							else if (p == "PRECOND") skip = ed::read_num(line.substr(s+1,line.size()-1),&pm.precond,1,p=p);
+							else if (p == "EPSAB") skip = ed::read_num(line.substr(s+1,line.size()-1),&pm.eps_ab,1,p=p);
+							else if (p == "EPSLOSS") skip = ed::read_num(line.substr(s+1,line.size()-1),&pm.eps_loss,1,p=p);
+							else if (p == "NITERCFE") skip = ed::read_num(line.substr(s+1,line.size()-1),&pm.niterCFE,1,p=p);
+							else if (p == "CGTOL") skip = ed::read_num(line.substr(s+1,line.size()-1),&pm.CG_tol,1,p=p);
+							else if (p == "NEDOS") skip = ed::read_num(line.substr(s+1,line.size()-1),&pm.nedos,1,p=p);
+							else if (p == "ABMAX") skip = ed::read_num(line.substr(s+1,line.size()-1),&pm.abmax,1,p=p);
+							else if (p == "SPINFLIP") skip = ed::read_bool(line.substr(s+1,line.size()-1),pm.spin_flip);
+							else if (p == "CROSS") skip = ed::read_bool(line.substr(s+1,line.size()-1),pm.cross);
 							else if (p == "AB") {
-								skip = read_num(line.substr(s+1,line.size()-1),abrange_temp,2,p=p);
+								skip = ed::read_num(line.substr(s+1,line.size()-1),abrange_temp,2,p=p);
 								for (int i = 0; i < 2; ++i) pm.ab_range[i] = abrange_temp[i];
 							}
 							else if (p == "INCIDENT") {
-								skip = read_num(line.substr(s+1,line.size()-1),incident_temp,3,p=p);
+								skip = ed::read_num(line.substr(s+1,line.size()-1),incident_temp,3,p=p);
 								for (int i = 0; i < 3; ++i) pm.incident[i] = incident_temp[i];
 								pm.set_incident_points();
 							}
-							else if (p == "EM") skip = read_num(line.substr(s+1,line.size()-1),&pm.em_energy,1,p=p);
+							else if (p == "EM") skip = ed::read_num(line.substr(s+1,line.size()-1),&pm.em_energy,1,p=p);
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -541,12 +475,13 @@ int main(int argc, char** argv){
 		cout << ", tpp = " << hparam.tpp; 
 		if (GS.coord == "oct") cout << ", z distortion = " << hparam.octJT << endl; 
 		if (GS.coord != "ion") {
-			cout << ", sigma pi bond ratio = " << hparam.sig_pi; 
+			cout << ", sigma pi bond ratio = " << hparam.sig_pi << endl; 
 			// if (hparam.tppsigma_on) cout << ", tppsigma on (only tppzpi!!!)" << endl; 
 			// else cout << ", tppsigma off" << endl; 
 		}
 		else cout << endl;
 	} else cout << "Hybridization turned off" << endl; 
+	if (GS.have_phonon()) GS.phonon_modes->print_phonon_data();
 
 	// Converts between notation for convenience sake
 	if (hparam.SC[0][2] > 1) hparam.SC[0][2] /= 25;

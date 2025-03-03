@@ -29,6 +29,10 @@ public:
 	void print_eigstate(const vecd& occ, bool is_print = true, std::string fname = "", int p = 5);
 	vecc get_inp_tmat();
 	vecd get_tmat_real();
+	std::string get_orb_name(int ind) {
+		if (ind >= this->orb_names.size()) throw std::invalid_argument("Invalid orbital index");
+		return this->orb_names[ind];
+	};
 protected:
 	int w = PRINT_WIDTH, num_sites = 1;
 	std::vector<std::string> orb_names;

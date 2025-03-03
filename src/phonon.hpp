@@ -31,6 +31,7 @@ struct pn_op {
 
 // A structure that holds terms and parameters for phonon Hamiltonian
 struct Phonon_Param {
+	bool is_set = false;
 	// Bare phonon parameters: wb^b
 	double omega = 0;
 
@@ -48,6 +49,16 @@ struct Phonon_Param {
 		omega(pnParam.omega), h_orb_i(pnParam.h_orb_i), g_h(pnParam.g_h),
 		b_orb_ij(pnParam.b_orb_ij), g_b(pnParam.g_b) {};
 	~Phonon_Param() = default;
+
+	void clear() {
+		is_set = false;
+		omega = 0;
+		g_h = 0;
+		h_orb_i.clear();
+		g_b = 0;
+		b_orb_ij.clear();
+		return;
+	}
 };
 
 // Contains information for max number of phonons
@@ -249,6 +260,8 @@ public:
     	return matches;
     };
 	void print_phonons_occuptation(const vecd& occ, bool is_print, std::string fname);
+	void print_phonon_data();
+	void read_phonon_from_input(std::string file_dir);
 
     // Hash functions for phonon hilbert space
 	bindex Hash(const veci &s) {return (this->*hashfunc)(s);};
