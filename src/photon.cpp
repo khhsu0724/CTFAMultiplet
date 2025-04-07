@@ -459,6 +459,8 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 		XAS_peak_occupation(GS,EX,vecd({10}),xas_aben,xas_int,gsi,gs_en,"top",write_output);
 	}
 
+	// Normalize intensity
+	for (auto & val : xas_int) val /= gsi.size();
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Run time = " << duration.count() << " ms\n";
@@ -866,10 +868,12 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	if (pm.spec_solver == 2 || pm.spec_solver == 3)
 		// ed::write_vec(rixs_peaks_kh,nedos,nedos,"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+"-full.csv");
 		cout << "RIXS matrix wrote to RIXS_"+string(pm.edge)+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+"-kh.txt" << endl;
+		for (auto & val : rixs_peaks_kh) val /= gsi.size();
 		write_kh_RIXS(rixs_peaks_kh,rixs_em_kh,"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+"-kh.txt");
 
 	if (pm.spec_solver == 1 || pm.spec_solver == 3) {
 		cout << endl;
+		for (auto & val : rixs_peaks) val /= gsi.size();
 		RIXS_peak_occupation(GS,EX,vecd({20}),rixs_ab,rixs_em,rixs_peaks,gsi,pm,gs_en,"top",true);
 		write_RIXS(rixs_peaks,rixs_ab,rixs_em,pm.eloss,"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+".txt");
 	} 
