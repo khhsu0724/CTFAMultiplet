@@ -38,20 +38,20 @@ def get_XAS_iter(filedir):
 
 
 def read_dir_xas(dir_name,xdata=0,b=0.1,edge = "L",pol = "XYZ",extension=".txt",solver=4):
-	"""
-	read XAS output file in the specified directory. outputs absorption (x), intensity (y)
+    """
+    read XAS output file in the specified directory. outputs absorption (x), intensity (y)
     INPUTS:
-		dir_name: Directory filepath
+        dir_name: Directory filepath
         xdata: for exact peaks, xdata can be np.linspace(-25,25,1000) etc
         b: broadening
         edge: absorption edge
         pol: string of "XYZ" for example
     """
+    if (solver < 4): 
+        ydata = np.zeros(xdata.size)
     for p in pol:
         filename = dir_name+"/XAS_"+edge+"edge_"+p+extension
-        if (solver < 4): 
-            assert not(xdata is 0), print("xdata cant be 0 for exact XAS file")
-            ydata = np.zeros(xdata.size)
+            assert not (xdata is 0), print("xdata cant be 0 for exact XAS file")
             ydata += get_XAS_exact(filename,xdata,b)
         else: 
             ydata = 0
