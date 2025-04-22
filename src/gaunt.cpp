@@ -7,8 +7,6 @@
     #include <boost/functional/hash.hpp>
 #elif __has_include("boost/functional/hash/hash.hpp")
     #include <boost/functional/hash/hash.hpp>
-#else
-    #error "boost/function/hash.h not found in specified paths"
 #endif
 #include "gaunt.hpp"
 
@@ -25,9 +23,51 @@ struct Gaunt_coeff
     Gaunt_coeff(const initializer_list<double> l) {
     	this->size = l.size();
     	this->g = new double[l.size()];
-    	copy(l.begin(),l.end(),g);
+    	std::copy(l.begin(),l.end(),g);
     }
-    ~Gaunt_coeff() {} //Figure out of destructor is needed
+
+    // Copy constructor
+    Gaunt_coeff(const Gaunt_coeff& other) {
+        size = other.size;
+        g = new double[size];
+        std::copy(other.g, other.g+size, g);
+    }
+
+    // Copy assignment
+    Gaunt_coeff& operator=(const Gaunt_coeff& other) {
+        if (this != &other) {
+            delete[] g;
+            size = other.size;
+            g = new double[size];
+            std::copy(other.g, other.g + size, g);
+        }
+        return *this;
+    }
+
+    // Move constructor
+    Gaunt_coeff(Gaunt_coeff&& other) noexcept {
+        size = other.size;
+        g = other.g;
+        other.g = nullptr;
+        other.size = 0;
+    }
+
+    // Move assignment
+    Gaunt_coeff& operator=(Gaunt_coeff&& other) noexcept {
+        if (this != &other) {
+            delete[] g;
+            size = other.size;
+            g = other.g;
+            other.g = nullptr;
+            other.size = 0;
+        }
+        return *this;
+    }
+
+    // Destructor
+    ~Gaunt_coeff() {
+        delete[] g;
+    }
 };
 
 bool operator==(Gaunt_coeff gc1, Gaunt_coeff gc2)
@@ -35,7 +75,8 @@ bool operator==(Gaunt_coeff gc1, Gaunt_coeff gc2)
     return gc1.size == gc2.size && memcmp(gc1.g, gc2.g, gc1.size) == 0;
 }
 
-
+#ifdef BOOST_FUNCTIONAL_HASH_HASH_HPP
+// Boost is likely not required 
 size_t hash(Gaunt_coeff gc) 
 {
     size_t h = 0;
@@ -43,6 +84,7 @@ size_t hash(Gaunt_coeff gc)
         boost::hash_combine(h,*g);
     return h;
 }
+#endif
 
 map<pair<int,int>,Gaunt_coeff> dd_coeff =   {{{ 2, 2}, {1, 0,     -2.0/7.0, 0,       1.0/21}},
 											 {{-2,-2}, {1, 0,     -2.0/7.0, 0,       1.0/21}},

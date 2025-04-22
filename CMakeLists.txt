@@ -19,9 +19,7 @@ message("-- CXXFLAGS: ${CMAKE_CXX_FLAGS}")
 #-------------------------------------------------------------------
 # Check BOOST
 #-------------------------------------------------------------------
-find_package(Boost COMPONENTS functional
-    HINTS $ENV{LD_LIBRARY_PATH} $ENV{CPATH} $ENV{LIBRARY_PATH}
-    )
+find_package(Boost)
 if (Boost_FOUND)
     message(STATUS "Boost found!")
     message(STATUS "Include directory: ${Boost_INCLUDE_DIRS}")
@@ -40,7 +38,7 @@ else()
 
     # Verify that BOOST was found
     if (NOT Boost_INCLUDE_DIRS OR NOT Boost_LIBRARIES) 
-        message(FATAL_ERROR "Boost not found. Please install Boost, or use -DBoost_ROOT=/path/to/boost")
+        message(WARNING "Boost not found. Please install Boost, or use -DBoost_ROOT=/path/to/boost")
     else()
         set(Boost_FOUND TRUE)
         message(STATUS "Found boost include directory: ${Boost_INCLUDE_DIRS}")
@@ -52,9 +50,7 @@ endif()
 #-------------------------------------------------------------------
 # Check OpenMP
 #-------------------------------------------------------------------
-find_package(OpenMP COMPONENTS CXX
-    HINTS $ENV{LD_LIBRARY_PATH} $ENV{CPATH} $ENV{LIBRARY_PATH}
-    )
+find_package(OpenMP COMPONENTS CXX)
 
 if (OPENMP_FOUND)
     # include_directories("${OPENMP_INCLUDES}")
