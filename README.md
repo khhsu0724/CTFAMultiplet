@@ -47,9 +47,9 @@ $ cmake -DARPACK_ROOT=/path/to/arpack/ -DBoost_ROOT=/path/to/boost/ ..
 
 For sherlock specifically: Once in the build directory, issue these command: 
 ```
-$ module load icc arpack boost gcc/8.1.0
-$ #module load imkl boost gcc/8.1.0 => if you don't want to use arpack
-$ cmake -DCMAKE_CXX_COMPILER=icpc -DBoost_ROOT="/share/software/user/open/boost/1.87.0" ..
+$ module load icc arpack gcc/8.1.0
+$ #module load icc imkl gcc/8.1.0 => if you don't want to use arpack
+$ cmake -DCMAKE_CXX_COMPILER=icpc ..
 $ make
 ```
 
