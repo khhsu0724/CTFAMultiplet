@@ -1,5 +1,5 @@
 # Minimum CMake version
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.5)
 
 # Project configuration
 project(CTFAMultiplet LANGUAGES CXX)
@@ -19,20 +19,42 @@ message("-- CXXFLAGS: ${CMAKE_CXX_FLAGS}")
 #-------------------------------------------------------------------
 # Check BOOST
 #-------------------------------------------------------------------
-find_package(Boost REQUIRED)
+find_package(Boost COMPONENTS functional
+    HINTS $ENV{LD_LIBRARY_PATH} $ENV{CPATH} $ENV{LIBRARY_PATH}
+    )
 if (Boost_FOUND)
     message(STATUS "Boost found!")
     message(STATUS "Include directory: ${Boost_INCLUDE_DIRS}")
     message(STATUS "Libraries: ${Boost_LIBRARIES}")
 else()
-    message(FATAL_ERROR "Boost not found. Please install Boost and try again.")
+    find_library(Boost_LIBRARIES
+        HINTS /usr/local/lib /opt/homebrew/lib /usr/lib /usr/local/Cellar/ /usr/local/opt/
+        HINTS /usr/lib/x86_64-linux-gnu/ $ENV{LD_LIBRARY_PATH}
+    )
+
+    find_path(Boost_INCLUDE_DIRS
+        HINTS /usr/local/include /opt/homebrew/include /usr/include /usr/local/include/boost 
+        HINTS /usr/include/boost $ENV{CPATH} 
+        PATH_SUFFIXES boost # This is used for sherlock
+    )
+
+    # Verify that BOOST was found
+    if (NOT Boost_INCLUDE_DIRS OR NOT Boost_LIBRARIES) 
+        message(FATAL_ERROR "Boost not found. Please install Boost, or use -DBoost_ROOT=/path/to/boost")
+    else()
+        set(Boost_FOUND TRUE)
+        message(STATUS "Found boost include directory: ${Boost_INCLUDE_DIRS}")
+        message(STATUS "Found boost library: ${Boost_LIBRARIES}")
+    endif()
 endif()
 
 
 #-------------------------------------------------------------------
 # Check OpenMP
 #-------------------------------------------------------------------
-find_package(OpenMP COMPONENTS CXX)
+find_package(OpenMP COMPONENTS CXX
+    HINTS $ENV{LD_LIBRARY_PATH} $ENV{CPATH} $ENV{LIBRARY_PATH}
+    )
 
 if (OPENMP_FOUND)
     # include_directories("${OPENMP_INCLUDES}")
@@ -43,7 +65,7 @@ if (OPENMP_FOUND)
     message(STATUS "OMP libraries: ${OpenMP_CXX_LIBRARIES}")
     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 else()
-    message(STATUS "OpenMP NOT found! No links will be made")
+    message(STATUS "OpenMP NOT found! Please install openMP and try again")
 endif(OPENMP_FOUND)
 
 
@@ -51,6 +73,7 @@ endif(OPENMP_FOUND)
 #-------------------------------------------------------------------
 # Check ARPACK Library
 #-------------------------------------------------------------------
+set(ARPACK_FOUND FALSE)
 set(ARPACK_ROOT "" CACHE PATH "Path to the ARPACK installation")
 if (ARPACK_ROOT)
     set(ARPACK_INCLUDE_DIR "${ARPACK_ROOT}/include")
@@ -89,11 +112,12 @@ else()
 
     # Verify that ARPACK was found
     if (NOT ARPACK_INCLUDE_DIR OR NOT ARPACK_LIBRARY)
-        message(FATAL_ERROR 
+        message(WARNING 
             "ARPACK library and/or include files not found. Please ensure they are installed.\n"
-            "If ARPACK is installed but not detected, please set the ARPACK_ROOT variable."
+            "If ARPACK is installed but not detected, please use -DARPACK_ROOT=/path/to/arpack."
         )
     else()
+        set(ARPACK_FOUND TRUE)
         message(STATUS "Found ARPACK include directory: ${ARPACK_INCLUDE_DIR}")
         message(STATUS "Found ARPACK library: ${ARPACK_LIBRARY}")
     endif()
@@ -155,9 +179,15 @@ set_target_properties(CTFAMultiplet PROPERTIES OUTPUT_NAME ../main)
 #-------------------------------------------------------------------
 # Link Libraries
 #-------------------------------------------------------------------
+if (ARPACK_FOUND)
+    target_link_libraries(CTFAMultiplet 
+        PRIVATE
+        ${ARPACK_LIBRARY}    # ARPACK library
+    )
+endif()
+
 target_link_libraries(CTFAMultiplet 
     PRIVATE
-    ${ARPACK_LIBRARY}    # ARPACK library
     ${LAPACK_LIBRARIES}  # LAPACK libraries (fallback)
 )
 
@@ -165,11 +195,19 @@ target_link_libraries(CTFAMultiplet
 #-------------------------------------------------------------------
 # Include Directories
 #-------------------------------------------------------------------
-target_include_directories(CTFAMultiplet 
-    PRIVATE
-    ${Boost_INCLUDE_DIRS}  # Boost headers
-    ${ARPACK_INCLUDE_DIR}  # ARPACK headers
-)
+if (ARPACK_FOUND)
+    target_include_directories(CTFAMultiplet 
+        PRIVATE
+        ${ARPACK_INCLUDE_DIR}  # ARPACK headers
+    )
+endif()
+
+if (Boost_FOUND) 
+    target_include_directories(CTFAMultiplet 
+        PRIVATE
+        ${Boost_INCLUDE_DIRS}  # Boost headers
+    )
+endif()
 
 if (OPENMP_FOUND)
     target_link_libraries(CTFAMultiplet 
