@@ -38,7 +38,7 @@ else()
 
     # Verify that BOOST was found
     if (NOT Boost_INCLUDE_DIRS OR NOT Boost_LIBRARIES) 
-        message(WARNING "Boost not found. Please install Boost, or use -DBoost_ROOT=/path/to/boost")
+        message(WARNING "Boost not found (Optional). Please install Boost, or use -DBoost_ROOT=/path/to/boost")
     else()
         set(Boost_FOUND TRUE)
         message(STATUS "Found boost include directory: ${Boost_INCLUDE_DIRS}")

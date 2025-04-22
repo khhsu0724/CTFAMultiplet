@@ -2,6 +2,7 @@
 #include <cmath>
 #include <utility>
 #include <initializer_list>
+#include <cstring>
 #include <map>
 #if __has_include("boost/functional/hash.hpp")
     #include <boost/functional/hash.hpp>
@@ -72,7 +73,7 @@ struct Gaunt_coeff
 
 bool operator==(Gaunt_coeff gc1, Gaunt_coeff gc2)
 {
-    return gc1.size == gc2.size && memcmp(gc1.g, gc2.g, gc1.size) == 0;
+    return gc1.size == gc2.size && std::memcmp(gc1.g, gc2.g, gc1.size) == 0;
 }
 
 #ifdef BOOST_FUNCTIONAL_HASH_HASH_HPP
