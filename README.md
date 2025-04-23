@@ -23,11 +23,11 @@ For large matrix problem, it is recommended to use a workstation or computing no
 The only software version requirements for this program are:
 ```
 c++14
-cmake 3.15
+cmake 3.5
 ```
 
 ## Compile and running
-Linux and Mac users can install optional libraries via *brew*:
+Linux and Mac users can install **optional** libraries via *brew*:
 ```
 $ brew install boost libomp arpack
 ```
@@ -38,7 +38,7 @@ $ git clone https://github.com/khhsu0724/CTFAMultiplet.git
 $ cd CTFAMultiplet/build
 $ cmake ..
 $ make
-$ ../main ./test/INPUT # To execute the code
+$ ../main ../test/INPUT # To execute the code
 ```
 If cmake is unable to locate boost or arpack, use: 
 ```
