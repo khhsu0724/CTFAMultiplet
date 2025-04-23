@@ -4,11 +4,11 @@ This project provides a **charge transfer full atomic multiplet code** designed 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ## Package Dependencies
-- **C++ Compiler**
-- **Boost** (Optional)
-- **OpenMP** (Optional)
-- **BLAS/LAPACK**
-- **MKL** (Optional)
+- **C++ Compiler** (Required)
+- **Boost** 
+- **OpenMP** 
+- **BLAS/LAPACK** (Required)
+- **MKL**
 - **ARPACK** (Recommended)
 - **cmake** (Recommended)
 
