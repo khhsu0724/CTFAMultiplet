@@ -556,6 +556,15 @@ void write_iter_RIXS(vecd const& rixs_ab, vecd const& rixs_loss, vecd const& rix
 	return;
 }
 
+inline void calc_rixs_blap(Hilbert& GS, Hilbert& EX, size_t gsind, size_t exind, 
+							vector<blapIndex>& blap_in, vector<blapIndex>& blap_out, const PM& pm) {
+	basis_overlap(GS,EX,bindex(gsind,exind),blap_in,pm);
+	if (pm.pvin != pm.pvout) {
+		basis_overlap(GS,EX,bindex(gsind,exind),blap_out,pm,true);
+	} else blap_out = blap_in;
+	return;
+}
+
 void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	double beta = 0, hbar = 6.58e-16, nedos = pm.nedos, eloss_min = -2;
 	dcomp igamma(0,pm.eps_loss);
@@ -586,11 +595,17 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	auto start = chrono::high_resolution_clock::now();
 	vecd rixs_em, rixs_ab, rixs_peaks, rixs_peaks_kh, rixs_em_kh;
 	vector<blapIndex> blap, blap_in, blap_out;
+	bool reuse_blap = false;
 
 	if (pm.spec_solver == 4) {
 		// BiCGstab and Lanczos to solve RIXS spectra
 		// Solve for each incident energy, not super efficient
 		vecc solved_vec;
+		// Special case where there are no symmetry, we can use the same basis overlap.
+		if (GS.hblks.size()==1 and EX.hblks.size()==1) {
+			reuse_blap = true;
+			calc_rixs_blap(GS,EX,0,0,blap_in,blap_out,pm);
+		}
 		if (pm.precond != 0) solved_vec = vecc(EX.hsize,0);
 		for (auto &ab_en: pm.inc_e_points) {
 			cout << "---------------Solving for incident energy: " << ab_en << "---------------" << endl;
@@ -603,10 +618,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 			for (auto &exblk : EX.hblks) {
 				size_t last_gs_block = gsi[0].first;
 				size_t exblk_ind = &exblk-&EX.hblks[0];
-				basis_overlap(GS,EX,bindex(last_gs_block,exblk_ind),blap_in,pm);
-				if (pm.pvin != pm.pvout) {
-					basis_overlap(GS,EX,bindex(last_gs_block,exblk_ind),blap_out,pm,true);
-				} else blap_out = blap_in;
+				if (!reuse_blap) calc_rixs_blap(GS,EX,last_gs_block,exblk_ind,blap_in,blap_out,pm);
 				for (auto &g  : gsi) {
 					auto& gsblk = GS.hblks[g.first];
 					size_t gblk_size =  GS.hblks[g.first].size;
@@ -618,14 +630,10 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 					for (int i = 0; i < gblk_size; ++i) 
 						gs_vec[i] = dcomp(GS.hblks[g.first].eigvec[g.second*gblk_size+i],0);
 					// Recalculate basis state overlap if different blocks
-					if (g.first != last_gs_block) {
-						basis_overlap(GS,EX,bindex(g.first,&exblk-&EX.hblks[0]),blap_in,pm);
-						if (pm.pvin != pm.pvout) {
-							basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap_out,pm,true);
-						} else blap_out = blap_in;
+					if (g.first != last_gs_block && !reuse_blap) {
+						calc_rixs_blap(GS,EX,g.first,exblk_ind,blap_in,blap_out,pm);
 						last_gs_block = g.first;
 					}
-					// basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap_in,pm);
 					vecc dipole_vec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),gs_vec,blap_in);
 					// Perform BiCGS, solve for intermediate state
 					vecc guess_vec; // This is currently unstable...?
