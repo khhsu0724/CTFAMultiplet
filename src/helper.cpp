@@ -1,9 +1,15 @@
 #include "helper.hpp"
 
 size_t ed::choose(size_t n, size_t k) {
-	if (k > n) return 0;
-	if (!k) return 1;
-    return (n*choose(n-1, k-1))/k;
+    if (k > n) return 0;
+    if (k == 0 || k == n) return 1;
+    if (k > n - k) k = n - k;  // Use symmetry
+
+    size_t res = 1;
+    for (size_t i = 1; i <= k; ++i) {
+        res = res * (n - k + i) / i;
+    }
+    return res;
 }
 
 bool ed::is_pw2(ulli x) {return !(x == 0) && !(x & (x - 1));}

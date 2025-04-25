@@ -17,6 +17,7 @@ public:
 	std::vector<Atom> atlist; // atlist is ordered
 	std::vector<Block<double>> hblks;
 	std::vector<int> sites = {1,1,1};
+	std::vector<int> orb_atom_ind; // return the index of atom for the orbital
 	using Hashptr = bindex (Hilbert::*)(ulli s);
 	using HBptr = ulli (Hilbert::*)(bindex ind);
 	Hashptr hashfunc;

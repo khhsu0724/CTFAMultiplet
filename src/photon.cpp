@@ -93,90 +93,6 @@ vecd occupation(Hilbert& hilbs, const vector<bindex>& si, bool is_print, string 
 	return occ_tot;
 }
 
-
-vecd occupation_test(Hilbert& hilbs, const vector<bindex>& si, bool is_print) {
-	// Calculation occupation of orbitals, only valid when matrix is diagonalized
-	for (auto& blk : hilbs.hblks) if (blk.eigvec == nullptr) throw runtime_error("matrix not diagonalized for occupation");
-	int nvo = hilbs.cluster->vo_persite * hilbs.tot_site_num();
-	int nco = hilbs.cluster->co_persite * hilbs.tot_site_num();
-	// cout << "NVO: " << nvo << ", NCO:" << nco << endl;
-	vecc U = ed::make_blk_mat(hilbs.cluster->get_seph2real_mat(),hilbs.tot_site_num());
-	vector<double> occ_totc(nvo,0);
-	Hilbert minus_1vh(hilbs,-1);
-	// cout << "hilbs: " << hilbs.hsize << ", minus_vh hsize:" << minus_1vh.hsize << endl;
-	for (auto &s  : si) {
-		auto& blk = hilbs.hblks[s.first];
-		// cout << s.first << ", " << s.second << endl;
-		// double norm = 0;
-		// for (size_t x = 0; x < blk.size; ++x) {
-		// 	// cout << blk.eigvec[s.second*blk.size+x] << endl;
-		// 	norm += pow(blk.eigvec[s.second*blk.size+x],2);
-		// }
-		// cout << "Norm: " << norm << endl;
-		// Pick an operator
-		for (size_t c = 0; c < nvo; ++c) {
-			vecc wvfnc(minus_1vh.hsize,0);
-			for (size_t ci = 0; ci < nvo; ++ci) {
-				if (abs(U[c*nvo+ci]) < TOL) continue;
-				for (size_t j = 0; j < blk.size; ++j) {
-					double sj = blk.eigvec[s.second*blk.size+j];
-					if (abs(sj) < TOL) continue;
-					// Operate on spin up and spin down
-					for (int sud = nco; sud <= 2*(nco+nvo); sud += nco+nvo) {
-						ulli op_state = hilbs.Hashback(bindex(s.first,j)), op;
-						if (BIG1 << (ci+sud) & op_state) op = BIG1<<(ci+sud);
-						else continue;
-						// cout << "opstate: " << bitset<32>(op_state) << ", op: " << bitset<32>(op) << ", minus: " <<  bitset<32>(op_state-op) << endl;
-						bindex ind = minus_1vh.norm_Hash(op_state-op);
-						int fsgn = hilbs.Fsign(&op,op_state,1);
-						wvfnc[ind.second] += fsgn*sj*U[c*nvo+ci];
-					}
-				}
-			}
-			for (auto &w : wvfnc) occ_totc[c] += abs(pow(w,2))/si.size();
-		}
-		// if (is_print) hilbs.cluster->print_eigstate(occ_totc);
-	}
-	// if (is_print) hilbs.cluster->print_eigstate(occ_totc);
-
-	//DEBUG
-	// U = hilbs.cluster->get_seph2real_mat();
-	// cout << "DEBUGGGG NVO: " << nvo << ", NCO:" << nco << " U size: " << U.size()  << endl;
-	// occ_totc = vecd(nvo,0);
-	// for (auto &s  : si) {
-	// 	auto& blk = hilbs.hblks[s.first];
-	// 	// Pick an operator
-	// 	for (size_t site = 0; site < hilbs.tot_site_num()*5; site+=5) {
-	// 		for (size_t c = 0; c < 5; ++c) {
-	// 			vecc wvfnc(minus_1vh.hsize,0);
-	// 			for (size_t ci = 0; ci < 5; ++ci) {
-	// 				if (abs(U[c*5+ci]) < TOL) continue;
-	// 				for (size_t j = 0; j < blk.size; ++j) {
-	// 					double sj = blk.eigvec[s.second*blk.size+j];
-	// 					if (abs(sj) < TOL) continue;
-	// 					// Operate on spin up and spin down
-	// 					for (int sud = nco; sud <= 2*(nco+nvo); sud += nco+nvo) {
-	// 						ulli op_state = hilbs.Hashback(bindex(s.first,j)), op = 0;
-	// 						if (BIG1 << (ci+sud+site) & op_state) op = BIG1<<(ci+sud+site);
-	// 						else continue;
-	// 						bindex ind = minus_1vh.norm_Hash(op_state-op);
-	// 						double fsgn = hilbs.Fsign(&op,op_state,1);
-	// 						wvfnc[ind.second] += fsgn*sj*U[c*5+ci];
-	// 					}
-	// 				}
-	// 				for (auto &w : wvfnc) occ_totc[c+site] += abs(pow(w,2))/si.size();
-	// 			}
-	// 		}
-	// 	}
-	// 	if (is_print) hilbs.cluster->print_eigstate(occ_totc);
-	// }
-	// DEBUG
-
-
-	if (is_print) hilbs.cluster->print_eigstate(occ_totc);
-	return occ_totc;
-}
-
 vector<double> wvfnc_weight(Hilbert& hilbs, const vector<bindex>& si, int ligNum, bool print) {
 	// Returns fraction of degenerate states with their ligand occupation
 	ligNum = (ligNum < hilbs.num_vh) ? ligNum : hilbs.num_vh;
@@ -289,29 +205,66 @@ void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, vector<blapIndex>& bla
 	const int exblk_size = EX.hblks[exi].size;
 	vector<ulli> gslist = GS.get_hashback_list(gbi);
 	vector<ulli> exslist = EX.get_hashback_list(exi);
-	#pragma omp parallel for shared(blap,gslist,exslist) collapse(2)
-	for (size_t g = 0; g < gsblk_size; g++) {
-		for (size_t e = 0; e < exblk_size; e++) {
-			ulli gs = gslist.at(g), exs = exslist.at(e);
-			ulli ch = exs - (gs & exs), vh = gs - (gs & exs);
-			int coi = EX.orbind(ch), voi = GS.atlist[coi].vind;
-			if (!ed::is_pw2(vh) || !GS.atlist[voi].contains(vh)) continue;
-			QN chqn = EX.atlist[coi].fast_qn(ch,half_orb,coi);
-			QN vhqn = GS.atlist[voi].fast_qn(vh,half_orb,voi);
-			if (chqn.spin != vhqn.spin || abs(vhqn.ml-chqn.ml) > 1) continue;
-			// dcomp blap_val = gaunt(cl,chqn.ml,vl,vhqn.ml)[1] 
-			// 	* GS.Fsign(&vh,gs,1) * EX.Fsign(&ch,exs,1) * proj_pvec(vhqn.ml-chqn.ml,pvec);
-			dcomp blap_val = gaunt(cl,chqn.ml,vl,vhqn.ml)[1] * pow(-1,vhqn.ml-chqn.ml+1)
-				* GS.Fsign(&vh,gs,1) * EX.Fsign(&ch,exs,1) * proj_pvec(vhqn.ml-chqn.ml,pvec);
-			if (blap_val != dcomp(0.0,0.0)) {
-				#pragma omp critical
-				{	
-					blap.emplace_back(g,e,blap_val);
-				}
-			}
-		}
+	#pragma omp parallel
+	{
+	    std::vector<blapIndex> local_blap;
+	    local_blap.reserve(EX.hblks[exi].size*2/omp_get_max_threads());
+	    #pragma omp for collapse(2) nowait
+	    for (size_t g = 0; g < gsblk_size; g++) {
+	        for (size_t e = 0; e < exblk_size; e++) {
+	            ulli gs = gslist[g], exs = exslist[e];
+	            ulli vh = gs - (gs & exs);
+	            if (!ed::is_pw2(vh)) continue;
+	            ulli ch = exs - (gs & exs);
+	            int coi = EX.orbind(ch);
+	            if (coi == -1) continue;
+	            int voi = GS.atlist[coi].vind;
+	            if (!GS.atlist[voi].contains(vh)) continue;
+	            QN chqn = EX.atlist[coi].fast_qn(ch,half_orb,coi);
+	            QN vhqn = GS.atlist[voi].fast_qn(vh,half_orb,voi);
+	            if (chqn.spin != vhqn.spin || abs(vhqn.ml-chqn.ml) > 1) continue;
+	            dcomp blap_val = gaunt(cl,chqn.ml,vl,vhqn.ml)[1] * pow(-1,vhqn.ml-chqn.ml+1)
+	                            * GS.Fsign(&vh,gs,1) * EX.Fsign(&ch,exs,1) * proj_pvec(vhqn.ml-chqn.ml,pvec);
+	            if (blap_val != dcomp(0.0,0.0)) {
+	                local_blap.emplace_back(g, e, blap_val);
+	            }
+	        }
+	    }
+
+	    // Merge local results back to global vector
+	    #pragma omp critical
+	    {
+	        blap.insert(blap.end(), local_blap.begin(), local_blap.end());
+	    }
 	}
 	return;
+}
+
+vecc gen_dipole_state(Hilbert& GS, Hilbert& EX, const PM& pm, const bindex& inds, vecc vec_in, 
+						const vector<blapIndex>& blap, bool excite) {
+	size_t gbi = inds.first, exi = inds.second;
+	if (excite) {
+		// Generate excited state with D|g>
+		if (vec_in.size() != GS.hblks[gbi].size) {
+			cout << "Block size mismatch in gen_dipole_state" << endl;
+			exit(1);
+		}
+		vecc dpvec(EX.hblks[exi].size,0);
+		for (auto & b : blap) {
+			dpvec[b.e] += vec_in[b.g] * b.blap;
+		}
+		return dpvec;
+	} else { // Generate excited state with D+|g>
+		if (vec_in.size() != EX.hblks[exi].size) {
+			cout << "Block size mismatch in gen_dipole_state (rev)" << endl;
+			exit(1);
+		}
+		vecc dpvec(GS.hblks[gbi].size,0);
+		for (auto & b : blap) {
+			dpvec[b.g] += vec_in[b.e] * conj(b.blap);
+		}
+		return dpvec;
+	}
 }
 
 void XAS_peak_occupation(Hilbert& GS, Hilbert& EX, vecd const& peak_en, vecd const& energy, 
@@ -407,18 +360,28 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 		// Lanczos solver
 		for (int i = 0; i < nedos; ++i) 
 			xas_aben[i] = pm.ab_range[0] + (pm.ab_range[1]-pm.ab_range[0])/nedos*i;
-		for (auto &g  : gsi) {
-			size_t gblk_size =  GS.hblks[g.first].size;
-			for (auto &exblk : EX.hblks) {
-				size_t exblk_ind = &exblk-&EX.hblks[0];
-				// No spin flip
+		for (auto &exblk : EX.hblks) {
+			size_t last_gs_block = gsi[0].first;
+			size_t exblk_ind = &exblk-&EX.hblks[0];
+			basis_overlap(GS,EX,bindex(last_gs_block,&exblk-&EX.hblks[0]),blap,pm);
+			for (auto &g  : gsi) {
+				auto& gsblk = GS.hblks[g.first];
+				size_t gblk_size =  GS.hblks[g.first].size;
+				// If spin ordered block, check for no spin flip
 				if (!GS.SO_on && !EX.SO_on && GS.hblks[g.first].get_sz() != exblk.get_sz()) continue;
-				cout << "gsblk: " << g.first << ", exblk: " << &exblk-&EX.hblks[0] << endl;
+				if (g.first != last_gs_block) {
+					basis_overlap(GS,EX,bindex(g.first,&exblk-&EX.hblks[0]),blap,pm);
+					last_gs_block = g.first;
+				}
+				// cout << "gsblk: " << g.first << ", exblk: " << &exblk-&EX.hblks[0] << endl;
 				vecc gs_vec(gblk_size,0);
 				#pragma omp parallel for
 				for (int i = 0; i < gblk_size; ++i) 
-					gs_vec[i] = dcomp(GS.hblks[g.first].eigvec[g.second*gblk_size+i],0);
-				basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm);
+					gs_vec[i] = dcomp(GS.hblks[g.first].eigvec[g.second*gblk_size+i],0);		
+				if (g.first != last_gs_block) {
+					basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm);
+					last_gs_block = g.first;
+				}
 				vecc dipole_vec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),gs_vec,blap);
 				// Perform Lanczos
 				ContFracExpan(exblk.ham,dipole_vec,gs_en,xas_aben,xas_int,pm.eps_ab,pm.niterCFE);
@@ -593,33 +556,6 @@ void write_iter_RIXS(vecd const& rixs_ab, vecd const& rixs_loss, vecd const& rix
 	return;
 }
 
-vecc gen_dipole_state(Hilbert& GS, Hilbert& EX, const PM& pm, const bindex& inds, vecc vec_in, 
-						const vector<blapIndex>& blap, bool excite) {
-	size_t gbi = inds.first, exi = inds.second;
-	if (excite) {
-		// Generate excited state with D|g>
-		if (vec_in.size() != GS.hblks[gbi].size) {
-			cout << "Block size mismatch in gen_dipole_state" << endl;
-			exit(1);
-		}
-		vecc dpvec(EX.hblks[exi].size,0);
-		for (auto & b : blap) {
-			dpvec[b.e] += vec_in[b.g] * b.blap;
-		}
-		return dpvec;
-	} else { // Generate excited state with D+|g>
-		if (vec_in.size() != EX.hblks[exi].size) {
-			cout << "Block size mismatch in gen_dipole_state (rev)" << endl;
-			exit(1);
-		}
-		vecc dpvec(GS.hblks[gbi].size,0);
-		for (auto & b : blap) {
-			dpvec[b.g] += vec_in[b.e] * conj(b.blap);
-		}
-		return dpvec;
-	}
-}
-
 void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	double beta = 0, hbar = 6.58e-16, nedos = pm.nedos, eloss_min = -2;
 	dcomp igamma(0,pm.eps_loss);
@@ -649,7 +585,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	cout << "Calculating cross section..." << endl;
 	auto start = chrono::high_resolution_clock::now();
 	vecd rixs_em, rixs_ab, rixs_peaks, rixs_peaks_kh, rixs_em_kh;
-	vector<blapIndex> blap;
+	vector<blapIndex> blap, blap_in, blap_out;
 
 	if (pm.spec_solver == 4) {
 		// BiCGstab and Lanczos to solve RIXS spectra
@@ -664,20 +600,35 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 			vecd rixs_peaks_local(nedos,0);
 			// Using previous coverged vector as guess, use a vector with size = Hilbert space
 			for (int i = 0; i < nedos; ++i) rixs_em_local[i] = -2 + (pm.em_energy+2)/nedos*i;
-			for (auto &g  : gsi) {
-				size_t gblk_size =  GS.hblks[g.first].size;
-				for (auto &exblk : EX.hblks) {
-					size_t exblk_ind = &exblk-&EX.hblks[0];
+			for (auto &exblk : EX.hblks) {
+				size_t last_gs_block = gsi[0].first;
+				size_t exblk_ind = &exblk-&EX.hblks[0];
+				basis_overlap(GS,EX,bindex(last_gs_block,exblk_ind),blap_in,pm);
+				if (pm.pvin != pm.pvout) {
+					basis_overlap(GS,EX,bindex(last_gs_block,exblk_ind),blap_out,pm,true);
+				} else blap_out = blap_in;
+				for (auto &g  : gsi) {
+					auto& gsblk = GS.hblks[g.first];
+					size_t gblk_size =  GS.hblks[g.first].size;
+					// If spin ordered block, check for no spin flip
 					if (!GS.SO_on && !EX.SO_on && GS.hblks[g.first].get_sz() != exblk.get_sz()) continue;
 					cout << "Block: " << g.first << ", " << exblk_ind << endl;
 					vecc gs_vec(gblk_size,0);
 					#pragma omp parallel for
 					for (int i = 0; i < gblk_size; ++i) 
 						gs_vec[i] = dcomp(GS.hblks[g.first].eigvec[g.second*gblk_size+i],0);
-					basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm);
-					vecc dipole_vec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),gs_vec,blap);
+					// Recalculate basis state overlap if different blocks
+					if (g.first != last_gs_block) {
+						basis_overlap(GS,EX,bindex(g.first,&exblk-&EX.hblks[0]),blap_in,pm);
+						if (pm.pvin != pm.pvout) {
+							basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap_out,pm,true);
+						} else blap_out = blap_in;
+						last_gs_block = g.first;
+					}
+					// basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap_in,pm);
+					vecc dipole_vec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),gs_vec,blap_in);
 					// Perform BiCGS, solve for intermediate state
-					vecc guess_vec;
+					vecc guess_vec; // This is currently unstable...?
 					if (pm.precond != 0 && ab_en != pm.inc_e_points[0]) {
 						guess_vec = vecc(exblk.size,0);
 						std::copy(solved_vec.begin()+exblk.f_ind, 
@@ -686,10 +637,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 					vecc midvec = BiCGS(exblk.ham,dipole_vec,z,pm.CG_tol,guess_vec);
 					if (pm.precond != 0) std::copy(midvec.begin(), midvec.end(), solved_vec.begin()+exblk.f_ind);
 					// De-excitation
-					if (pm.pvin != pm.pvout) {
-						basis_overlap(GS,EX,bindex(g.first,exblk_ind),blap,pm,true);
-					}
-					midvec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),midvec,blap,false);
+					midvec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),midvec,blap_out,false);
 					int niter_CFE_in = pm.niterCFE;
 					if (niter_CFE_in > GS.hblks[g.first].size/100) niter_CFE_in = GS.hblks[g.first].size/100;
 					if (niter_CFE_in < 20) niter_CFE_in = 20; 
