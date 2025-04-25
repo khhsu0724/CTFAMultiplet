@@ -105,7 +105,7 @@ int Lanczos(Matrix<T>* ham, const vecc& v0, vecc& alpha, vecc& betha, int niter_
 	vecc phipp(hsize,0);
 	vecc phil(hsize,0);
 	// Normalize the vector
-	vecc phi = v0;
+	vecc phi(v0);
 	ed::norm_vec(phi);
 
 	for (int i = 0; i < niter_CFE; ++i) {
@@ -115,14 +115,14 @@ int Lanczos(Matrix<T>* ham, const vecc& v0, vecc& alpha, vecc& betha, int niter_
 		for (int j = 0; j < hsize; ++j) alpha_element += std::conj(phi[j])*phip[j];
 		alpha[i] = alpha_element;
 		if (i != 0) {
-			#pragma omp parallel for 
+			#pragma omp parallel for simd
 			for (int j = 0; j < hsize; ++j) phip[j] -= betha[i] * phil[j];
 		}
-		#pragma omp parallel for 
+		#pragma omp parallel for simd
 		for (int j = 0; j < hsize; ++j) phipp[j] = phip[j] - alpha[i] * phi[j];
 		if (i != niter_CFE-1) {
 			betha[i+1] = ed::norm(phipp);
-			if (std::abs(betha[i+1]) < 1E-13) {
+			if (std::norm(betha[i+1]) < 1E-13) {
 				std::cout << "Lanzcos ended after: " << i << " steps." << std::endl;
 				niter_CFE = i;
 				break;

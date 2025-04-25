@@ -217,9 +217,9 @@ double Hilbert::Fsign(ulli* op, ulli state, int opnum) {
 }
 
 int Hilbert::orbind(ulli s) {
-	int i = 0;
-	while (!(atlist[i].check & s)) ++i;
-	return i;
+	if (!ed::is_pw2(s)) return -1;
+	int i = __builtin_ctzll(s);
+	return orb_atom_ind[i];
 }
 
 int Hilbert::tot_site_num() {
@@ -382,10 +382,15 @@ void Hilbert::read_from_file(string file_dir) {
 			if (num_corb+num_vorb > 64) 
 				throw invalid_argument("Cannot have more than 32 orbitals for now");
 			// TEMPORARY SAFE GAURD 
+			orb_atom_ind = vector<int>(num_corb+num_vorb,0);
+			int atcnt = 0;
 			for (auto &at : atlist) {
 				for (size_t i = at.sind; i <= at.eind; i++) {
 					at.check += (BIG1 << i | BIG1 << (i+num_corb/2+num_vorb/2));
+					orb_atom_ind[i] = atcnt;
+					orb_atom_ind[i+num_corb/2+num_vorb/2] = atcnt;
 				}
+				atcnt++;
 			}
 			ind = 0;
 			while(!atlist[ind].is_val) {
