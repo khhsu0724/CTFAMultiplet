@@ -225,7 +225,7 @@ void basis_overlap(Hilbert& GS, Hilbert& EX, bindex inds, vector<blapIndex>& bla
 	            if (chqn.spin != vhqn.spin || abs(vhqn.ml-chqn.ml) > 1) continue;
 	            dcomp blap_val = gaunt(cl,chqn.ml,vl,vhqn.ml)[1] * pow(-1,vhqn.ml-chqn.ml+1)
 	                            * GS.Fsign(&vh,gs,1) * EX.Fsign(&ch,exs,1) * proj_pvec(vhqn.ml-chqn.ml,pvec);
-	            if (blap_val != dcomp(0.0,0.0)) {
+	            if (std::norm(blap_val) > 1E-14) {
 	                local_blap.emplace_back(g, e, blap_val);
 	            }
 	        }

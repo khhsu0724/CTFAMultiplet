@@ -520,7 +520,7 @@ int main(int argc, char** argv){
 	cout << "TM 2p Spin-Orbit Coupling: " << hparam.SO[0] << " eV" << endl;
 	cout << "TM 3d Spin-Orbit Coupling: " << hparam.SO[1] << " eV" << endl;
 	if (hparam.SO[2] < 0) hparam.SO[2] = hparam.SO[1];
-	cout << "TM 3d Spin-Orbit Coupling (for Core-Hole state): " << hparam.SO[1] << " eV" << endl;
+	cout << "TM 3d Spin-Orbit Coupling (for Core-Hole state): " << hparam.SO[2] << " eV" << endl;
 	cout << "SC1: ";
 	for (int i = 0; i < 3; ++i) cout << hparam.SC[0][i] << ", ";
 	cout << endl << "SC2 for GS: ";
