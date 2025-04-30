@@ -69,7 +69,6 @@ endif(OPENMP_FOUND)
 #-------------------------------------------------------------------
 # Check ARPACK Library
 #-------------------------------------------------------------------
-set(ARPACK_FOUND FALSE)
 set(ARPACK_ROOT "" CACHE PATH "Path to the ARPACK installation")
 if (ARPACK_ROOT)
     set(ARPACK_INCLUDE_DIR "${ARPACK_ROOT}/include")
@@ -113,7 +112,6 @@ else()
             "If ARPACK is installed but not detected, please use -DARPACK_ROOT=/path/to/arpack."
         )
     else()
-        set(ARPACK_FOUND TRUE)
         message(STATUS "Found ARPACK include directory: ${ARPACK_INCLUDE_DIR}")
         message(STATUS "Found ARPACK library: ${ARPACK_LIBRARY}")
     endif()
@@ -175,23 +173,19 @@ set_target_properties(CTFAMultiplet PROPERTIES OUTPUT_NAME ../main)
 #-------------------------------------------------------------------
 # Link Libraries
 #-------------------------------------------------------------------
-if (ARPACK_FOUND)
-    target_link_libraries(CTFAMultiplet 
-        PRIVATE
-        ${ARPACK_LIBRARY}    # ARPACK library
-    )
-endif()
-
 target_link_libraries(CTFAMultiplet 
     PRIVATE
-    ${LAPACK_LIBRARIES}  # LAPACK libraries (fallback)
+    ${LAPACK_LIBRARIES}  # LAPACK libraries
 )
-
 
 #-------------------------------------------------------------------
 # Include Directories
 #-------------------------------------------------------------------
-if (ARPACK_FOUND)
+if (ARPACK_INCLUDE_DIR AND ARPACK_LIBRARY)
+    target_link_libraries(CTFAMultiplet 
+        PRIVATE
+        ${ARPACK_LIBRARY}    # ARPACK library
+    )
     target_include_directories(CTFAMultiplet 
         PRIVATE
         ${ARPACK_INCLUDE_DIR}  # ARPACK headers
@@ -225,5 +219,3 @@ endif()
 
 
 # Clean up build files (CMake takes care of this with built-in clean)
-
-
