@@ -1,17 +1,18 @@
 #ifndef MATRIX
 #define MATRIX
 #include "helper.hpp"
-#ifdef _OPENMP
-#include <omp.h>
-#else
-// Provide dummy replacements so code compiles without OpenMP
-inline int omp_get_max_threads() { return 1; }
-inline int omp_get_thread_num() { return 0; }
-#endif
 #if defined __has_include && __has_include ("mkl.h") 
 #include "mkl.h" // Can we auto-detect if mkl is installed
 #include "mkl_lapacke.h"
 #include "mkl_blas.h"
+inline int omp_get_max_threads() { return mkl_get_max_threads(); }
+#else
+	#ifdef _OPENMP
+	#include <omp.h>
+	#else
+	// Provide dummy replacements so code compiles without OpenMP
+	inline int omp_get_max_threads() { return 1; }
+	#endif
 #endif
 
 typedef std::unique_ptr<double[]> uptrd;

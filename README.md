@@ -40,11 +40,20 @@ $ cmake ..
 $ make
 $ ../main ../test/INPUT # To execute the code
 ```
+
+#### Optional packages
 If cmake is unable to locate boost or arpack, use: 
 ```
 $ cmake -DARPACK_ROOT=/path/to/arpack/ -DBoost_ROOT=/path/to/boost/ ..
 ```
 
+Intel MKL support can be enabled for this code. If so, ARPACK **must** be compile with MKL support. \
+To turn on MKL: 
+```
+$ cmake -DMKL_ON=TRUE ..
+```
+
+#### Installing on sherlock
 For sherlock specifically: Once in the build directory, issue these command: 
 ```
 $ module load icc arpack gcc/8.1.0

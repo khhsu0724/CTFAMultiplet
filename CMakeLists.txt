@@ -122,20 +122,32 @@ endif()
 #-------------------------------------------------------------------
 # Check LAPACK/MKL
 #-------------------------------------------------------------------
-message(STATUS "ENV{MKLROOT}: $ENV{MKLROOT}")
-set(MKL_INTERFACE_FULL intel_lp64)
-find_package(MKL PATHS $ENV{MKLROOT})
-if (MKL_FOUND)
-    set(MKL_INCLUDE_DIRS "$ENV{MKLROOT}/include")
-    message(STATUS "Intel MKL found!")
-    message(STATUS "Include directory: ${MKL_INCLUDE_DIRS}")
-    message(STATUS "Libraries: ${MKL_LIBRARIES}")
+
+option(MKL_ON "Enable linking with Intel MKL" OFF)
+
+if (MKL_ON)
+    message(STATUS "MKL turned on. Please insure ARPACK is compiled with MKL.")
+    message(STATUS "ENV{MKLROOT}: $ENV{MKLROOT}")
+
+    set(MKL_INTERFACE_FULL intel_lp64)  # or use "gnu_lp64" if you're using GCC
+    find_package(MKL PATHS $ENV{MKLROOT})
+
+    if (MKL_FOUND)
+        set(USE_MKL ON)
+        set(MKL_INCLUDE_DIRS "$ENV{MKLROOT}/include")
+        message(STATUS "Intel MKL found!")
+        message(STATUS "Include directory: ${MKL_INCLUDE_DIRS}")
+        message(STATUS "Libraries: ${MKL_LIBRARIES}")
+    else()
+        set(USE_MKL OFF)
+        message(WARNING "Intel MKL not found. Falling back to LAPACK.")
+    endif()
 else()
-    message(WARNING "Intel MKL not found. Falling back to LAPACK.")
-    # set(USE_MKL OFF) # NOT sure if I should comment this out?
+    set(USE_MKL OFF)
+    message(STATUS "MKL support not requested. Using LAPACK.")
 endif()
 
-if (NOT MKL_FOUND)
+if (NOT USE_MKL)
     find_package(LAPACK REQUIRED)
     if (LAPACK_FOUND)
         message(STATUS "LAPACK found!")
@@ -205,7 +217,7 @@ if (OPENMP_FOUND)
     )
 endif()
 
-if (MKL_FOUND)
+if (MKL_ON)
     target_link_libraries(CTFAMultiplet 
         PRIVATE $<IF:${MKL_FOUND},$<LINK_ONLY:MKL::MKL>,> 
     )
