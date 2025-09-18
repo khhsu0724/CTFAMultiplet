@@ -50,12 +50,14 @@ def get_RIXS_iter_all(filedir,edge="",pvin="XYZ",pvout="XYZ",cross=True):
         pvin/pvout: Incoming and outgoing polarization
         cross: Cross polarization, if True then X->X, Y->Y and Z->Z are not considered
     """
+    xsum = None
+    ysum = None
     zsum = None
     for pin in pvin:
         for pout in pvout:
             if (cross and pin == pout): continue
             fname = filedir + "/RIXS_"+edge+"edge_"+pin+"_"+pout+".txt"
-            x,y,z = get_RIXS_iter_all(fname,edge=edge)
+            x,y,z = get_RIXS_iter(fname,edge=edge)
             xsum = x
             ysum = y
             if (zsum is None): zsum = z

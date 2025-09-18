@@ -31,9 +31,9 @@ def get_XAS_exact(fname,xdata,b=0.1):
 
 def get_XAS_iter(filedir):
     with open(filedir) as f:
-        res_raman = np.genfromtxt(f,usecols=np.arange(0,2))
-    x = res_raman[1:,0]
-    y = res_raman[1:,1]
+        xas = np.genfromtxt(f,usecols=np.arange(0,2))
+    x = xas[1:,0]
+    y = xas[1:,1]
     return x,y
 
 
