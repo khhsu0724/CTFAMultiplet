@@ -1,0 +1,39 @@
+&CONTROL
+        SO = 11.507 # Spin Orbit Coupling
+        SC1 = 1.0 0 0.1 #F_0,2 for l = 1 
+        SC2 = 6 0 12.233 0 7.597
+        SC2EX = 6 0 13.005 0 8.084
+        FG = 6 5.783 7.720 3.290
+	#FG = 1 0.25 0 0
+        HFscale = 0.80
+        CF = 0 0 1.0 1.0 1.0
+        tpd = 0.3
+        sigpi = 0.5
+        tpp = 0.1
+        MLCT = 4.5
+        EFFDEL = True
+        DIAG = 4
+        EXNEV = 2
+        GSNEV = 10
+        OVERWRITE = True # Overwrite photon file in the directory
+/
+&CELL
+        Coordination = "sqpl" # Defaults to no coordination
+        Sites = 1 # x,y,z, Defaults to 1 site
+        Holes = 2 
+/
+&PHOTON
+        XAS = True
+        RIXS = True
+        CROSS = True
+        pvin = 1 1 1 
+        pvout = 1 1 1  
+        epsloss = 0.1
+        epsab = 0.3
+        solver = 4
+        Edge = L
+        NEDOS = 1000         
+        AB = -20 20
+        INCIDENT = 10 50 -1     ### start E, end E, number of points.
+        EM = 12             ### max_loss
+/
