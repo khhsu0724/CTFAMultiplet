@@ -383,6 +383,7 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 					last_gs_block = g.first;
 				}
 				vecc dipole_vec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),gs_vec,blap);
+				if (ed::norm(dipole_vec) < TOL) continue; // exit loop if no overlap
 				// Perform Lanczos
 				ContFracExpan(exblk.ham,dipole_vec,gs_en,xas_aben,xas_int,pm.eps_ab,pm.niterCFE);
 			}
@@ -635,6 +636,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 						last_gs_block = g.first;
 					}
 					vecc dipole_vec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),gs_vec,blap_in);
+					if (ed::norm(dipole_vec) < TOL) continue; // exit loop if no overlap
 					// Perform BiCGS, solve for intermediate state
 					vecc guess_vec; // This is currently unstable...?
 					if (pm.precond != 0 && ab_en != pm.inc_e_points[0]) {

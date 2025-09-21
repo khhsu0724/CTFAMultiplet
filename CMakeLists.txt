@@ -11,7 +11,7 @@ endif()
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ffast-math -march=native")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ffast-math -march=native") # -g for gdb debugging
 
 message("-- CXX: ${CMAKE_CXX_COMPILER}")
 message("-- CXXFLAGS: ${CMAKE_CXX_FLAGS}")
