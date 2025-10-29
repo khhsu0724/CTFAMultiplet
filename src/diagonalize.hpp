@@ -362,7 +362,6 @@ public:
 			eig = return_uptr<double>(&_eig);
 		} else if (option == 4) {
 			nev = std::min(nev_in,size/3);
-			std::cout << "Arpack Eigenvalues " << nev << ", size: " << size << std::endl;
 			_eig = new double[nev]{0};
 			_eigvec = new double[size*nev]{0};
 			ed_dsarpack(ham,_eigvec,_eig,size,nev);

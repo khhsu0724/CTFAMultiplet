@@ -67,6 +67,7 @@ private:
 	bool skip_cout;
 };
 
+
 namespace ed {
 	bool is_pw2(ulli x);
 	size_t choose(size_t n, size_t k);

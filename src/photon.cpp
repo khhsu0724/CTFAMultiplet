@@ -624,8 +624,8 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 					auto& gsblk = GS.hblks[g.first];
 					size_t gblk_size =  GS.hblks[g.first].size;
 					// If spin ordered block, check for no spin flip
-					if (!GS.SO_on && !EX.SO_on && GS.hblks[g.first].get_sz() != exblk.get_sz()) continue;
-					cout << "Block: " << g.first << ", " << exblk_ind << endl;
+					if (!GS.SO_on && !EX.SO_on && gsblk.get_sz() != exblk.get_sz()) continue;
+					cout << "==>Block: " << g.first << ", " << exblk_ind << ", Eig num: " << &g-&gsi[0] << "<==" << endl;
 					vecc gs_vec(gblk_size,0);
 					#pragma omp parallel for
 					for (int i = 0; i < gblk_size; ++i) 
@@ -648,6 +648,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 					if (pm.precond != 0) std::copy(midvec.begin(), midvec.end(), solved_vec.begin()+exblk.f_ind);
 					// De-excitation
 					midvec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),midvec,blap_out,false);
+					if (ed::norm(midvec) < TOL) continue; // exit loop if no overlap
 					int niter_CFE_in = pm.niterCFE;
 					if (niter_CFE_in > GS.hblks[g.first].size/100) niter_CFE_in = GS.hblks[g.first].size/100;
 					if (niter_CFE_in < 20) niter_CFE_in = 20; 
@@ -823,12 +824,11 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	cout << "Run time = " << duration.count() << " ms\n";
 
 	cout << "Writing results..." << endl;
-	if (pm.spec_solver == 2 || pm.spec_solver == 3)
-		// ed::write_vec(rixs_peaks_kh,nedos,nedos,"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+"-full.csv");
+	if (pm.spec_solver == 2 || pm.spec_solver == 3) {
 		cout << "RIXS matrix wrote to RIXS_"+string(pm.edge)+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+"-kh.txt" << endl;
 		for (auto & val : rixs_peaks_kh) val /= gsi.size();
 		write_kh_RIXS(rixs_peaks_kh,rixs_em_kh,"RIXS_"+pm.edge+"edge_"+pol_str(pm.pvin)+"_"+pol_str(pm.pvout)+"-kh.txt");
-
+	}
 	if (pm.spec_solver == 1 || pm.spec_solver == 3) {
 		cout << endl;
 		for (auto & val : rixs_peaks) val /= gsi.size();
