@@ -78,3 +78,4 @@ For detailed input cards, please refer to the **[Wiki](https://github.com/khhsu0
 
 ## Publications
 - [A formal Fe(III/V) redox couple in an intercalation electrode](https://chemrxiv.org/engage/chemrxiv/article-details/6671eb0e5101a2ffa8e63407)
+- [Negative Charge Transfer: Ground State Precursor towards High Energy Batteries](https://arxiv.org/pdf/2509.20622)
