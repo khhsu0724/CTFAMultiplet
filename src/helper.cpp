@@ -1,9 +1,16 @@
 #include "helper.hpp"
 
 size_t ed::choose(size_t n, size_t k) {
-	if (k > n) return 0;
-	if (!k) return 1;
-    return (n*choose(n-1, k-1))/k;
+    if (k > n) return 0;
+    if (k == 0 || k == n) return 1;
+    if (k > n / 2) k = n - k; // Optimization: choose(n, k) == choose(n, n-k)
+    
+    // Use a simple iterative approach to prevent recursion depth/overflow issues
+    size_t res = 1;
+    for (size_t i = 1; i <= k; ++i) {
+        res = res * (n - i + 1) / i;
+    }
+    return res;
 }
 
 bool ed::is_pw2(ulli x) {return !(x == 0) && !(x & (x - 1));}
@@ -13,22 +20,26 @@ ulli ed::next_perm(ulli v) {
 	return (t + 1) | (((~t & -~t) - 1) >> (__builtin_ctzll(v) + 1));
 }
 
-// Enumarate states that include bits for "inc" variable using recursion
 void ed::enum_states(std::vector<ulli>& states, ulli n, ulli k, ulli inc, ulli s) {
-	if (k > n) return;
-	if (k == 0 && n < (__builtin_ctzll(inc)+1)) {
-		states.emplace_back(s);
-		return;
-	}
-	enum_states(states,n-1,k-1,inc,s+(1<<(n-1))); // bit is 1
-	if (!(inc & (1<<(n-1)))) enum_states(states,n-1,k,inc,s); // bit is 0
+    if (k > n) return;
+    if (k == 0) {
+        // Only add if the core/valence requirements (inc) are met
+        if (n == 0 || (n < 64 && n < (__builtin_ctzll(inc)+1))) {
+            states.emplace_back(s);
+        }
+        return;
+    }
+    if (n == 0) return; // Safety break
+
+    enum_states(states, n-1, k-1, inc, s + (BIG1 << (n-1))); 
+    if (!(inc & (BIG1 << (n-1)))) enum_states(states, n-1, k, inc, s);
 }
 
 // Add valence state and core state 
 ulli ed::add_bits(ulli b1, ulli b2, int b1size, int b2size) {
-	ulli b1d = b1 & ((BIG1 << (b1size/2)) - 1);
-	ulli b2d = b2 & ((BIG1 << (b2size/2)) - 1);
-	return (b1^b1d) << b2size | (b2^b2d) << (b1size/2) | b1d << (b2size/2) | b2d;
+    ulli b1d = b1 & ((BIG1 << (b1size/2)) - 1);
+    ulli b2d = b2 & ((BIG1 << (b2size/2)) - 1);
+    return (b1^b1d) << b2size | (b2^b2d) << (b1size/2) | b1d << (b2size/2) | b2d;
 }
 
 int ed::count_bits(ulli b) {

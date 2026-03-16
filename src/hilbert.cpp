@@ -14,7 +14,7 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 	num_ch += is_ex;
 	HYB_on = (hparam.tpd || hparam.tpp || hparam.MLdelta) && hparam.HYB;
 	SO_on = !ed::is_zero_arr(hparam.SO,2);
-	CF_on = !ed::is_zero_arr(hparam.CF,5);
+	CF_on = !ed::is_zero_arr(hparam.CF,6);
 	CV_on = (is_ex && !ed::is_zero_arr(hparam.FG,4));
 	cluster->set_print_site(hparam.print_site_occ);
 	if (hparam.block_diag && !hparam.SO[1]) BLOCK_DIAG = !(edge == "L" && is_ex) || !hparam.SO[0];
@@ -152,7 +152,7 @@ inline ulli Hilbert::qn2ulli(int snum, QN* qn, bool only_val, bool only_core) {
 		Atom *qnat = &atlist[qn[i].order];
 		if (qnat->l - qn[i].ml < 0) cerr << "quantum number larger than site's ml\n";
 		int ind = qnat->sind - shift + (qnat->l - qn[i].ml) + (qn[i].spin+0.5)*num_orb/2;
-		s += BIG1 << ind;
+		s += BIG1 << (ulli)ind;
 	}
 	return s;
 }
@@ -258,19 +258,25 @@ vector<ulli> Hilbert::get_hashback_list(size_t blk_ind) {
 }
 
 
-// Functions for file parsing
+// In hilbert.cpp
 void Hilbert::assign_cluster(string input) {
-	transform(input.begin(),input.end(),input.begin(),::toupper);
-	if (input == "" || input == "NONE" || input == "ION") {
-		coord = "ion";
-		cluster = new Ion(edge);
-	} else if (input == "SQUARE PLANAR" || input == "SQPL") {
-		coord = "sqpl"; 
-		cluster = new SquarePlanar(edge);
-	} else if (input == "OCTAHEDRAL" || input == "OCT") {
-		coord = "oct"; 
-		cluster = new Octahedral(edge);
-	} else throw invalid_argument("unavailable coordination");
+    transform(input.begin(),input.end(),input.begin(),::toupper);
+    if (input == "" || input == "NONE" || input == "ION") {
+        coord = "ion";
+        cluster = new Ion(edge);
+    } else if (input == "SQUARE PLANAR" || input == "SQPL") {
+        coord = "sqpl"; 
+        cluster = new SquarePlanar(edge);
+    } else if (input == "OCTAHEDRAL" || input == "OCT") {
+        coord = "oct"; 
+        cluster = new Octahedral(edge);
+    } 
+    // ADD THIS NEW BLOCK:
+    else if (input == "TETRAHEDRAL" || input == "TET") {
+        coord = "tet";
+        cluster = new Tetrahedral(edge); // Assumes you name the class Tetrahedral
+    } 
+    else throw invalid_argument("unavailable coordination");
 }
 
 void Hilbert::read_from_file(string file_dir) {

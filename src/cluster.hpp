@@ -91,4 +91,19 @@ private:
 	double tpp_sig_pi = 0;
 };
 
+class Tetrahedral : public Cluster {
+public:
+    double tpd = 0, tpp = 0, del = 0, octJT = 1;
+    double D_trig = 0; // NEW: Variable to hold the distortion
+    Tetrahedral(std::string edge);
+    void set_hyb_params(const HParam& hparam);
+    vecc get_seph2real_mat();
+    vecc get_operator_mat();
+    vecc get_tmat();
+private:
+    double tpd_sig_pi = 0.5; 
+    double tpp_sig_pi = 0;
+    bool tppsigma_on = false;
+};
+
 #endif

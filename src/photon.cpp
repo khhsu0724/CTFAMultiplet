@@ -460,6 +460,7 @@ void XAS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 	}
 
 	// Normalize intensity
+	cout << "THIS IS SIZE:" << gsi.size() << endl;
 	for (auto & val : xas_int) val /= gsi.size();
 	auto stop = chrono::high_resolution_clock::now();
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);

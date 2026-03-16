@@ -331,3 +331,155 @@ vecc Octahedral::get_tmat() {
 };
 
 // End of Octahedral Implementation
+
+// ==========================================
+// Tetrahedral Implementation
+// ==========================================
+Tetrahedral::Tetrahedral(std::string edge) : Cluster(edge) {
+    co_persite = 3;
+    vo_persite = 17; // 5 d-orbitals + (4 ligands * 3 p-orbitals)
+    lig_per_site = 4;
+    tm_per_site = 1;
+    no_HYB = false;
+	orb_names = {"dx2","dz2","dxy","dxz","dyz",
+					"p0x","p0y","p0z",
+					"p1x","p1y","p1z",
+					"p2x","p2y","p2z",
+					"p3x","p3y","p3z"};
+    return;
+};
+
+void Tetrahedral::set_hyb_params(const HParam& hparam) {
+    tpd = hparam.tpd;
+    tpp = hparam.tpp;
+    del = hparam.MLdelta;
+    octJT = hparam.octJT;
+    tpd_sig_pi = hparam.sig_pi;
+    tppsigma_on = hparam.tppsigma_on;
+    
+    // NEW: Grab the 6th CF parameter for the distortion
+    D_trig = hparam.CF[5]; 
+    return;
+};
+
+vecc Tetrahedral::get_seph2real_mat() {
+    // 1 d-site, 4 p-sites
+    return ed::make_blk_mat(U_d(), 1, U_p(), 4);
+};
+
+vecc Tetrahedral::get_operator_mat() {
+    vecc a(vo_persite*vo_persite,0);
+    for(int i = 0; i < 5; i++) a[i*vo_persite+i] = {1,0};   // d-orbitals
+    for(int i = 5; i < 8; i++) a[i*vo_persite+i] = {0,1};   // L0
+    for(int i = 8; i < 11; i++) a[i*vo_persite+i] = {1,0};  // L1
+    for(int i = 11; i < 14; i++) a[i*vo_persite+i] = {0,1}; // L2
+    for(int i = 14; i < 17; i++) a[i*vo_persite+i] = {1,0}; // L3
+    return a;
+};
+
+vecc Tetrahedral::get_tmat() {
+    double V_sigma = tpd;
+    double V_pi = tpd * tpd_sig_pi; 
+
+    int nvo = vo_persite;
+    vecc tmat(nvo*nvo, 0);
+
+    // 1. Set the Ligand charge transfer energy (diagonal elements)
+    for (int i = 5; i < 17; ++i) {
+        tmat[i*nvo+i] = {del, 0};
+    }
+
+    // 2. Define the exact directional cosines for a perfect tetrahedron
+    double rt3 = sqrt(3.0);
+    double inv_rt3 = 1.0 / rt3;
+
+    double ligands[4][3] = {
+        { inv_rt3,  inv_rt3,  inv_rt3}, // L0: [ 1,  1,  1]
+        {-inv_rt3, -inv_rt3,  inv_rt3}, // L1: [-1, -1,  1]
+        { inv_rt3, -inv_rt3, -inv_rt3}, // L2: [ 1, -1, -1]
+        {-inv_rt3,  inv_rt3, -inv_rt3}  // L3: [-1,  1, -1]
+    };
+
+	int d_x2y2 = 0;
+	int d_z2   = 1;
+	int d_xy   = 2;
+	int d_xz   = 3;
+	int d_yz   = 4;
+
+	// NEW: Apply the trigonal distortion to the t2 manifold
+	if (D_trig != 0.0) {
+		// dxy - dxz coupling
+		tmat[d_xy*nvo + d_xz] = {D_trig, 0};
+		tmat[d_xz*nvo + d_xy] = {D_trig, 0};
+		
+		// dxy - dyz coupling
+		tmat[d_xy*nvo + d_yz] = {D_trig, 0};
+		tmat[d_yz*nvo + d_xy] = {D_trig, 0};
+		
+		// dxz - dyz coupling
+		tmat[d_xz*nvo + d_yz] = {D_trig, 0};
+		tmat[d_yz*nvo + d_xz] = {D_trig, 0};
+	}
+
+    // 3. Build the tight-binding hoppings using Slater-Koster rules
+    for (int L = 0; L < 4; ++L) {
+        double l = ligands[L][0];
+        double m = ligands[L][1];
+        double n = ligands[L][2];
+
+        double l2 = l*l, m2 = m*m, n2 = n*n;
+
+        // Orbital indices (Mapping to the orb_names array)
+        int p_x = 5 + 3*L;
+        int p_y = 6 + 3*L;
+        int p_z = 7 + 3*L;
+
+        // Calculate hoppings from p to d
+        double h_px_dx2 = 0.5 * rt3 * l * (l2 - m2) * V_sigma + l * (1.0 - l2 + m2) * V_pi;
+        double h_py_dx2 = 0.5 * rt3 * m * (l2 - m2) * V_sigma - m * (1.0 + l2 - m2) * V_pi;
+        double h_pz_dx2 = 0.5 * rt3 * n * (l2 - m2) * V_sigma - n * (l2 - m2) * V_pi;
+
+        double h_px_dz2 = l * (n2 - 0.5 * (l2 + m2)) * V_sigma - rt3 * l * n2 * V_pi;
+        double h_py_dz2 = m * (n2 - 0.5 * (l2 + m2)) * V_sigma - rt3 * m * n2 * V_pi;
+        double h_pz_dz2 = n * (n2 - 0.5 * (l2 + m2)) * V_sigma + rt3 * n * (l2 + m2) * V_pi;
+
+        double h_px_dxy = rt3 * l2 * m * V_sigma + m * (1.0 - 2.0 * l2) * V_pi;
+        double h_py_dxy = rt3 * l * m2 * V_sigma + l * (1.0 - 2.0 * m2) * V_pi;
+        double h_pz_dxy = rt3 * l * m * n * V_sigma - 2.0 * l * m * n * V_pi;
+
+        double h_px_dxz = rt3 * l2 * n * V_sigma + n * (1.0 - 2.0 * l2) * V_pi;
+        double h_py_dxz = rt3 * l * m * n * V_sigma - 2.0 * l * m * n * V_pi;
+        double h_pz_dxz = rt3 * l * n2 * V_sigma + l * (1.0 - 2.0 * n2) * V_pi;
+
+        double h_px_dyz = rt3 * l * m * n * V_sigma - 2.0 * l * m * n * V_pi;
+        double h_py_dyz = rt3 * m2 * n * V_sigma + n * (1.0 - 2.0 * m2) * V_pi;
+        double h_pz_dyz = rt3 * m * n2 * V_sigma + m * (1.0 - 2.0 * n2) * V_pi;
+
+        // Populate the Hermitian matrix. We use purely real components {val, 0}
+        tmat[d_x2y2*nvo + p_x] = {h_px_dx2, 0}; tmat[p_x*nvo + d_x2y2] = {h_px_dx2, 0};
+        tmat[d_x2y2*nvo + p_y] = {h_py_dx2, 0}; tmat[p_y*nvo + d_x2y2] = {h_py_dx2, 0};
+        tmat[d_x2y2*nvo + p_z] = {h_pz_dx2, 0}; tmat[p_z*nvo + d_x2y2] = {h_pz_dx2, 0};
+
+        tmat[d_z2*nvo + p_x] = {h_px_dz2, 0}; tmat[p_x*nvo + d_z2] = {h_px_dz2, 0};
+        tmat[d_z2*nvo + p_y] = {h_py_dz2, 0}; tmat[p_y*nvo + d_z2] = {h_py_dz2, 0};
+        tmat[d_z2*nvo + p_z] = {h_pz_dz2, 0}; tmat[p_z*nvo + d_z2] = {h_pz_dz2, 0};
+
+        tmat[d_xy*nvo + p_x] = {h_px_dxy, 0}; tmat[p_x*nvo + d_xy] = {h_px_dxy, 0};
+        tmat[d_xy*nvo + p_y] = {h_py_dxy, 0}; tmat[p_y*nvo + d_xy] = {h_py_dxy, 0};
+        tmat[d_xy*nvo + p_z] = {h_pz_dxy, 0}; tmat[p_z*nvo + d_xy] = {h_pz_dxy, 0};
+
+        tmat[d_xz*nvo + p_x] = {h_px_dxz, 0}; tmat[p_x*nvo + d_xz] = {h_px_dxz, 0};
+        tmat[d_xz*nvo + p_y] = {h_py_dxz, 0}; tmat[p_y*nvo + d_xz] = {h_py_dxz, 0};
+        tmat[d_xz*nvo + p_z] = {h_pz_dxz, 0}; tmat[p_z*nvo + d_xz] = {h_pz_dxz, 0};
+
+        tmat[d_yz*nvo + p_x] = {h_px_dyz, 0}; tmat[p_x*nvo + d_yz] = {h_px_dyz, 0};
+        tmat[d_yz*nvo + p_y] = {h_py_dyz, 0}; tmat[p_y*nvo + d_yz] = {h_py_dyz, 0};
+        tmat[d_yz*nvo + p_z] = {h_pz_dyz, 0}; tmat[p_z*nvo + d_yz] = {h_pz_dyz, 0};
+    }
+
+    // We only to d-p hoppings, p-p can be added later...
+
+    return tmat;
+};
+
+// End of Tetrahedral implementaton

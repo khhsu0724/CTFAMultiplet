@@ -167,7 +167,25 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 								skip = read_num(line.substr(s+1,line.size()-1),hparam.SC2EX,5,p=p);
 							}
 							else if (p == "FG") skip = read_num(line.substr(s+1,line.size()-1),hparam.FG,4,p=p);
-							else if (p == "CF") skip = read_num(line.substr(s+1,line.size()-1),hparam.CF,5,p=p);
+							else if (p == "CF") {
+									string vals = line.substr(s+1, line.size()-1);
+									string clean_vals = vals.substr(vals.find('=')+1);
+									if (clean_vals.find('#') != string::npos) {
+										clean_vals = clean_vals.substr(0, clean_vals.find('#'));
+									}
+									
+									stringstream ss(clean_vals);
+									double temp;
+									int num_args = 0;
+									while (ss >> temp) num_args++;
+									
+									if (num_args >= 6) {
+										skip = read_num(vals, hparam.CF, 6, p=p);
+									} else {
+										skip = read_num(vals, hparam.CF, 5, p=p);
+										hparam.CF[5] = 0.0; // Default D_trig to 0 if not provided
+									}
+								}
 							else if (p == "HYB") skip = read_bool(line.substr(s+1,line.size()-1),hparam.HYB);
 							else if (p == "HFSCALE") skip = read_num(line.substr(s+1,line.size()-1),&hparam.HFscale,1,p=p);
 							else if (p == "TPD") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpd,1,p=p);
