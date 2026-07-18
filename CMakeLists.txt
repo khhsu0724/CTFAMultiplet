@@ -11,7 +11,14 @@ endif()
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ffast-math -march=native") # -g for gdb debugging
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+    message(STATUS "Apple Silicon detected. Skipping -march=native.")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ffast-math") # -g for gdb debugging
+else()
+    message(STATUS "Intel/x86_64 detected. Applying -march=native.")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ffast-math -march=native")
+endif()
 
 message("-- CXX: ${CMAKE_CXX_COMPILER}")
 message("-- CXXFLAGS: ${CMAKE_CXX_FLAGS}")
@@ -171,9 +178,11 @@ file(GLOB HEADER_FILES ${SRC_DIR}/*.hpp)
 # Include directories
 include_directories(${INCLUDE_DIR})
 
-# SET MKLROOT just in case 
-set(CMAKE_INSTALL_RPATH "$ENV{MKLROOT}/lib;")
-set(CMAKE_BUILD_RPATH "$ENV{MKLROOT}/lib;")
+# SET MKLROOT just in case
+if (MKL_ON)
+    set(CMAKE_INSTALL_RPATH "$ENV{MKLROOT}/lib")
+    set(CMAKE_BUILD_RPATH "$ENV{MKLROOT}/lib")
+endif()
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 #-------------------------------------------------------------------
