@@ -16,6 +16,7 @@ Hilbert::Hilbert(string file_dir, const HParam& hparam, string edge, bool is_ex)
 	SO_on = !ed::is_zero_arr(hparam.SO,2);
 	CF_on = !ed::is_zero_arr(hparam.CF,5);
 	CV_on = (is_ex && !ed::is_zero_arr(hparam.FG,4));
+	MF_on = (hparam.MF != 0);
 	cluster->set_print_site(hparam.print_site_occ);
 	if (hparam.block_diag && !hparam.SO[1]) BLOCK_DIAG = !(edge == "L" && is_ex) || !hparam.SO[0];
 	int hv = num_vorb/2, hc = num_corb/2;
@@ -177,13 +178,15 @@ vpulli Hilbert::match(int snum, QN* lhs, QN* rhs) {
 	return mp;
 }
 
-void Hilbert::fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs) {
+void Hilbert::fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs, HTarget target) {
 	// Find block index for lhs and rhs
 	bindex lind = Hash(lhs);
 	bindex rind = Hash(rhs);
-	if (lind.first == rind.first) 
-		hblks[lind.first].ham->fill_mat(lind.second,rind.second,matelem);
-	else throw out_of_range("invalid block matrix element entry");
+	if (lind.first != rind.first) throw out_of_range("invalid block matrix element entry");
+	Block<double>& blk = hblks[lind.first];
+	Matrix<double>* mat = (target == HTarget::HAM) ? blk.ham :
+							(target == HTarget::HAM_STATIC) ? blk.ham_static : blk.ham_hyb;
+	mat->fill_mat(lind.second,rind.second,matelem);
 	return;
 }
 

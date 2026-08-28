@@ -1,0 +1,53 @@
+# Mode B (two-time correlator) toy validation test, matching Fortran reference
+# fortran_toy_reference (timesteps=80, nb=1, nt=1) exactly.
+&CONTROL
+	SO = 11.5 0
+	SC1 = 1.0 0 0.1
+	SC2 = 6.0 0 0.12857 0 0.025
+	SC2EX = 6.0 0 0.12857 0 0.025
+	FG = 6.0 6.18 4.635 2.63
+	CF = 0 0 1.0 1.0 1.0
+	tpd = 1.0
+	tpp = 0
+	tpdzr = 0.25
+	sigpi = 0.225
+	TPPPI = 0.25
+	MLCT = 10.900004
+	DIAG = 2
+	EFFDEL = False
+	EXNEV = 150
+	GSNEV = 150
+	OVERWRITE = True
+/
+&CELL
+	Coordination = "sqpl"
+	Sites = 1
+	Holes = 2
+/
+&PHOTON
+	XAS = false
+	RIXS = false
+	pvin = 1 0 0
+	pvout = 0 1 0
+	solver = 4
+	Edge = L
+	NEDOS = 16
+	AB = -25 25
+	INCIDENT = -6.906552397870166 21.813222178495966 16
+	EM = 6.5
+	EMLO = -1.5
+/
+&PUMP
+	TIMEDEP = True
+	TRRIXS2 = True
+	PUMPFREQ = 3.14159265
+	PUMPAMPX = 5.0
+	PUMPAMPY = 0
+	PUMPSIGMA = 1.224745
+	PUMPT0 = 0
+	TDDT = 0.07853981633974483
+	TDM = 20
+	TAUCH = 4.1887902047863905
+	TRPROBESIGMA = 5.092958178940651
+	TRDELAY = -5.654866776461628 5.654866776461628 19
+/

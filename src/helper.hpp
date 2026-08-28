@@ -113,6 +113,14 @@ namespace ed {
 		for (int i = 0; i < invec.size(); ++i) invec[i] = invec[i] / norm;
 	};
 
+	// <a|b> = sum_i conj(a_i) * b_i
+	inline dcomp inner_product(const vecc& a, const vecc& b) {
+		dcomp s(0,0);
+		#pragma omp parallel for reduction(+:s)
+		for (int i = 0; i < a.size(); ++i) s += std::conj(a[i]) * b[i];
+		return s;
+	};
+
 	template <typename T> void norm_ev(T* ev, int n) {
 		for (int i = 0; i < n; ++i) {
 			T nm = 0;

@@ -10,24 +10,32 @@ double calc_U(double* gaunt1, double* gaunt2, const double* SC, int size) {
 	return u;
 }
 
-void calc_ham(Hilbert& hilbs, const HParam& hparam, bool nohyb) {
+void calc_ham(Hilbert& hilbs, const HParam& hparam, bool nohyb, Hilbert::HTarget target) {
 	// Assemble Hamiltonian of the hilbert space
 	for (auto& blk : hilbs.hblks) {
-		if (hilbs.num_ch == 0) blk.malloc_ham(hparam.gs_diag_option);
-		if (hilbs.num_ch == 1) blk.malloc_ham(hparam.ex_diag_option);
+		if (target == Hilbert::HTarget::HAM_STATIC) {
+			blk.malloc_ham_static();
+		} else {
+			if (hilbs.num_ch == 0) blk.malloc_ham(hparam.gs_diag_option);
+			if (hilbs.num_ch == 1) blk.malloc_ham(hparam.ex_diag_option);
+		}
 	}
-	calc_coulomb(hilbs,hparam.SC); 
+	calc_coulomb(hilbs,hparam.SC,target);
 	if (hilbs.SO_on) {
-		calc_SO(hilbs,hparam.SO[0],1);
-		calc_SO(hilbs,hparam.SO[1],2);
+		calc_SO(hilbs,hparam.SO[0],1,target);
+		calc_SO(hilbs,hparam.SO[1],2,target);
 	}
-	if (hilbs.CF_on) calc_CF(hilbs,&hparam.CF[0]);
-	if (hilbs.CV_on) calc_CV(hilbs,&hparam.FG[0]);
-	if (hilbs.HYB_on) calc_HYB(hilbs,hparam,nohyb);
+	if (hilbs.CF_on) calc_CF(hilbs,&hparam.CF[0],target);
+	if (hilbs.CV_on) calc_CV(hilbs,&hparam.FG[0],target);
+	if (hilbs.MF_on) calc_MF(hilbs,hparam.MF,target);
+	// nohyb=true (only ever used to build the static-only piece for real-time
+	// propagation, target=HAM_STATIC) skips the hybridization term entirely --
+	// it's rebuilt separately, per-timestep, into ham_hyb (see calc_HYB, tdynamics.hpp).
+	if (hilbs.HYB_on && !nohyb) calc_HYB(hilbs,hparam,nohyb,0.0,target);
 	return;
 }
 
-void calc_coulomb(Hilbert& hilbs, const vector<double*>& SC) {
+void calc_coulomb(Hilbert& hilbs, const vector<double*>& SC, Hilbert::HTarget target) {
 	//Calculate Coulomb Matrix Element
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		int l = hilbs.atlist[i].l;
@@ -56,7 +64,7 @@ void calc_coulomb(Hilbert& hilbs, const vector<double*>& SC) {
 						double matelem = calc_U(gaunt(l,m12.first,l,m34.first),
 										gaunt(l,m34.second,l,m12.second),SC[l-1],2*l+1);
 						if (e.first != e.second) matelem *= hilbs.Fsign(qn12,e.first,2)*hilbs.Fsign(qn34,e.second,2);
-						hilbs.fill_hblk(matelem,e.first,e.second);
+						hilbs.fill_hblk(matelem,e.first,e.second,target);
 					}
 				}
 			}
@@ -73,7 +81,7 @@ void calc_coulomb(Hilbert& hilbs, const vector<double*>& SC) {
 										 	calc_U(gaunt(l,m12.second,l,m34.first),
 										 	gaunt(l,m34.second,l,m12.first),SC[l-1],2*l+1);
 							if (e.first != e.second) matelem *= hilbs.Fsign(qn12,e.first,2)*hilbs.Fsign(qn34,e.second,2);
-							hilbs.fill_hblk(matelem,e.first,e.second);
+							hilbs.fill_hblk(matelem,e.first,e.second,target);
 						}
 					}
 				}
@@ -102,7 +110,7 @@ vecd CFmat(int l, const double* CF) {
 	return cfmat;
 }
 
-void calc_CF(Hilbert& hilbs, const double* CF) {
+void calc_CF(Hilbert& hilbs, const double* CF, Hilbert::HTarget target) {
 	// Calculate Crystal Field, Charge Transfer Matrix Element
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
 		int l = hilbs.atlist[i].l;
@@ -116,16 +124,16 @@ void calc_CF(Hilbert& hilbs, const double* CF) {
 				QN qn1(ml1,spin,i), qn2(ml2,spin,i);
 				vpulli entries = hilbs.match(1,&qn1,&qn2);
 				for (auto& e : entries) {
-					if (e.first == e.second) hilbs.fill_hblk(cfmat[j],e.first,e.second);
+					if (e.first == e.second) hilbs.fill_hblk(cfmat[j],e.first,e.second,target);
 					else hilbs.fill_hblk(cfmat[j]*hilbs.Fsign(&qn1,e.first,1) // Negative for hole language
-						 *hilbs.Fsign(&qn2,e.second,1),e.first,e.second);
+						 *hilbs.Fsign(&qn2,e.second,1),e.first,e.second,target);
 				}
 			}
 		}
 	}
 }
 
-void calc_SO(Hilbert& hilbs, const double lambda, int l_in) {
+void calc_SO(Hilbert& hilbs, const double lambda, int l_in, Hilbert::HTarget target) {
 	// Calculate Spin Orbit Coupling Matrix Element
 	if (lambda == 0) return;
 	for (int i = 0; i < hilbs.atlist.size(); ++i) {
@@ -139,7 +147,7 @@ void calc_SO(Hilbert& hilbs, const double lambda, int l_in) {
 				vpulli entries = hilbs.match(1,&qn,&qn);
 				// No sign traversing issue due to symmetry, spin = 1/2 factored in equation
 				double matelem = -lambda * spin * ml;
-				for (auto& e : entries) hilbs.fill_hblk(matelem,e.first,e.second);
+				for (auto& e : entries) hilbs.fill_hblk(matelem,e.first,e.second,target);
 			}
 			// transverse phonon
 			if (ml < l) {
@@ -147,15 +155,39 @@ void calc_SO(Hilbert& hilbs, const double lambda, int l_in) {
 				vpulli entries = hilbs.match(1,&qn1,&qn2);
 				double matelem = -lambda/2 * sqrt((l-ml)*(l+ml+1));
 				for (auto& e : entries) {
-					hilbs.fill_hblk(matelem*hilbs.Fsign(&qn1,e.first,1)*hilbs.Fsign(&qn2,e.second,1),e.first,e.second);
-					hilbs.fill_hblk(matelem*hilbs.Fsign(&qn2,e.second,1)*hilbs.Fsign(&qn1,e.first,1),e.second,e.first);
+					hilbs.fill_hblk(matelem*hilbs.Fsign(&qn1,e.first,1)*hilbs.Fsign(&qn2,e.second,1),e.first,e.second,target);
+					hilbs.fill_hblk(matelem*hilbs.Fsign(&qn2,e.second,1)*hilbs.Fsign(&qn1,e.first,1),e.second,e.first,target);
 				}
 			}
 		}
 	}
 }
 
-void calc_CV(Hilbert& hilbs, const double* FG) {
+void calc_MF(Hilbert& hilbs, const double h_field, Hilbert::HTarget target) {
+	// Mean-field molecular/exchange field standing in for interatomic superexchange
+	// with neighboring magnetic sites (Nag et al., PRL 124, 067202 (2020)). Splits
+	// the Ms sublevels of the valence d-shell by h_field per unit Ms, which is what
+	// turns the SOC/core-valence-exchange-enabled Delta-Ms=1,2 spin-flip transitions
+	// (already present via calc_SO/calc_CV) into resolvable inelastic RIXS peaks
+	// instead of leaving them degenerate with the elastic line. Diagonal in Sz, so
+	// it does not break the Sz block structure.
+	if (h_field == 0) return;
+	for (int i = 0; i < hilbs.atlist.size(); ++i) {
+		auto& at = hilbs.atlist[i];
+		if (at.is_lig || !at.is_val || at.l != 2) continue; // TM valence d-shell only
+		for (int ml = -at.l; ml <= at.l; ++ml) {
+			for (auto spin : {-0.5,0.5}) {
+				QN qn(ml,spin,i);
+				vpulli entries = hilbs.match(1,&qn,&qn);
+				double matelem = -h_field * spin;
+				for (auto& e : entries) hilbs.fill_hblk(matelem,e.first,e.second,target);
+			}
+		}
+	}
+	return;
+}
+
+void calc_CV(Hilbert& hilbs, const double* FG, Hilbert::HTarget target) {
 	// Calculate core valence interactions
 	if (!hilbs.is_ex) return;
 	for (int ci = 0; ci < hilbs.val_ati; ci++) {
@@ -172,35 +204,29 @@ void calc_CV(Hilbert& hilbs, const double* FG) {
 				struct QN qnr[2] = {{vmr,s.first,vi},{cmr,s.second,ci}};
 				vpulli entries = hilbs.match(2,qnl,qnr);
 				double meF = calc_U(gaunt(vl,vml,vl,vmr),gaunt(cl,cmr,cl,cml),FG,2*cl+1);
-				for (auto& e : entries) 
-					hilbs.fill_hblk(meF*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second);
+				for (auto& e : entries)
+					hilbs.fill_hblk(meF*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second,target);
 				qnl[1] = {vml,s.second,vi}, qnl[0] = {cml,s.first,ci};
 				qnr[0] = {vmr,s.first,vi}, qnr[1] = {cmr,s.second,ci};
 				entries = hilbs.match(2,qnl,qnr);
 				double meG = calc_U(gaunt(vl,vmr,cl,cml),gaunt(vl,vml,cl,cmr),FG,cl+vl+1);
 				if (s.first == s.second) meG *= -1; // This is due to the ordering convention of the fermions in this code
 				for (auto& e : entries)
-					hilbs.fill_hblk(meG*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second);
+					hilbs.fill_hblk(meG*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second,target);
 			}
 		}}}}
 	}
 	return;
 }
 
-void calc_HYB(Hilbert& hilbs, const HParam& hparam, bool nohyb) {
-	// Charge Transfer and Hybridization	
+void calc_HYB(Hilbert& hilbs, const HParam& hparam, bool nohyb, double t, Hilbert::HTarget target) {
+	// Charge Transfer and Hybridization
 	if (hilbs.cluster->no_HYB) return;
 	else hilbs.cluster->set_hyb_params(hparam);
 	int nvo = hilbs.cluster->vo_persite * hilbs.tot_site_num();
 	int nco = hilbs.cluster->co_persite * hilbs.tot_site_num();
 	// HYBRIDIZATION is momentum dependent, need to rewrite code here
-	vecd hybmat = ed::make_blk_mat(hilbs.cluster->get_tmat_real(),hilbs.tot_site_num());
-	// if (nohyb) {
-	// 	// Wipe out all non diagonal term if no hybridization is needed
-	// 	for (int i = 0; i < nvo*nvo; ++i) {
-	// 		if ()
-	// 	}
-	// }
+	vecd hybmat = ed::make_blk_mat(hilbs.cluster->get_tmat_real(t),hilbs.tot_site_num());
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
 	// Loop through hyb matrix, TODO: Loop through each site
 	for (int i = 0; i < nvo; ++i) {
@@ -234,9 +260,9 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam, bool nohyb) {
 			}
 
 			for (auto &e : entries) {
-				if (e.first == e.second) hilbs.fill_hblk(hybmat[i*nvo+j],e.first,e.second);
+if (e.first == e.second) hilbs.fill_hblk(hybmat[i*nvo+j],e.first,e.second,target);
 				else hilbs.fill_hblk(hybmat[i*nvo+j]*hilbs.Fsign(&qnld,e.first,1)*hilbs.Fsign(&qnrd,e.second,1),
-									 e.first,e.second);
+									 e.first,e.second,target);
 			}
 			// Fill in spin up matrix element
 			match_entries = hilbs.enum_hspace(incsu,0,ed::count_bits(incsu)-1,0);
@@ -245,9 +271,9 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam, bool nohyb) {
 				entries.emplace_back(pair<ulli,ulli>(me-lhssu_shift,me-rhssu_shift));
 			}
 			for (auto &e : entries) {
-				if (e.first == e.second) hilbs.fill_hblk(hybmat[i*nvo+j],e.first,e.second);
+if (e.first == e.second) hilbs.fill_hblk(hybmat[i*nvo+j],e.first,e.second,target);
 				else hilbs.fill_hblk(hybmat[i*nvo+j]*hilbs.Fsign(&qnlu,e.first,1)*hilbs.Fsign(&qnru,e.second,1),
-									 e.first,e.second);
+									 e.first,e.second,target);
 			}
 		}
 	}

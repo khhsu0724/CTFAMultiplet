@@ -1,0 +1,20 @@
+  delay (eV^-1)  file
+       -5.65487  trRIXS2_chan1_t-5.654867.txt
+       -5.02655  trRIXS2_chan1_t-5.026548.txt
+       -4.39823  trRIXS2_chan1_t-4.398230.txt
+       -3.76991  trRIXS2_chan1_t-3.769911.txt
+       -3.14159  trRIXS2_chan1_t-3.141593.txt
+       -2.51327  trRIXS2_chan1_t-2.513274.txt
+       -1.88496  trRIXS2_chan1_t-1.884956.txt
+       -1.25664  trRIXS2_chan1_t-1.256637.txt
+      -0.628319  trRIXS2_chan1_t-0.628319.txt
+              0  trRIXS2_chan1_t0.000000.txt
+       0.628319  trRIXS2_chan1_t0.628319.txt
+        1.25664  trRIXS2_chan1_t1.256637.txt
+        1.88496  trRIXS2_chan1_t1.884956.txt
+        2.51327  trRIXS2_chan1_t2.513274.txt
+        3.14159  trRIXS2_chan1_t3.141593.txt
+        3.76991  trRIXS2_chan1_t3.769911.txt
+        4.39823  trRIXS2_chan1_t4.398230.txt
+        5.02655  trRIXS2_chan1_t5.026548.txt
+        5.65487  trRIXS2_chan1_t5.654867.txt

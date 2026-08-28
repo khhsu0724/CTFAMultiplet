@@ -113,10 +113,10 @@ vecc Cluster::get_inp_tmat() {
 	return tmat;
 };
 
-vecd Cluster::get_tmat_real() {
+vecd Cluster::get_tmat_real(double t) {
 	// Swap spherical harmonics basis
 	vecc tmat;
-	if (inp_hyb_file.empty()) tmat = get_tmat();
+	if (inp_hyb_file.empty()) tmat = get_tmat(t);
 	else tmat = get_inp_tmat();
 	ed::write_vec(tmat,vo_persite,vo_persite,"./tmat.txt");
 	vecc U = get_seph2real_mat();
@@ -173,8 +173,12 @@ SquarePlanar::SquarePlanar(std::string edge) : Cluster(edge) {
 };
 
 void SquarePlanar::set_hyb_params(const HParam& hparam) {
+	capture_pump_params(hparam);
+	if (pump_A0[2] != 0)
+		std::cout << "WARNING: SquarePlanar has no z-bonds; PUMPAMPZ has no effect" << std::endl;
 	tpd = hparam.tpd;
 	tpp = hparam.tpp;
+	tpp_pi = hparam.tpp_pi;
 	del = hparam.MLdelta;
 	sig_pi = hparam.sig_pi;
 	tpdz_ratio = hparam.tpdz_ratio;
@@ -194,17 +198,17 @@ vecc SquarePlanar::get_operator_mat() {
 	return a;
 };
 
-vecc SquarePlanar::get_tmat() {
+vecc SquarePlanar::get_tmat(double t) {
 	// TODO: Change the hybridization matrix consistent with Oct definition
 	// The ratio of tpd bonds can be tweaked individually
 	double tpdz = tpd*tpdz_ratio, tpdxy = tpd*sig_pi, tpdxz = tpd*sig_pi, tpdyz = tpd*sig_pi;
-	double tpppi = 0*tpp, tppsigma = tpp, tppzpi = 0*tpp; // Introduces tppzpi
-	double kx = PI/2, ky = PI/2, kz = 0; // momentum at (pi,pi) for hole language
+	double tppsigma = tpp;
+	// momentum at (pi,pi) for hole language, Peierls-shifted by the pump field (zero if no pump)
+	double kx = PI/2 + pump_shift(t,0), ky = PI/2 + pump_shift(t,1), kz = 0;
 	double sx = 2*sin(kx), sy = 2*sin(ky), cx = 2*cos(kx), cy = 2*cos(ky);
 	int nvo = vo_persite;
-	// if (tppsigma_on) tppzpi = 20*tpp;
 	cout << "tpd: " << tpd << ", tdpz: " << tpdz << ", tpdxy: " << tpdxy << ", tpdxz: " << tpdxz << endl;
-	cout << "tpp: " << tpp << ", tppzpi: " << tppzpi << endl;
+	cout << "tpp: " << tpp << ", tpp_pi: " << tpp_pi << endl;
 	vecc tmat(nvo*nvo,0);
 	tmat[0*nvo+5] = {0,-tpd*sx};
 	tmat[5*nvo+0] = -tmat[0*nvo+5];
@@ -224,11 +228,16 @@ vecc SquarePlanar::get_tmat() {
 	tmat[10*nvo+4] =  -tmat[4*nvo+10];
 	tmat[5*nvo+5] = tmat[6*nvo+6] = tmat[7*nvo+7] = del;
 	tmat[8*nvo+8] = tmat[9*nvo+9] = tmat[10*nvo+10] = del;
-	tmat[5*nvo+8] = tmat[8*nvo+5] = {-tpppi*cx*cy,0};
-	tmat[5*nvo+9] = tmat[9*nvo+5] = {tppsigma*sx*sy,0};
-	tmat[6*nvo+8] = tmat[8*nvo+6] = {tppsigma*sx*sy,0};
-	tmat[6*nvo+9] = tmat[9*nvo+6] = {-tpppi*cx*cy,0};
-	tmat[7*nvo+10] = tmat[10*nvo+7] = {tppzpi*cx*cy,0};
+	// [xx<->yx] and [xy<->yy] are neglected here (kept at zero) to keep the Hamiltonian
+	// real, matching the reference implementation's own choice for this geometry -- only
+	// [xx<->yy] and [xy<->yx] survive, with the ligand-ligand pi-bonding term (tpp_pi)
+	// entering with opposite relative sign between the two (a genuine Slater-Koster
+	// sign structure, not an arbitrary choice): xx<->yy get (tppsigma-tpp_pi), xy<->yx
+	// get (tppsigma+tpp_pi). tpp_pi defaults to 0, so this is identical to the previous
+	// tppsigma-only formula unless a nonzero TPPPI is explicitly requested.
+	tmat[5*nvo+9] = tmat[9*nvo+5] = {(tppsigma-tpp_pi)*sx*sy,0};
+	tmat[6*nvo+8] = tmat[8*nvo+6] = {(tppsigma+tpp_pi)*sx*sy,0};
+	// [xz<->yz] (out-of-plane pz-pz) is also neglected, same reality-preserving reason.
 	return tmat;
 };
 // End of Square-Planar Implementation
@@ -247,6 +256,7 @@ Octahedral::Octahedral(std::string edge) : Cluster(edge) {
 };
 
 void Octahedral::set_hyb_params(const HParam& hparam) {
+	capture_pump_params(hparam);
 	tpd = hparam.tpd;
 	tpp = hparam.tpp;
 	del = hparam.MLdelta;
@@ -269,12 +279,13 @@ vecc Octahedral::get_operator_mat() {
 	return a;
 };
 
-vecc Octahedral::get_tmat() {
+vecc Octahedral::get_tmat(double t) {
 	double tpdz = tpd/sqrt(3.0), tpdxy = tpd*tpd_sig_pi, tpdxz = tpd*tpd_sig_pi, tpdyz = tpd*tpd_sig_pi;
 	// tpp_pi_1 is pxy/pyy type overlaps, tpp_pi_2 is pzy/pxy type overlaps
 	double vppsigma = tpp, vpppi = tpp*tpp_sig_pi;
 	double tppsigma_1 = 0.5*(vppsigma+vpppi), tppsigma_2 = 0.5*(vppsigma-vpppi), tpppi = vpppi;
-	double kx = PI/2, ky = PI/2, kz = PI/2; // relative oxygen positionss
+	// relative oxygen positions, Peierls-shifted by the pump field (zero if no pump)
+	double kx = PI/2 + pump_shift(t,0), ky = PI/2 + pump_shift(t,1), kz = PI/2 + pump_shift(t,2);
 	double sx = 2*sin(kx), sy = 2*sin(ky), sz = 2*sin(kz);
 	double cx = 2*cos(kx), cy = 2*cos(ky), cz = 2*sin(kz);
 	// double d = octJT;

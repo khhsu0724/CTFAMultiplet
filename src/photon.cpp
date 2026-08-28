@@ -615,7 +615,7 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 			vecd rixs_em_local(nedos,0);
 			vecd rixs_peaks_local(nedos,0);
 			// Using previous coverged vector as guess, use a vector with size = Hilbert space
-			for (int i = 0; i < nedos; ++i) rixs_em_local[i] = -2 + (pm.em_energy+2)/nedos*i;
+			for (int i = 0; i < nedos; ++i) rixs_em_local[i] = pm.em_lo + (pm.em_energy-pm.em_lo)/nedos*i;
 			for (auto &exblk : EX.hblks) {
 				size_t last_gs_block = gsi[0].first;
 				size_t exblk_ind = &exblk-&EX.hblks[0];
@@ -649,9 +649,12 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 					// De-excitation
 					midvec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),midvec,blap_out,false);
 					if (ed::norm(midvec) < TOL) continue; // exit loop if no overlap
+					// NITERCFE is honored as-is (Lanczos() itself caps it at the block
+					// dimension). A Lanczos step is one mat-vec, so there is no real
+					// cost reason to shrink this on small/medium blocks -- doing so
+					// under-converges the continued fraction relative to a tight
+					// EPSLOSS and produces spurious wiggly structure in the spectrum.
 					int niter_CFE_in = pm.niterCFE;
-					if (niter_CFE_in > GS.hblks[g.first].size/100) niter_CFE_in = GS.hblks[g.first].size/100;
-					if (niter_CFE_in < 20) niter_CFE_in = 20; 
 					cout << "Number of Lanczos Iteration: " << niter_CFE_in << endl;
 					ContFracExpan(GS.hblks[g.first].ham,midvec,gs_en,rixs_em_local,rixs_peaks_local,
 									pm.eps_loss,niter_CFE_in);
