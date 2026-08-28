@@ -222,16 +222,73 @@ previously (incorrectly) assumed to only affect the single edge-most delay (+5.6
 suggests the whole delay range may be edge-affected to some degree** since `probe_sigma` is
 comparable to the full window half-width.
 
-**Concrete next test (not yet run):** rebuild the toy Fortran reference with a **larger** window
-(bigger `nb`,`nt`, e.g. double the toy's current `1,1`) so every requested delay sits well clear of
-the `t1`/`t2` boundary relative to `probe_sigma`, rerun the matching C++ toy case (same
-`sim_window_mult` derivation logic, scaled to the new `nb`,`nt`), and rerun
-`compare_modeb_full.py`. If the rise-then-fall shape mismatch shrinks or disappears with a bigger
-window, this whole discrepancy is a shared truncation artifact of the toy validation setup, not a
-real Mode B bug — meaning Mode B may already be correct at production (paper) scale, where the
-simulated window is comfortably larger. If the shape mismatch *persists* even with a much larger
-window, that rules out the truncation explanation and points back to something in the K(t1,t2)
-construction or propagation itself.
+## MAJOR FINDING: the reference toy Fortran run silently crashed after its FIRST channel —
+## the "3-channel" comparison this whole session was built on compared against an incomplete reference
+
+While setting up the v2 diagnostic test below (narrower probe, same window, to isolate edge
+truncation), the rebuilt toy Fortran crashed:
+
+```
+At line 2712 of file TD_Cluster_Xray.f90
+Fortran runtime error: Attempting to allocate already allocated variable 'allowed_tm'
+```
+
+Root cause: `allocate(allowed_tm(...))` sits inside the `do ppp=1,qstates` (final/core-hole block,
+`wsp`) loop, guarded by `if(tspin.eq.0)`. But `tspin=0` is set unconditionally just above, and only
+overwritten by `if(dlso.eq.0.0d0)tspin=sztot(ws)-sztot(wsp)` — which **never fires when SOC is on**
+(`dlso != 0` for this system, `SO=11.5`). So `tspin.eq.0` is trivially true for **every** `ppp`, and
+the code reallocates `allowed_tm` on every matching `ppp` without ever deallocating it. It crashes
+on the *second* matching `wsp` — under `-fcheck=all` (the exact compile flags this whole project has
+been using).
+
+**This is not new to the v2 run.** Checking the exploratory run logs from earlier this session
+(`/private/tmp/fortran_ref_build/run.log`, `fortran_ref_build3/run.log`) confirms the *original* toy
+run that produced `validation_modeB/fortran_toy_reference/trSPEC_XY_*.dat` (the reference this whole
+session's comparison was built on) **hit the exact same crash** — it just wasn't noticed because the
+process still wrote a complete, plausible-looking set of 19 `trSPEC_XY_0010.dat`...`1810.dat` files
+(one full tm-scan's worth) before dying, and nobody checked the exit code or scrolled to the end of
+the log. Consistent with this: `fortran_toy_reference/` has no `XPS.dat` or later-stage output that
+the full program would write after the RIXS section completes — it never got that far.
+
+**What this means:** the reference only ever reflects the **first** matching (ground-state,
+core-hole-block) `wsp` channel that Fortran's internal `qlist` ordering happens to try first
+(dimension 55, per the log). The two other matching channels the C++ side computes and (in every
+prior comparison this session) **incoherently summed in** (`chan0+chan1+chan2`, dims 55/121/55) were
+**never computed by the reference at all** — the Fortran crashed before reaching them. Every
+prior-session conclusion about magnitude and delay-shape mismatch (the "13×→98× growing ratio," the
+"rise-then-fall shape mismatch") was drawn from comparing `mine = 3 channels summed` against
+`ref = 1 channel only`. **This alone is enough to explain a large chunk of the magnitude
+discrepancy**, and quite possibly the shape discrepancy too, without implicating any bug in Mode B's
+physics/normalization at all.
+
+**Fix applied (in `validation_modeB/fortran_toy_reference_v2/TD_Cluster_Xray.f90` only — the
+original `fortran_toy_reference/` copy is left untouched as historical record):** added
+`if (allocated(allowed_tm)) deallocate(allowed_tm)` immediately before the `allocate` call. This
+lets the reference process all matching `wsp` channels and write all 3 sets of `trSPEC_XY_*.dat`
+files (with different `tlabel` bases, since `tmom` differs by channel), so each can finally be
+compared against its correct matching C++ channel individually, and only genuinely-matching
+channels summed.
+
+**Concrete next steps (v2 Fortran rerun in progress as of this writing, PID/log in
+`validation_modeB/fortran_toy_reference_v2/run.log`):**
+1. Once it completes, inspect the *new* set of `trSPEC_XY_*.dat` tlabel groups it writes (there
+   should now be up to 3 distinct 5-file groups, one per surviving `wsp`, each with its own
+   `100*count+10*tmom` offset — read off the actual `tmom` per group by checking which
+   count-bases appear, analogous to how `tmom=1` was reverse-engineered for the original 19-file
+   run) — see "How the delay/channel labels were reverse-engineered" note below for the method.
+2. Match each Fortran `wsp` group to its corresponding C++ `chan{0,1,2}` by comparing block
+   dimension (55/121/55) and, if that's ambiguous, by comparing which channel's peak location lines
+   up with which reference group's peak location.
+3. Redo the comparison **per-channel** (not summed) first — this is the real apples-to-apples test.
+   Only sum channels that Fortran actually confirms are separate, nonzero, matching contributions.
+4. If per-channel comparison still shows the same rise-then-fall shape mismatch even after removing
+   the summed-incomplete-reference confound, then (and only then) return to the edge-truncation
+   question the v2 test was originally designed to isolate (narrower probe within the same window,
+   already set up and ready to compare once step 1-3 are done).
+5. This also means the original `fortran_toy_reference/` 19-file dataset and every ratio/shape
+   number derived from it earlier in this document should be treated as **provisional and likely
+   revised** once the fixed 3-channel comparison is in hand — don't cite the old 13×-98× table or
+   the "peaks at T≈-1.88 vs T≈0..+1.88" shape claim as settled fact anymore.
 
 ## What NOT to re-try (already explored exhaustively, dead ends for this specific question)
 
