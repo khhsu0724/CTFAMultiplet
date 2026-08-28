@@ -138,25 +138,22 @@ interior delays (see `validation_modeB/compare_modeb_full.py`, results saved in
 - **Peak location matches exactly** at 6 of 7 delays: both codes agree the dominant feature
   sits at `ab=-4.992, loss=2.00` — strong confirmation the core resonance structure and energy
   bookkeeping are now correct.
-- **Peak magnitude is systematically too large, and the ratio *grows* with delay** (not
-  constant — this rules out a simple missing normalization prefactor):
-
-  | delay (eV⁻¹) | mine/ref ratio |
-  |---|---|
-  | −5.65 | ~13× |
-  | −3.77 | ~14× |
-  | −1.88 | ~17× |
-  | 0.00 | ~26× |
-  | +1.88 | ~63× |
-  | +3.77 | ~98× |
+- **Peak magnitude is systematically too large, and — as of the latest re-analysis below — the
+  *shape* of the magnitude vs. delay is wrong, not just a scale factor.** (An earlier pass at this
+  session described this as a simple "ratio that grows with delay" and hypothesized a missing
+  normalization; that hypothesis has since been **falsified** by direct source inspection — see
+  "Immediate next step" below for the corrected picture and current best explanation.) Both `ref`
+  and `mine` show a rise-then-fall shape in peak intensity vs. delay, but `ref` peaks near
+  `T≈-1.88` while `mine` peaks later (`T≈0` to `+1.88`), and `ref` falls off much faster past its
+  peak than `mine` does.
 
 - **The last delay (+5.65) breaks down entirely** — the reference's peak has moved to a
   completely different (ab, loss) location there. This delay sits only ~0.63 eV⁻¹ from the
   simulation's hard edge (`t_hi=+6.28`), while `probe_sigma=5.09` is much wider than that
-  margin — so the Gaussian probe window is barely attenuated by the time it hits the edge, and
-  this delay is very likely a probe-truncation artifact in *both* codes (they share the same
-  `nt*timesteps` boundary) rather than a genuine physics discrepancy. Treat this one delay as
-  unreliable; focus on the other 6.
+  margin — so the Gaussian probe window is barely attenuated by the time it hits the edge. Given
+  the newer finding that even the *other 6* delays show a shape mismatch (not just this one), this
+  is now understood as the most extreme case of a truncation effect that likely touches the whole
+  delay range in this particular toy window, not an isolated one-off artifact.
 
 ## Mode A vs Mode B selection: current state, and the user's plan
 
@@ -188,19 +185,53 @@ to Mode B** as the mode being worked on/fixed. Don't spend further effort tuning
 to Mode A — it's confirmed structurally incapable of resolving the target feature (see point 3
 in the validated-results section above).
 
-## Immediate next step (not yet started)
+## Immediate next step: normalization hypothesis FALSIFIED, new lead identified
 
-Diagnose the growing-magnitude-ratio pattern. Leading hypothesis, not yet tested: something
-related to how the fixed simulated window `[t_lo, t_hi]` interacts with the probe normalization
-`gnorm = 1/(probe_sigma*sqrt(2*pi))` as the requested delay `T` moves away from the window's
-center — worth checking whether the *effective* probe-weight normalization (`sum over t1 of
-g(t1-T)`, which should equal 1 for an infinite window but will be `<1` for delays near a finite
-window's edge) needs to be computed and divided out per-delay, the way the existing Mode A
-implementation already does via its own `norm_weight` array (see `trRIXS()` in the same file,
-which normalizes by `norm_weight[d]` at the very end) — Mode B currently has **no analogous
-per-delay normalization at all**. This is a strong, concrete, easy-to-test lead: implement the
-same per-delay weight normalization Mode A already has, rerun the same 7-delay comparison, and
-check whether the ratio becomes constant (or at least stops growing).
+**The "missing per-delay normalization" hypothesis queued at the end of the last session is
+wrong — do not implement it.** Verified by reading the reference Fortran's own two-time-correlator
+section directly (`Ni-L-RIXS/new_shape_function/XY/TD_Cluster_Xray.f90`, the `tm`/`omegai`/`omega`
+loop around line 2783): `csum` is accumulated exactly like our `csum` (same `s1*s2*l12*tkern*phase`
+structure, same `gauss = 1/probe_sigma` convention), and the result is written directly as
+`dreal(csum4*dconjg(csum4))` — **there is no division by any per-delay weight sum anywhere in that
+section.** (The unrelated equilibrium `ckern`/`spectra` block much later in the file does divide by
+`twistx*twisty`, a k-point twist-average factor that has nothing to do with the two-time delay
+scan — don't confuse the two.) So Mode A's `norm_weight[d]` pattern has no counterpart in the
+reference for Mode B, and adding one would make our output *diverge* from the reference, not
+converge. Confirmed by direct source read, not just architectural reasoning.
+
+**Re-running `validation_modeB/compare_modeb_full.py` and reading the full loss-axis profiles
+(not just the peak ratio) reveals the real pattern is more specific than "a ratio that grows":**
+- `ref`'s peak intensity at `ab=-4.992,loss=2.00` **rises then falls with delay**, peaking around
+  `T≈-1.88` (4.63e-5) and falling off almost 20x by `T≈+3.77` (8.49e-6) — a real physical decay
+  shape, roughly symmetric-looking but stronger on the positive side.
+- `mine`'s peak at the *same* `(ab,loss)` also rises then falls, but **peaks later** (around
+  `T≈0` to `+1.88`, ~1.0e-3) and falls off much more gently.
+- i.e. both codes show a peaked, non-monotonic delay dependence (ruling out a simple missing
+  normalization *or* a pure constant/growing scale factor) — but the peak **location along the
+  delay axis is shifted**, and the falloff **rate differs strongly** between the two.
+
+**Leading explanation, not yet confirmed:** this toy validation window is small enough
+(`probe_sigma=5.09`, half-window `t_hi-t_lo` only `2*6.28=12.57`) that the causal truncation
+`t1<=t2<=t_hi` (both codes cap `t2` at the same simulated-range edge) removes a *different*
+fraction of each delay's Gaussian-weighted (t1,t2) pairs depending on how close `T` sits to that
+edge — this alone produces a rise-then-fall-with-delay shape in *both* codes, but a subtle
+difference in how the truncation is realized (e.g. Krylov-propagation error accumulating over the
+trajectory length being used for a given `t1`, or an off-by-one/asymmetry in how `t_lo`/`t_hi` are
+placed relative to the delay grid) could shift/broaden it differently between them. **This was
+previously (incorrectly) assumed to only affect the single edge-most delay (+5.65); the new data
+suggests the whole delay range may be edge-affected to some degree** since `probe_sigma` is
+comparable to the full window half-width.
+
+**Concrete next test (not yet run):** rebuild the toy Fortran reference with a **larger** window
+(bigger `nb`,`nt`, e.g. double the toy's current `1,1`) so every requested delay sits well clear of
+the `t1`/`t2` boundary relative to `probe_sigma`, rerun the matching C++ toy case (same
+`sim_window_mult` derivation logic, scaled to the new `nb`,`nt`), and rerun
+`compare_modeb_full.py`. If the rise-then-fall shape mismatch shrinks or disappears with a bigger
+window, this whole discrepancy is a shared truncation artifact of the toy validation setup, not a
+real Mode B bug — meaning Mode B may already be correct at production (paper) scale, where the
+simulated window is comfortably larger. If the shape mismatch *persists* even with a much larger
+window, that rules out the truncation explanation and points back to something in the K(t1,t2)
+construction or propagation itself.
 
 ## What NOT to re-try (already explored exhaustively, dead ends for this specific question)
 
