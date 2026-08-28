@@ -158,6 +158,36 @@ interior delays (see `validation_modeB/compare_modeb_full.py`, results saved in
   `nt*timesteps` boundary) rather than a genuine physics discrepancy. Treat this one delay as
   unreliable; focus on the other 6.
 
+## Mode A vs Mode B selection: current state, and the user's plan
+
+Mechanically, the INPUT file's `&PUMP` block already has three booleans that select between
+modes: `TRXAS`, `TRRIXS` (Mode A), `TRRIXS2` (Mode B) — parsed at `main.cpp` lines ~284-286,
+dispatched in that priority order (`TRRIXS2` checked first) starting at line ~722. So switching
+is *possible* today by editing the INPUT file. But it is **not yet a clean, general-purpose
+toggle** — Mode B is currently a validation harness, not a finished feature:
+
+1. `sim_window_mult` and `t2_max_window` are **hardcoded literals in `main.cpp`'s dispatch
+   block** (not read from any INPUT key), tuned specifically to match the toy Fortran
+   reference's exact bounded time window. They are almost certainly wrong for a different
+   (e.g. full physical/paper-scale) run and require editing the source directly to change.
+2. `GSNEV`/`EXNEV` must be set (via INPUT) large enough to cover the *entire* relevant block
+   dimension for Mode B's de-excitation sum to be correct (see the bug-fix section above) —
+   there is no automatic check, so an under-sized value silently gives a wrong answer with no
+   warning.
+3. Mode B currently writes **one set of output files per (ground-state, core-hole block)
+   channel** (`trRIXS2_chan0_*`, `trRIXS2_chan1_*`, ...), unlike Mode A which writes one
+   already-combined spectrum. Getting "the" final Mode B spectrum currently requires manually
+   summing the channel files afterward (see `validation_modeB/compare_modeb_full.py` for how).
+4. Mode B has the open magnitude-normalization bug described above, so its output isn't
+   quantitatively trustworthy yet regardless of the above.
+
+**The user has explicitly said**: they may want to implement a proper, general Mode A/Mode B
+switch at some point (exposing the hardcoded parameters as real INPUT keys, auto-checking
+NEV sizing, auto-summing channels) — but that is *not* the current priority. **For now, default
+to Mode B** as the mode being worked on/fixed. Don't spend further effort tuning or falling back
+to Mode A — it's confirmed structurally incapable of resolving the target feature (see point 3
+in the validated-results section above).
+
 ## Immediate next step (not yet started)
 
 Diagnose the growing-magnitude-ratio pattern. Leading hypothesis, not yet tested: something
@@ -196,10 +226,12 @@ check whether the ratio becomes constant (or at least stops growing).
   no changes needed here for Mode B), `build_trajectory()`.
 - `validation_modeB/`: all reference data and comparison scripts described above.
 
-## Uncommitted state
+## Commit state
 
-All of this session's changes (Phase 1-2 propagator, Mode A trXAS/trRIXS, the `EMLO` parameter,
-pump-profile output, and now Mode B) are **uncommitted working-tree changes** — `git status`
-shows 13 modified files plus 2 new untracked files (`src/tdynamics.hpp`, `src/tr_photon.hpp`).
-Given the scale of work involved, strongly consider committing (or asking the user to) before
-doing anything destructive to the working tree.
+All of this session's work (Phase 1-2 propagator, Mode A trXAS/trRIXS, the `EMLO` parameter,
+pump-profile output, and Mode B including the two bug fixes) is **committed** as commit
+`287a7e3` ("Add time-resolved XAS/RIXS: real-time propagator, frozen-snapshot spectroscopy,
+and two-time-correlator RIXS") on `main`, including this handoff doc and everything under
+`validation_modeB/`. Any *new* changes made after reading this handoff (e.g. the growing-ratio
+fix) will show up as fresh working-tree modifications on top of that commit — check `git log`/
+`git status` to confirm you're starting from `287a7e3` before assuming anything is uncommitted.
