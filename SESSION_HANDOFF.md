@@ -446,16 +446,74 @@ the `ab≈12.24` feature becomes the visible global max simply because the (corr
 dropped below it — an effect entirely masked in our output because our dd feature never drops enough
 to be overtaken.
 
-**Next step, not yet done:** since the `ab≈12.24` channel is roughly correct, the bug is most likely
-specific to whatever distinguishes the `ab=-4.992, loss≈2` pathway — e.g. a specific final valence
-eigenstate (or narrow group of them) within the `2Sz=-2` block that carries unusually large weight in
-`combined_traj`, or a resonance where `win≈ab=-4.992` sits close to a pole/near-degeneracy in the
-intermediate core-hole propagation that amplifies numerical error. Worth checking: (a) does the
-`ab=-4.992` incident energy sit unusually close to a core-hole eigenvalue (a near-resonant condition
-that could be numerically sensitive to `hparam.td_m`/`hparam.td_dt`); (b) does restricting
-`combined_traj`'s valence sum to progressively fewer eigenstates (instead of all `nval=55`) change the
-`ab=-4.992` magnitude disproportionately, which would point to specific problem eigenstates rather
-than a global scaling bug.
+**Tested and ruled out: Lanczos/Krylov propagator convergence.** Reran the identical v2 `chan0` test
+with `TDM` (Krylov subspace order) raised from 20 to 50 — near-exact diagonalization for the 55-dim
+blocks involved. Result: **bit-for-bit identical** intensity at every one of the 5 delays (to the
+digits printed). The propagator is already fully converged at `TDM=20`; this is not a numerical
+accuracy issue and `TDM` is not the fix.
+
+## DECISIVE TEST: raw K(t1,t2) amplitude compared directly between both codes — real error found, but far too small to explain the final discrepancy alone
+
+Since `Krows` (our K(t1,t2)) is built once and shared across every incident energy, while only the
+final delay/frequency loop depends on `win`/`wout`, the natural next test is to compare the **raw
+two-time-correlator amplitude itself** — before any Fourier/frequency processing — directly against
+the reference's `tkern(t1,t2)`. Both codes were instrumented to print `K(t1=0, t2=k·dt)` for
+`k=1..5`, keeping everything else in the v2 `chan0` setup fixed. Result:
+
+| k | ref (Re, Im) | mine (Re, Im) | \|mine\|/\|ref\| | phase diff (°) |
+|---|---|---|---|---|
+| 1 | (0.022965, −0.111863) | (−0.00609, −0.41457) | 3.63 | −12.4 |
+| 2 | (−0.062462, −0.119060) | (0.13246, −0.34793) | 2.77 | +48.5 |
+| 3 | (−0.099491, −0.019005) | (0.26449, −0.13095) | 2.91 | +142.9 |
+| 4 | (−0.044650, 0.070359) | (0.30492, 0.11940) | 3.93 | −101.0 |
+| 5 | (0.037773, 0.076761) | (0.25392, 0.27186) | 4.35 | −16.8 |
+
+**A real discrepancy exists in the raw amplitude construction** — magnitudes are systematically too
+large by a factor of roughly **2.8–4.3×** (not 1.0×, ruling out "amplitude construction is exactly
+correct") — but this is drastically smaller than the up-to-575× discrepancy seen in the final
+frequency-domain output. **The phase differences do not follow a clean pattern** (not a constant
+offset, not a clean conjugate/mirror, not a smoothly-growing linear drift when unwrapped — differences
+between consecutive k's phase-diffs are 61°, 94°, 116°, 84°, suggestive of *something* systematic but
+too noisy to pin to a single constant frequency/energy offset from only 5 points).
+
+**Conclusion: the bug is NOT purely in the final delay/frequency summation loop** (a modest 3-4×,
+non-unity magnitude ratio proves the raw amplitude itself is measurably wrong) **but the final-output
+discrepancy is far larger than this raw error alone can explain** — meaning the final coherent
+(t1,t2) double-sum used to build a *sharp, long-lived resonance* (the dd-excitation feature
+specifically) amplifies a modest point-wise phase/magnitude mismatch into a much larger error,
+consistent with how narrow resonances are especially sensitive to phase coherence across a wide time
+range. **Both a real amplitude-construction bug and further amplification in the coherent
+(t1,t2)-sum are likely both part of the picture** — fixing the amplitude-construction bug is the
+priority since it's the more tractable, better-localized piece.
+
+**Where to look next:** the `~3-4×` magnitude error and irregular phase pattern point toward the
+dipole matrix element / propagation pieces feeding `Krows`, not the frequency-domain loop. Concrete
+candidates, cheapest-to-check first:
+1. **Compare `blap_in`/`blap_out` (dipole overlap coefficients from `basis_overlap`) directly against
+   Fortran's own dipole matrix elements** for this specific `(gs_blk_ind, ex_blk_ind)` pair — a
+   normalization-convention mismatch here (e.g. a missing `sqrt` factor, a different Clebsch-Gordan/
+   reduced-matrix-element convention, or an extra factor from `pm.pvin`/`pm.pvout` handling) would
+   show up as exactly this kind of moderate, not-quite-constant magnitude/phase discrepancy once
+   summed over several matrix elements.
+2. **Check whether Fortran's `tpivert`/`tfvert` construction includes an energy-reference term ours
+   doesn't** — an old code comment in the reference (`confirmed tpivert(tj,ti)~exp(-i(tj-ti)*E_CH(m)
+   -i(ti-t0)*E_gs)`) explicitly ties the propagated amplitude's phase to *both* the core-hole
+   eigenvalue *and* `E_gs` (ground energy) in a specific way. This echoes a concern the user raised
+   much earlier this session about whether RIXS energies should be referenced to the ground state or
+   the pump-excited state (`instantaneous_energy`, used explicitly in Mode A's `trRIXS`/`trXAS` to
+   anchor the absorption resonance to `E_gs_t1`, an *instantaneous* expectation value under the
+   possibly-pump-driven Hamiltonian) — worth checking carefully whether `trRIXS_2time` needs an
+   analogous, currently-absent energy-reference term somewhere in the K(t1,t2) construction (not
+   necessarily in the final `win`/`wout` phase factor, since peak *locations* already agree between
+   codes, ruling out a gross missing offset there — but possibly in how the propagation phase relates
+   `E_gs` to the core-hole eigenvalues internally).
+3. Only after (1)-(2) are checked: revisit whether `combined_traj`'s treatment of near-degenerate
+   final valence eigenstates (several of the eigenvalues in this block are 2-4 fold degenerate, per
+   the printed spectrum — e.g. `11.9000044` appears with degeneracy 3 and 4 in adjacent slots) could
+   introduce spurious coherent cross-terms; ruled out as a code-vs-code *difference* (Fortran's own
+   `l` loop treats degenerate members identically, individually, coherently — same as ours) but not
+   yet ruled out as a genuine subtlety in whether coherent summing over degenerate final states is
+   the physically correct treatment in the first place.
 
 ## What NOT to re-try (already explored exhaustively, dead ends for this specific question)
 

@@ -465,6 +465,16 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 		}
 	}
 
+	// DEBUG: dump K(t1=0, t2=k*dt) for k=1..5 to compare directly against the reference's own
+	// tkern(t1=0,t2=1..5) debug dump -- t1=0 sits at is1 = round((0-t_lo)/dt).
+	{
+		int is0 = (int)std::round((0.0-t_lo)/dt);
+		if (is0 >= 0 && is0 <= n_is) {
+			for (int k = 1; k <= 5 && k <= (int)Krows[is0].size(); ++k)
+				std::cout << "DEBUG Krows t1=0 t2=" << k << " val=" << Krows[is0][k-1] << std::endl;
+		}
+	}
+
 	size_t n_ab = ab_grid.size(), n_loss = loss_grid.size();
 	std::vector<vecd> intensity(delays.size(), vecd(n_loss*n_ab, 0));
 	double gnorm = 1.0/(probe_sigma*std::sqrt(2*PI));

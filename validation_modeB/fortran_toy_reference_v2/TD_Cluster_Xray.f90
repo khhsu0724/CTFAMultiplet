@@ -2789,6 +2789,8 @@ program main
                                              end do
                                           end do
                                           tkern(t1,t2)=csum
+                                          if(myrank.eq.0.and.t1.eq.0.and.t2.ge.1.and.t2.le.5) &
+                                             write(6,*)'DEBUG tkern t1=',t1,'t2=',t2,'val=',csum
                                        end do
                                     end do
                                     do m=1,ifreq
