@@ -10,7 +10,7 @@
  qnumbers, number of states:           2         121
  qnumbers, number of states:           3          55
  total quantum numbers, largest Hilbert subspace:           3         121
- time initializing   5.85700572E-03
+ time initializing   4.96300310E-03
  Sector:         K:           0           0 2*Sz:          -2 Hilbert space:          55
  ------------------------------------------------------------------------------------------------------
  writing valence Hamiltonian...
@@ -208,7 +208,7 @@
  -------End of non-core hole calculation--------------
  -----------------------------------------------------
 
- time writing and diagonalizing valence Hamiltonian matrix   3.33495998    
+ time writing and diagonalizing valence Hamiltonian matrix   2.90075111    
  edge (1=TM L, 2=Ligand K):           1
  Hilbert space for core hole states:         132
  Core states partitioned
@@ -217,7 +217,7 @@
  -----------------------------------------------------
  -------End of core hole calculation--------------
  -----------------------------------------------------
- time writing and diagonalizing core Hamiltonian matrix   4.41854811    
+ time writing and diagonalizing core Hamiltonian matrix   4.00861692    
 
  Finding XAS & RIXS overlap states between valence-hole and core-hole sectors...(twist1,twist2)           0           0
 
@@ -725,6 +725,9 @@
  DEBUG tkern t1=           0 t2=           3 val= (-9.94912294257179475E-002,-1.90054284898642685E-002)
  DEBUG tkern t1=           0 t2=           4 val=  (-4.46496406122553480E-002,7.03591559209799100E-002)
  DEBUG tkern t1=           0 t2=           5 val=   (3.77733566452659042E-002,7.67606813711436686E-002)
+ DEBUG tkern t1=           0 t2=          20 val=  (9.79338691952835183E-002,-1.14405006043180116E-002)
+ DEBUG tkern t1=           0 t2=          40 val=       (-2.42411533665764676E-003,0.10723123084458887)
+ DEBUG tkern t1=           0 t2=          80 val=  (-9.71107545764010038E-002,5.12919724780852848E-002)
          -40           1          16
          -40           2          16
          -40           3          16
@@ -748,6 +751,9 @@
  DEBUG tkern t1=           0 t2=           3 val= (-9.94912294257179475E-002,-1.90054284898642685E-002)
  DEBUG tkern t1=           0 t2=           4 val=  (-4.46496406122553480E-002,7.03591559209799100E-002)
  DEBUG tkern t1=           0 t2=           5 val=   (3.77733566452659042E-002,7.67606813711436686E-002)
+ DEBUG tkern t1=           0 t2=          20 val=  (9.79338691952835183E-002,-1.14405006043180116E-002)
+ DEBUG tkern t1=           0 t2=          40 val=       (-2.42411533665764676E-003,0.10723123084458887)
+ DEBUG tkern t1=           0 t2=          80 val=  (-9.71107545764010038E-002,5.12919724780852848E-002)
          -20           1          16
          -20           2          16
          -20           3          16
@@ -771,6 +777,9 @@
  DEBUG tkern t1=           0 t2=           3 val= (-9.94912294257179475E-002,-1.90054284898642685E-002)
  DEBUG tkern t1=           0 t2=           4 val=  (-4.46496406122553480E-002,7.03591559209799100E-002)
  DEBUG tkern t1=           0 t2=           5 val=   (3.77733566452659042E-002,7.67606813711436686E-002)
+ DEBUG tkern t1=           0 t2=          20 val=  (9.79338691952835183E-002,-1.14405006043180116E-002)
+ DEBUG tkern t1=           0 t2=          40 val=       (-2.42411533665764676E-003,0.10723123084458887)
+ DEBUG tkern t1=           0 t2=          80 val=  (-9.71107545764010038E-002,5.12919724780852848E-002)
            0           1          16
            0           2          16
            0           3          16
@@ -794,6 +803,9 @@
  DEBUG tkern t1=           0 t2=           3 val= (-9.94912294257179475E-002,-1.90054284898642685E-002)
  DEBUG tkern t1=           0 t2=           4 val=  (-4.46496406122553480E-002,7.03591559209799100E-002)
  DEBUG tkern t1=           0 t2=           5 val=   (3.77733566452659042E-002,7.67606813711436686E-002)
+ DEBUG tkern t1=           0 t2=          20 val=  (9.79338691952835183E-002,-1.14405006043180116E-002)
+ DEBUG tkern t1=           0 t2=          40 val=       (-2.42411533665764676E-003,0.10723123084458887)
+ DEBUG tkern t1=           0 t2=          80 val=  (-9.71107545764010038E-002,5.12919724780852848E-002)
           20           1          16
           20           2          16
           20           3          16
@@ -817,6 +829,9 @@
  DEBUG tkern t1=           0 t2=           3 val= (-9.94912294257179475E-002,-1.90054284898642685E-002)
  DEBUG tkern t1=           0 t2=           4 val=  (-4.46496406122553480E-002,7.03591559209799100E-002)
  DEBUG tkern t1=           0 t2=           5 val=   (3.77733566452659042E-002,7.67606813711436686E-002)
+ DEBUG tkern t1=           0 t2=          20 val=  (9.79338691952835183E-002,-1.14405006043180116E-002)
+ DEBUG tkern t1=           0 t2=          40 val=       (-2.42411533665764676E-003,0.10723123084458887)
+ DEBUG tkern t1=           0 t2=          80 val=  (-9.71107545764010038E-002,5.12919724780852848E-002)
           40           1          16
           40           2          16
           40           3          16
@@ -1331,6 +1346,9 @@
  DEBUG tkern t1=           0 t2=           3 val=        (0.17607649518802243,5.50325195822855204E-002)
  DEBUG tkern t1=           0 t2=           4 val=             (0.23848605438469936,0.10068940879853631)
  DEBUG tkern t1=           0 t2=           5 val=             (0.17515022223951826,0.13139970223842898)
+ DEBUG tkern t1=           0 t2=          20 val=   (2.44597304880338935E-002,5.18542435384579045E-002)
+ DEBUG tkern t1=           0 t2=          40 val=       (-7.73727725964304114E-002,0.14570243981360562)
+ DEBUG tkern t1=           0 t2=          80 val=           (-0.18952980950603965,-0.16655521263511466)
          -40           1          16
          -40           2          16
          -40           3          16
@@ -1354,6 +1372,9 @@
  DEBUG tkern t1=           0 t2=           3 val=        (0.17607649518802243,5.50325195822855204E-002)
  DEBUG tkern t1=           0 t2=           4 val=             (0.23848605438469936,0.10068940879853631)
  DEBUG tkern t1=           0 t2=           5 val=             (0.17515022223951826,0.13139970223842898)
+ DEBUG tkern t1=           0 t2=          20 val=   (2.44597304880338935E-002,5.18542435384579045E-002)
+ DEBUG tkern t1=           0 t2=          40 val=       (-7.73727725964304114E-002,0.14570243981360562)
+ DEBUG tkern t1=           0 t2=          80 val=           (-0.18952980950603965,-0.16655521263511466)
          -20           1          16
          -20           2          16
          -20           3          16
@@ -1377,6 +1398,9 @@
  DEBUG tkern t1=           0 t2=           3 val=        (0.17607649518802243,5.50325195822855204E-002)
  DEBUG tkern t1=           0 t2=           4 val=             (0.23848605438469936,0.10068940879853631)
  DEBUG tkern t1=           0 t2=           5 val=             (0.17515022223951826,0.13139970223842898)
+ DEBUG tkern t1=           0 t2=          20 val=   (2.44597304880338935E-002,5.18542435384579045E-002)
+ DEBUG tkern t1=           0 t2=          40 val=       (-7.73727725964304114E-002,0.14570243981360562)
+ DEBUG tkern t1=           0 t2=          80 val=           (-0.18952980950603965,-0.16655521263511466)
            0           1          16
            0           2          16
            0           3          16
@@ -1400,6 +1424,9 @@
  DEBUG tkern t1=           0 t2=           3 val=        (0.17607649518802243,5.50325195822855204E-002)
  DEBUG tkern t1=           0 t2=           4 val=             (0.23848605438469936,0.10068940879853631)
  DEBUG tkern t1=           0 t2=           5 val=             (0.17515022223951826,0.13139970223842898)
+ DEBUG tkern t1=           0 t2=          20 val=   (2.44597304880338935E-002,5.18542435384579045E-002)
+ DEBUG tkern t1=           0 t2=          40 val=       (-7.73727725964304114E-002,0.14570243981360562)
+ DEBUG tkern t1=           0 t2=          80 val=           (-0.18952980950603965,-0.16655521263511466)
           20           1          16
           20           2          16
           20           3          16
@@ -1423,6 +1450,9 @@
  DEBUG tkern t1=           0 t2=           3 val=        (0.17607649518802243,5.50325195822855204E-002)
  DEBUG tkern t1=           0 t2=           4 val=             (0.23848605438469936,0.10068940879853631)
  DEBUG tkern t1=           0 t2=           5 val=             (0.17515022223951826,0.13139970223842898)
+ DEBUG tkern t1=           0 t2=          20 val=   (2.44597304880338935E-002,5.18542435384579045E-002)
+ DEBUG tkern t1=           0 t2=          40 val=       (-7.73727725964304114E-002,0.14570243981360562)
+ DEBUG tkern t1=           0 t2=          80 val=           (-0.18952980950603965,-0.16655521263511466)
           40           1          16
           40           2          16
           40           3          16
@@ -1480,9 +1510,9 @@
 
  spin exchange (4t^2/U) is  0.539499462    
  ---------------------------------------------------
- Total time for run:   215.362778     seconds.   3.58937955     minutes
- time initializing:   5.85700572E-03 seconds.
- time for valence diagonalization:   3.33495998     seconds.
- time for core hole diagonalization:   4.41854811     seconds.
- time for time evolution:   4.58812714E-03 seconds.
- time for XAS/RIXS:   207.598831     seconds.
+ Total time for run:   204.125214     seconds.   3.40208697     minutes
+ time initializing:   4.96300310E-03 seconds.
+ time for valence diagonalization:   2.90075111     seconds.
+ time for core hole diagonalization:   4.00861692     seconds.
+ time for time evolution:   4.71019745E-03 seconds.
+ time for XAS/RIXS:   197.206177     seconds.

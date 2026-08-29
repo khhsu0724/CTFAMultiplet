@@ -515,6 +515,73 @@ candidates, cheapest-to-check first:
    yet ruled out as a genuine subtlety in whether coherent summing over degenerate final states is
    the physically correct treatment in the first place.
 
+## TESTED AND REJECTED: degenerate-final-state incoherent summing (item 3 above) — real theory, wrong diagnosis here
+
+Item 3 above was pursued to completion this session and **empirically falsified as the cause of
+this discrepancy** — worth recording in detail so a future session doesn't re-derive and re-test
+the same (reasonable-sounding) idea from scratch.
+
+**The theory itself is sound and worth remembering for other contexts:** coherently summing
+`Sigma_l <val_l(t2)|X>` then squaring once is only equivalent to the physically-correct incoherent
+sum `Sigma_l |<val_l(t2)|X>|^2` when each `l` lands in its own resolvable output bin. For an
+*exactly* degenerate group of `l`'s, the relative phase a diagonalization routine assigns within
+that degenerate eigenspace is arbitrary (any orthonormal basis of a degenerate eigenspace is an
+equally valid choice of eigenvectors) — so a coherent sum's cross-terms between degenerate members
+depend on an artifact of which basis a given routine happened to pick, not on physics, and are not
+guaranteed to agree between two independent codes even when both correctly diagonalize the
+identical Hamiltonian.
+
+**Two implementations were tried, in `src/tr_photon.hpp`'s `trRIXS_2time`, both later reverted:**
+1. **Fully incoherent per-eigenvector** (`Sigma_l |amplitude_l|^2` over all `nval` individual
+   valence eigenvectors, no grouping at all). Result: made things measurably *worse* overall — the
+   previously well-matched `ab≈12.24` feature degraded from ~1.2× off to ~3.2× off, while the
+   already-bad `ab=-4.992,loss≈2` feature barely changed (575×→201× at the worst delay, still
+   badly wrong; some delays got slightly better, one got slightly worse). Diagnosis: incoherently
+   summing *all* individually-squared contributions, including the ~54 technically-off-resonant-
+   but-not-exactly-zero ones, discards the destructive-interference cancellation that a coherent
+   sum provides between them — replacing it with a spurious, always-positive noise floor.
+2. **Grouped by exact/near-degenerate energy** (tolerance `1e-6` on `gsblk.eig[l]`, matching the
+   reference's own `abs(sngl(deig)-sngl(deig(1))).lt.small` convention): coherently sum *within*
+   each group (55 states collapsed into 38 groups for this system — legitimate, since a degenerate
+   subspace has no meaningful internal phase to protect), sum *across* groups incoherently
+   (distinct energies do carry a physically meaningful relative phase, and coherently combining
+   across them is exactly what let the original all-coherent version suppress far-off-resonant
+   noise). Result: **numerically almost identical to the fully-incoherent version** (e.g. at
+   `delay=+3.14`: 201.27× vs. 201.33×; `ab≈12.24` at `delay=0`: 2.92× vs. 3.19×) — meaning grouping
+   made essentially no difference. This is strong evidence that the specific degenerate pair
+   identified (`states 6,7` at `5.64394665`, sitting on the `loss≈2` feature) is **not** the
+   dominant driver of the discrepancy at that feature, and/or that most of the 38 groups found are
+   singletons anyway so the "grouped vs. fully incoherent" distinction rarely bites in practice
+   for this system.
+
+**Conclusion: reverted both changes** (`git checkout 48cc8dd -- src/tr_photon.hpp`, back to the
+single-Krows-per-exblk-group, fully-coherent-over-valence-eigenstates version from before this
+detour — the best-performing version found so far, since it's the only one that gets `ab≈12.24`
+reasonably close). **The degenerate-eigenspace hypothesis, while theoretically legitimate in
+general, is not the explanation for this specific discrepancy** — or at most a minor
+contributor. The fact that *breaking coherence anywhere* (fully or by group) makes the
+already-good feature worse without fixing the bad one suggests the toy window's frequency
+resolution is coarse enough that even nominally well-separated states aren't cleanly isolated at
+this scale, making the coherent-sum simplification's noise-suppression important everywhere, not
+just a simplification to protect for genuinely degenerate states. This may be a toy-scale artifact
+that would matter less at full paper-scale resolution — worth keeping in mind if this hypothesis is
+ever revisited with a finer output grid.
+
+**Where this leaves the investigation:** back to square one for *this specific* discrepancy, with
+items 1-2 above (dipole matrix element construction — checked at a structural level and found to
+plausibly match the reference's own polarization/Gaunt-coefficient convention exactly, not a clear
+lead either — and the `E_gs`-referencing question from Mode A's `instantaneous_energy`) as the
+remaining concrete candidates, plus reconsidering whether the raw `K(t1,t2)` magnitude/phase
+mismatch (2.8-4.8×, irregular phase, confirmed NOT growing with propagation time) has some other
+explanation not yet identified. Given the amount of ground already covered without success, the
+next session should consider: (a) a much more granular side-by-side dump of intermediate
+quantities (e.g. the actual `blap_in`/`blap_out` coefficient values, or the propagated `xi` state's
+own components at a few timesteps) rather than only the fully-assembled `K(t1,t2)`; (b) double-
+checking the FULL dipole-vertex formula against the Fortran source line-by-line rather than at the
+structural level this session managed; (c) stepping back to ask whether the toy validation system's
+extremely tight, non-physical window (`nb=nt=1`) is itself producing effects (in *both* codes, but
+differently) that a larger, more physically realistic window would not.
+
 ## What NOT to re-try (already explored exhaustively, dead ends for this specific question)
 
 - Re-deriving Hamiltonian parameters from the Fortran source — done, cross-validated 4+ times,
@@ -527,6 +594,11 @@ candidates, cheapest-to-check first:
   `dt`-convergence first (see the coarse-`timesteps` pitfall above).
 - The "d9 at TM L-edge" configuration (Downloads file (2)) — a genuinely different, untested
   system; not related to the current d8 investigation, don't conflate the two.
+- Incoherent (or grouped-incoherent) summing over the final valence eigenstate basis in
+  `trRIXS_2time`'s de-excitation step, as a fix for the `ab=-4.992,loss≈2` discrepancy — tried both
+  ways (fully per-eigenvector, and grouped by degenerate energy), both made the previously-good
+  `ab≈12.24` feature measurably worse without fixing the bad one. See "TESTED AND REJECTED" section
+  above for the full writeup and reasoning before re-attempting any variant of this idea.
 
 ## Key file locations
 

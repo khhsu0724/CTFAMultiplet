@@ -2789,7 +2789,8 @@ program main
                                              end do
                                           end do
                                           tkern(t1,t2)=csum
-                                          if(myrank.eq.0.and.t1.eq.0.and.t2.ge.1.and.t2.le.5) &
+                                          if(myrank.eq.0.and.t1.eq.0.and.(t2.le.5.or.t2.eq.20.or. &
+                                             t2.eq.40.or.t2.eq.80.or.t2.eq.120.or.t2.eq.160)) &
                                              write(6,*)'DEBUG tkern t1=',t1,'t2=',t2,'val=',csum
                                        end do
                                     end do
