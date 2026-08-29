@@ -339,9 +339,16 @@ inline void trRIXS(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, const HPar
 // iterative-Lanczos propagation of a single state vector, not full dense diagonalization
 // plus an ndim x ndim matrix composition at every timestep.
 //
-// This first version computes a single (ground-state eigenvector, core-hole block)
-// channel, matching the reference's own fixed (ws,wsp) sector structure -- summing over
-// multiple degenerate ground states / matching core-hole blocks is not yet implemented.
+// Multiple matching core-hole blocks (ex_blk_inds) for the same ground state are accumulated
+// COHERENTLY into one shared Krows amplitude array before the final |csum|^2 -- summing per-block
+// *intensities* instead (as an earlier version of this function did, one independent call and
+// output file per exblk) silently discards interference between amplitude contributions that
+// reach the same final valence state via different intermediate core-hole blocks. Confirmed against
+// the reference Fortran: its entire core-hole manifold is one undifferentiated space, and its own
+// vertex sum (the "i" loop inside csum, before tkern(t1,t2)=csum) sums the amplitude over every
+// core-hole eigenstate coherently, squaring only once, much later, after the full (t1,t2) sum --
+// never per-block. Summing multiple degenerate ground states coherently too (not yet implemented)
+// would require the same treatment if that case is ever exercised.
 // ============================================================================
 
 inline void write_trRIXS_2time(const vecd& ab, const vecd& em, const std::vector<vecd>& peaks_per_delay,
@@ -367,7 +374,8 @@ inline void write_trRIXS_2time(const vecd& ab, const vecd& em, const std::vector
 }
 
 inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, const HParam& hparam_ex,
-							const PM& pm, size_t gs_blk_ind, size_t gs_eig_ind, size_t ex_blk_ind,
+							const PM& pm, size_t gs_blk_ind, size_t gs_eig_ind,
+							const std::vector<size_t>& ex_blk_inds,
 							const vecd& ab_grid, const vecd& loss_grid, const vecd& delays,
 							double probe_sigma, double tau_ch, double dt, int m,
 							double sim_window_mult = 4.0, double t2_max_window = -1,
@@ -419,11 +427,6 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 		if (l % 20 == 0) std::cout << "  valence trajectory " << l << "/" << nval << std::endl;
 	}
 
-	std::vector<blapIndex> blap_in, blap_out;
-	basis_overlap(GS, EX, bindex(gs_blk_ind,ex_blk_ind), blap_in, pm);
-	if (pm.pvin != pm.pvout) basis_overlap(GS, EX, bindex(gs_blk_ind,ex_blk_ind), blap_out, pm, true);
-	else blap_out = blap_in;
-
 	int W_steps = (t2_max_window > 0) ? (int)std::round(t2_max_window/dt) : n_is;
 	std::cout << "t2 window: " << W_steps << " steps ("
 				<< (t2_max_window > 0 ? t2_max_window : (t_hi-t_lo)) << " eV^-1)" << std::endl;
@@ -433,21 +436,33 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 	// energy resolution at all and Fourier-transforms into a spurious peak at zero energy
 	// loss if included), tau_ch-window-truncated, and built ONCE, reused for every requested
 	// delay (the reference rebuilds this once per delay, redundantly). Krows[is1][k-1] holds
-	// K(t1, t1+k*dt) for k=1..kmax, coherently summed over the full valence final-state basis.
+	// K(t1, t1+k*dt) for k=1..kmax, coherently summed over BOTH the full valence final-state
+	// basis (combined_traj, above) AND every matching core-hole block in ex_blk_inds (below) --
+	// each exblk's contribution is ADDED into the same shared Krows entry before any |.|^2 is
+	// ever taken, matching the reference's own single undifferentiated core-hole manifold.
 	std::vector<std::vector<dcomp>> Krows(n_is+1);
-	for (int is1 = 0; is1 <= n_is; ++is1) {
-		int kmax = std::min(W_steps, n_is-is1);
-		Krows[is1].assign(kmax, dcomp(0,0));
-		vecc xi = gen_dipole_state(GS, EX, pm, bindex(gs_blk_ind,ex_blk_ind), gs_traj[is1], blap_in, true);
-		if (ed::norm(xi) < TOL) continue;
-		double t = t_lo + is1*dt;
-		for (int k = 1; k <= kmax; ++k) {
-			propagate_block_state(EX, ex_blk_ind, xi, t, dt, hparam_ex, m);
-			t += dt;
-			vecc deexc = gen_dipole_state(GS, EX, pm, bindex(gs_blk_ind,ex_blk_ind), xi, blap_out, false);
-			Krows[is1][k-1] = ed::inner_product(combined_traj[is1+k], deexc);
+	for (int is1 = 0; is1 <= n_is; ++is1) Krows[is1].assign(std::min(W_steps, n_is-is1), dcomp(0,0));
+
+	for (size_t ex_blk_ind : ex_blk_inds) {
+		std::vector<blapIndex> blap_in, blap_out;
+		basis_overlap(GS, EX, bindex(gs_blk_ind,ex_blk_ind), blap_in, pm);
+		if (pm.pvin != pm.pvout) basis_overlap(GS, EX, bindex(gs_blk_ind,ex_blk_ind), blap_out, pm, true);
+		else blap_out = blap_in;
+
+		std::cout << "  accumulating core-hole block " << ex_blk_ind << "..." << std::endl;
+		for (int is1 = 0; is1 <= n_is; ++is1) {
+			int kmax = (int)Krows[is1].size();
+			vecc xi = gen_dipole_state(GS, EX, pm, bindex(gs_blk_ind,ex_blk_ind), gs_traj[is1], blap_in, true);
+			if (ed::norm(xi) < TOL) continue;
+			double t = t_lo + is1*dt;
+			for (int k = 1; k <= kmax; ++k) {
+				propagate_block_state(EX, ex_blk_ind, xi, t, dt, hparam_ex, m);
+				t += dt;
+				vecc deexc = gen_dipole_state(GS, EX, pm, bindex(gs_blk_ind,ex_blk_ind), xi, blap_out, false);
+				Krows[is1][k-1] += ed::inner_product(combined_traj[is1+k], deexc);
+			}
+			if (is1 % 20 == 0) std::cout << "  K-row " << is1 << "/" << n_is << std::endl;
 		}
-		if (is1 % 20 == 0) std::cout << "  K-row " << is1 << "/" << n_is << std::endl;
 	}
 
 	size_t n_ab = ab_grid.size(), n_loss = loss_grid.size();

@@ -339,12 +339,60 @@ trRIXS_2time(...) }`, one independent call per channel) to something that passes
 `exblk`s into a single `trRIXS_2time` call, or accumulates their `Krows` externally before the final
 delay/frequency sum.
 
-**Once implemented:** rerun the v2 toy comparison (Fortran reference is already correct and
-available at `validation_modeB/fortran_toy_reference_v2/trSPEC_XY_1010.dat`...`1410.dat`, one clean
-channel, 5 delays; `TD_Cluster_Xray.f90` there has some now-unnecessary debug prints from this
-session's investigation that should be stripped or ignored before treating it as a clean reference
-going forward) against the corrected, single coherently-summed C++ output. If this fix closes the
-gap, the delay-shape mismatch was never really about probe-window truncation at all.
+**Implemented** (`trRIXS_2time` in `src/tr_photon.hpp` now takes `const std::vector<size_t>&
+ex_blk_inds` and accumulates every matching core-hole block into one shared `Krows` before the final
+`|.|^2`; `main.cpp`'s TRRIXS2 dispatch collects matching `exblk`s per ground state first, then makes
+one `trRIXS_2time` call per ground state instead of per exblk). Compiles cleanly. **Keep this fix —
+it is still correct and necessary in general** (multiple core-hole blocks legitimately reachable
+from one ground state must be summed as amplitudes, not intensities) — but see below: for *this
+specific toy system*, it turned out to make **no numerical difference**, because the premise that
+motivated it (3 exblk matches per single ground state) was wrong for this system.
+
+## CORRECTION: "3 channels" were never 3 exblk per ground state — they are 3 degenerate ground states
+
+Rerunning the v2 toy test with the coherent-exblk fix in place still produced **3** separate output
+files (`trRIXS2_chan0/1/2`), not 1. Checking `validation_modeB/modeb_pumpon_v2_fixed/run.log`
+directly shows why: each of the 3 channels prints `accumulating core-hole block 0...` exactly **once**
+— never block 1 or 2. So each channel's `ex_blk_inds` list only ever had one entry to begin with; the
+coherent-sum fix had nothing to combine here. The channel count comes from the *outer* `for (auto& g
+: gsi)` loop instead: `gsi.size() == 3`, with valence block dimensions 55, 121, 55 — the same three
+`2Sz = -2, 0, +2` sectors seen throughout this investigation, all sitting at the ground-state energy.
+**This is a spin-triplet (S=1) ground state, and "chan0/1/2" are its three degenerate Sz sublevels**,
+not three core-hole intermediate states. Every "3-channel" comparison this entire session — the
+original 13×-98× ratio table, the shape-mismatch analysis, the incomplete-Fortran-reference
+discovery, the exblk coherent-sum investigation — was actually comparing (sum or individual pick of)
+3 degenerate *initial states* against the reference's output, not 3 intermediate-state channels for
+one initial state. The exblk-coherence question this section was originally about is a real, orthogonal
+issue that simply doesn't happen to arise in this particular toy configuration.
+
+**Why this matters:** the reference Fortran's `do qqq=1,qstates; ...; if(count2.eq.0)` structure
+processes **only the first** `ws` satisfying `gsec(ws)==1` — i.e. it computes RIXS from *one single*
+representative sublevel of the degenerate ground state, not a properly averaged (sum or mean) result
+over all 2S+1=3 sublevels. Comparing our sum-over-3 (or any arbitrary one of our 3) against the
+reference's single, specific, unidentified sublevel is not guaranteed to match even if both codes'
+underlying physics is completely correct — the two quantities are conceptually different observables
+unless the specific sublevel picked happens to equal (or be simply proportional to) an average.
+
+**Tested: none of the 3 individual C++ channels cleanly matches the reference's single channel.**
+Comparing `trRIXS2_chan{0,1,2}_t{delay}.txt` (in `validation_modeB/modeb_pumpon_v2_fixed/`)
+individually against `trSPEC_XY_1010...1410.dat` (in `validation_modeB/fortran_toy_reference_v2/`)
+across all 5 delays: peak locations disagree even at `delay=0` (reference's actual global peak moved
+to `ab=12.240, loss=0.50`, a completely different resonance than the `ab=-4.992, loss=2.00` feature
+this whole session has tracked — that feature is still present in the reference at `delay=0`, just
+subdominant there, at `I=3.33e-4` vs. the new peak's `9.61e-4`), and the growing-with-delay ratio
+pattern reappears in every one of the 3 individual-channel comparisons (roughly 3×-150× depending on
+channel and delay) — i.e. **the core delay-shape/magnitude discrepancy this whole session has been
+chasing is still unresolved**, and is now known to be independent of both bugs fixed so far (the
+Fortran crash/tlabel-collision bugs, and the exblk-coherence question).
+
+**Immediate next step, not yet done:** figure out *which* of the 3 degenerate Sz sublevels the
+Fortran reference's `qlist` ordering actually picks first (likely deducible from `sztot(ws)` /
+`mtot(ws)` printed diagnostics, or by adding a targeted debug print of `ws`'s block dimension right
+where `count2.eq.0` gates entry), so the comparison can be pinned to the *correct* single C++ channel
+instead of guessing among all 3. Only once that channel is correctly identified is a real,
+apples-to-apples per-channel comparison possible — everything reported above (and in every earlier
+section of this document referencing "chan0+chan1+chan2" or a growing ratio/shape mismatch) should be
+treated as confounded by this degenerate-ground-state ambiguity until that is resolved.
 
 ## What NOT to re-try (already explored exhaustively, dead ends for this specific question)
 

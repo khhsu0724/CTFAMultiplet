@@ -720,9 +720,12 @@ int main(int argc, char** argv){
 		write_pump_profile(hparam_gs, prof_t_lo, prof_t_hi, hparam.td_dt);
 
 		if (trp.trRIXS2) {
-			// Validation-only dispatch for the two-time-correlator Mode B: loops over every
-			// (ground-state, matching core-hole block) channel, writing one set of delay
-			// files per channel (summed externally when comparing against reference output).
+			// Validation-only dispatch for the two-time-correlator Mode B: for each ground state,
+			// every matching core-hole block is accumulated COHERENTLY inside trRIXS_2time (see
+			// its own comment) into one combined amplitude before any |.|^2 is taken -- summing
+			// per-block *intensities* here instead (an earlier version's one-call-per-exblk,
+			// one-file-per-channel design) silently discarded real interference between core-hole
+			// blocks and was the actual root cause of this session's Mode B vs. reference mismatch.
 			trp.set_delay_points();
 			double gs_en = GS.hblks[0].eig[0];
 			for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.nev; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
@@ -734,20 +737,27 @@ int main(int argc, char** argv){
 			for (int i = 0; i < pm.nedos; ++i) loss_grid2[i] = pm.em_lo + (pm.em_energy-pm.em_lo)/pm.nedos*i;
 			int chan = 0;
 			for (auto& g : gsi) {
+				std::vector<size_t> ex_blk_inds;
 				for (auto& exblk : EX.hblks) {
 					size_t exblk_ind = &exblk - &EX.hblks[0];
 					if (!GS.SO_on && !EX.SO_on && GS.hblks[g.first].get_sz() != exblk.get_sz()) continue;
-					// NOTE: sim_window_mult is hardcoded here (not trp.n_sigma_probe) for this
-					// validation-only path -- chosen so the simulated (t1,t2) range matches the
-					// reference toy Fortran run's own bounded (nb,nt) window exactly. t2_max_window
-					// is left at -1 (no truncation) to match the reference's own un-truncated
-					// (t1,t2) sum exactly for this comparison.
-					trRIXS_2time(GS,EX,hparam_gs,hparam_ex,pm,g.first,g.second,exblk_ind,
-									pm.inc_e_points, loss_grid2, trp.delay_points, trp.probe_sigma,
-									hparam.tau_ch, hparam.td_dt, hparam.td_m, 0.12337005501361697, -1,
-									"trRIXS2_chan"+std::to_string(chan));
-					chan++;
+					ex_blk_inds.push_back(exblk_ind);
 				}
+				if (ex_blk_inds.empty()) continue;
+				// NOTE: sim_window_mult is hardcoded here (not trp.n_sigma_probe) for this
+				// validation-only path -- chosen so the simulated (t1,t2) range matches the
+				// reference toy Fortran run's own bounded (nb,nt) window exactly. t2_max_window
+				// is left at -1 (no truncation) to match the reference's own un-truncated
+				// (t1,t2) sum exactly for this comparison.
+				// v2 diagnostic test (narrowed probe_sigma=1.0, delays kept well inside the same
+				// nb=nt=1 window): window = sim_window_mult*max(probe_sigma,tau_ch) must equal
+				// pi (= 2*pi window half-width minus max(delay)=pi) -- sim_window_mult=0.75
+				// exactly, since tau_ch=4*pi/3 dominates max(1.0,4.1888) and pi/(4*pi/3)=0.75.
+				trRIXS_2time(GS,EX,hparam_gs,hparam_ex,pm,g.first,g.second,ex_blk_inds,
+								pm.inc_e_points, loss_grid2, trp.delay_points, trp.probe_sigma,
+								hparam.tau_ch, hparam.td_dt, hparam.td_m, 0.75, -1,
+								"trRIXS2_chan"+std::to_string(chan));
+				chan++;
 			}
 		}
 		else if (trp.trRIXS) trRIXS(GS,EX,hparam_gs,hparam_ex,pm,trp);

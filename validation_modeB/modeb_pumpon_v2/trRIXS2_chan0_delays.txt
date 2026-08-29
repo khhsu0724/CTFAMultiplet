@@ -1,0 +1,6 @@
+  delay (eV^-1)  file
+       -3.14159  trRIXS2_chan0_t-3.141593.txt
+        -1.5708  trRIXS2_chan0_t-1.570796.txt
+              0  trRIXS2_chan0_t0.000000.txt
+         1.5708  trRIXS2_chan0_t1.570796.txt
+        3.14159  trRIXS2_chan0_t3.141593.txt

@@ -1,0 +1,320 @@
+Eigen-energy number: 1, energy (rel to gs): 0
+Spin: 1, degeneracy: 3
+------------------------------
+ Num Holes:            2
+       dx2:      0.89335
+       dz2:      0.98441
+       dxy:      0.00000
+       dxz:      0.00000
+       dyz:      0.00000
+       pxx:      0.06112
+       pxy:      0.00000
+       pxz:      0.00000
+       pyx:      0.00000
+       pyy:      0.06112
+       pyz:      0.00000
+------------------------------
+Eigen-energy number: 2, energy (rel to gs): 0.835682
+Spin: 0, degeneracy: 1
+------------------------------
+ Num Holes:            2
+       dx2:      1.61204
+       dz2:      0.07157
+       dxy:      0.01416
+       dxz:      0.01475
+       dyz:      0.01475
+       pxx:      0.13626
+       pxy:      0.00004
+       pxz:      0.00005
+       pyx:      0.00004
+       pyy:      0.13626
+       pyz:      0.00005
+------------------------------
+Eigen-energy number: 3, energy (rel to gs): 1.06166
+Spin: 1, degeneracy: 6
+------------------------------
+ Num Holes:            2
+       dx2:      0.89213
+       dz2:      0.00035
+       dxy:      0.00003
+       dxz:      0.49676
+       dyz:      0.49676
+       pxx:      0.05374
+       pxy:      0.00000
+       pxz:      0.00324
+       pyx:      0.00000
+       pyy:      0.05374
+       pyz:      0.00324
+------------------------------
+Eigen-energy number: 4, energy (rel to gs): 1.06528
+Spin: 1, degeneracy: 3
+------------------------------
+ Num Holes:            2
+       dx2:      0.89193
+       dz2:      0.00000
+       dxy:      0.99061
+       dxz:      0.00011
+       dyz:      0.00011
+       pxx:      0.05398
+       pxy:      0.00464
+       pxz:      0.00000
+       pyx:      0.00464
+       pyy:      0.05398
+       pyz:      0.00000
+------------------------------
+Eigen-energy number: 5, energy (rel to gs): 1.51904
+Spin: 0, degeneracy: 1
+------------------------------
+ Num Holes:            2
+       dx2:      0.84870
+       dz2:      0.97256
+       dxy:      0.00000
+       dxz:      0.00001
+       dyz:      0.00001
+       pxx:      0.08936
+       pxy:      0.00000
+       pxz:      0.00000
+       pyx:      0.00000
+       pyy:      0.08936
+       pyz:      0.00000
+------------------------------
+Eigen-energy number: 6, energy (rel to gs): 1.91215
+Spin: 1, degeneracy: 3
+------------------------------
+ Num Holes:            2
+       dx2:      0.00000
+       dz2:      0.98239
+       dxy:      0.98982
+       dxz:      0.00000
+       dyz:      0.00000
+       pxx:      0.00880
+       pxy:      0.00509
+       pxz:      0.00000
+       pyx:      0.00509
+       pyy:      0.00880
+       pyz:      0.00000
+------------------------------
+Eigen-energy number: 7, energy (rel to gs): 1.96939
+Spin: 1, degeneracy: 6
+------------------------------
+ Num Holes:            2
+       dx2:      0.00031
+       dz2:      0.98145
+       dxy:      0.00033
+       dxz:      0.49631
+       dyz:      0.49631
+       pxx:      0.00896
+       pxy:      0.00000
+       pxz:      0.00369
+       pyx:      0.00000
+       pyy:      0.00896
+       pyz:      0.00369
+------------------------------
+Eigen-energy number: 8, energy (rel to gs): 2.57019
+Spin: 0, degeneracy: 1
+------------------------------
+ Num Holes:            2
+       dx2:      0.84625
+       dz2:      0.00000
+       dxy:      0.98483
+       dxz:      0.00000
+       dyz:      0.00000
+       pxx:      0.07688
+       pxy:      0.00758
+       pxz:      0.00000
+       pyx:      0.00758
+       pyy:      0.07688
+       pyz:      0.00000
+------------------------------
+Eigen-energy number: 9, energy (rel to gs): 2.59033
+Spin: 0, degeneracy: 2
+------------------------------
+ Num Holes:            2
+       dx2:      0.84600
+       dz2:      0.00002
+       dxy:      0.00002
+       dxz:      0.49403
+       dyz:      0.49403
+       pxx:      0.07698
+       pxy:      0.00000
+       pxz:      0.00597
+       pyx:      0.00000
+       pyy:      0.07698
+       pyz:      0.00597
+------------------------------
+Eigen-energy number: 10, energy (rel to gs): 2.9461
+Spin: 0, degeneracy: 1
+------------------------------
+ Num Holes:            2
+       dx2:      0.02673
+       dz2:      1.65621
+       dxy:      0.08214
+       dxz:      0.07358
+       dyz:      0.07358
+       pxx:      0.04291
+       pxy:      0.00043
+       pxz:      0.00053
+       pyx:      0.00043
+       pyy:      0.04291
+       pyz:      0.00053
+------------------------------
+Eigen-energy number: 11, energy (rel to gs): 2.97893
+Spin: 1, degeneracy: 6
+------------------------------
+ Num Holes:            2
+       dx2:      0.00002
+       dz2:      0.00032
+       dxy:      0.98933
+       dxz:      0.49630
+       dyz:      0.49630
+       pxx:      0.00001
+       pxy:      0.00516
+       pxz:      0.00370
+       pyx:      0.00516
+       pyy:      0.00001
+       pyz:      0.00370
+------------------------------
+Eigen-energy number: 12, energy (rel to gs): 3.00483
+Spin: 1, degeneracy: 3
+------------------------------
+ Num Holes:            2
+       dx2:      0.00009
+       dz2:      0.00000
+       dxy:      0.00011
+       dxz:      0.99247
+       dyz:      0.99247
+       pxx:      0.00001
+       pxy:      0.00000
+       pxz:      0.00742
+       pyx:      0.00000
+       pyy:      0.00001
+       pyz:      0.00742
+------------------------------
+Eigen-energy number: 13, energy (rel to gs): 3.62034
+Spin: 0, degeneracy: 1
+------------------------------
+ Num Holes:            2
+       dx2:      0.00000
+       dz2:      0.96238
+       dxy:      0.98104
+       dxz:      0.00011
+       dyz:      0.00011
+       pxx:      0.01875
+       pxy:      0.00942
+       pxz:      0.00000
+       pyx:      0.00942
+       pyy:      0.01875
+       pyz:      0.00000
+------------------------------
+Eigen-energy number: 14, energy (rel to gs): 3.66172
+Spin: 0, degeneracy: 2
+------------------------------
+ Num Holes:            2
+       dx2:      0.00002
+       dz2:      0.96192
+       dxy:      0.00003
+       dxz:      0.49207
+       dyz:      0.49207
+       pxx:      0.01902
+       pxy:      0.00000
+       pxz:      0.00793
+       pyx:      0.00000
+       pyy:      0.01902
+       pyz:      0.00793
+------------------------------
+Eigen-energy number: 15, energy (rel to gs): 4.69491
+Spin: 0, degeneracy: 1
+------------------------------
+ Num Holes:            2
+       dx2:      0.00001
+       dz2:      0.00026
+       dxy:      1.31904
+       dxz:      0.32195
+       dyz:      0.32195
+       pxx:      0.00003
+       pxy:      0.01312
+       pxz:      0.00524
+       pyx:      0.01312
+       pyy:      0.00003
+       pyz:      0.00524
+------------------------------
+Eigen-energy number: 16, energy (rel to gs): 4.70555
+Spin: 0, degeneracy: 2
+------------------------------
+ Num Holes:            2
+       dx2:      0.00002
+       dz2:      0.00003
+       dxy:      0.98047
+       dxz:      0.49185
+       dyz:      0.49185
+       pxx:      0.00000
+       pxy:      0.00974
+       pxz:      0.00815
+       pyx:      0.00974
+       pyy:      0.00000
+       pyz:      0.00815
+------------------------------
+Eigen-energy number: 17, energy (rel to gs): 4.73703
+Spin: 0, degeneracy: 1
+------------------------------
+ Num Holes:            2
+       dx2:      0.00001
+       dz2:      0.00001
+       dxy:      0.00000
+       dxz:      0.98357
+       dyz:      0.98357
+       pxx:      0.00001
+       pxy:      0.00000
+       pxz:      0.01641
+       pyx:      0.00000
+       pyy:      0.00001
+       pyz:      0.01641
+------------------------------
+Eigen-energy number: 18, energy (rel to gs): 4.73703
+Spin: 0, degeneracy: 1
+------------------------------
+ Num Holes:            2
+       dx2:      0.00000
+       dz2:      0.00010
+       dxy:      0.00011
+       dxz:      0.98344
+       dyz:      0.98344
+       pxx:      0.00000
+       pxy:      0.00000
+       pxz:      0.01645
+       pyx:      0.00000
+       pyy:      0.00000
+       pyz:      0.01645
+------------------------------
+Eigen-energy number: 19, energy (rel to gs): 5.59905
+Spin: 1, degeneracy: 3
+------------------------------
+ Num Holes:            2
+       dx2:      0.95322
+       dz2:      0.00000
+       dxy:      0.00000
+       dxz:      0.00000
+       dyz:      0.00000
+       pxx:      0.02339
+       pxy:      0.50000
+       pxz:      0.00000
+       pyx:      0.50000
+       pyy:      0.02339
+       pyz:      0.00000
+------------------------------
+Eigen-energy number: 20, energy (rel to gs): 5.61194
+Spin: 0, degeneracy: 1
+------------------------------
+ Num Holes:            2
+       dx2:      0.95497
+       dz2:      0.00001
+       dxy:      0.00001
+       dxz:      0.00000
+       dyz:      0.00000
+       pxx:      0.02251
+       pxy:      0.49999
+       pxz:      0.00000
+       pyx:      0.49999
+       pyy:      0.02251
+       pyz:      0.00000
+------------------------------
