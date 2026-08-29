@@ -2700,6 +2700,7 @@ program main
               if(gsec(ws).eq.1)then
                  if(count2.eq.0)then
                     count2=count2+1
+                    if(myrank.eq.0)write(6,*)'DEBUG which ws processed: ws=',ws,'2Sz=',sztot(ws),'binstates=',binstates(ws)
                     do ppp=1,qstates
                        wsp=qlist(ppp)
                        tmom=mdiff(mtot(ws),mtot(wsp))

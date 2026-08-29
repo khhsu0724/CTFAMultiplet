@@ -1,4 +1,4 @@
- time initializing   4.41699475E-03
+ time initializing   4.86800075E-03
  Quantum number, momentum [units pi/Nx,pi/Ny], spin, eigenvalue (lower set of states), degeneracy
 
            1           0           0          -2           1   3.67454934               1
@@ -176,8 +176,8 @@
  yz occupation:   6.6243367473850598E-032
 
  ground state is           3 -fold degenerate
- time writing and diagonalizing valence Hamiltonian matrix   2.52093482    
- time writing and diagonalizing core Hamiltonian matrix   3.18198085    
+ time writing and diagonalizing valence Hamiltonian matrix   2.52021813    
+ time writing and diagonalizing core Hamiltonian matrix   3.16979909    
  ---------------------------------------------------
  ---------------------------------------------------
  Succesful End
@@ -215,9 +215,9 @@
 
  spin exchange (4t^2/U) is  0.539499462    
  ---------------------------------------------------
- Total time for run:   194.515533     seconds.   3.24192548     minutes
- time initializing:   4.41699475E-03 seconds.
- time for valence diagonalization:   2.52093482     seconds.
- time for core hole diagonalization:   3.18198085     seconds.
- time for time evolution:   4.46701050E-03 seconds.
- time for XAS/RIXS:   188.803741     seconds.
+ Total time for run:   194.284607     seconds.   3.23807669     minutes
+ time initializing:   4.86800075E-03 seconds.
+ time for valence diagonalization:   2.52021813     seconds.
+ time for core hole diagonalization:   3.16979909     seconds.
+ time for time evolution:   4.37498093E-03 seconds.
+ time for XAS/RIXS:   188.585342     seconds.

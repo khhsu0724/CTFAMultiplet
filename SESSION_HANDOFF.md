@@ -385,14 +385,77 @@ channel and delay) — i.e. **the core delay-shape/magnitude discrepancy this wh
 chasing is still unresolved**, and is now known to be independent of both bugs fixed so far (the
 Fortran crash/tlabel-collision bugs, and the exblk-coherence question).
 
-**Immediate next step, not yet done:** figure out *which* of the 3 degenerate Sz sublevels the
-Fortran reference's `qlist` ordering actually picks first (likely deducible from `sztot(ws)` /
-`mtot(ws)` printed diagnostics, or by adding a targeted debug print of `ws`'s block dimension right
-where `count2.eq.0` gates entry), so the comparison can be pinned to the *correct* single C++ channel
-instead of guessing among all 3. Only once that channel is correctly identified is a real,
-apples-to-apples per-channel comparison possible — everything reported above (and in every earlier
-section of this document referencing "chan0+chan1+chan2" or a growing ratio/shape mismatch) should be
-treated as confounded by this degenerate-ground-state ambiguity until that is resolved.
+**Resolved: the reference processes `ws=1`, `2Sz=-2`, `binstates=55`** — confirmed via a targeted
+debug print (`DEBUG which ws processed: ws= 1 2Sz= -2 binstates= 55`, consistent across every
+polarization pair it reaches, in `validation_modeB/fortran_toy_reference_v2/run.log`). `GS.hblks` is
+built in ascending-Sz order (`hilbert.cpp`'s `sz_Hash`/block-construction loop runs
+`for (int sz = -max_2sz; sz <= max_2sz; sz+=2)`), and `main.cpp`'s `gsi` is populated by iterating
+`GS.hblks` in index order, so **`gsi[0]` = block 0 = `2Sz=-2` = `chan0`** is the *correctly matched*
+C++ channel — no ambiguity, confirmed independently by dimension (55) matching `binstates=55`.
+
+## FINAL RESULT (as of this writing): a real, unconfounded discrepancy remains even for the correctly-matched channel
+
+Comparing `chan0` (only) against the reference across all 5 delays, at the historically-tracked
+`ab=-4.992, loss=2.00` feature:
+
+| delay (eV⁻¹) | ref | mine (chan0) | ratio |
+|---|---|---|---|
+| −3.14 | 1.074e-03 | 6.495e-03 | 6.0× |
+| −1.57 | 1.894e-03 | 1.342e-03 | 0.7× |
+| 0.00 | 3.327e-04 | 7.748e-03 | 23× |
+| +1.57 | 3.809e-04 | 8.007e-03 | 21× |
+| +3.14 | 3.343e-05 | 1.924e-02 | 575× |
+
+This is now a **clean, unconfounded result** — every previously-suspected confound has been
+eliminated: not a missing normalization (falsified by direct source read), not an incomplete/crashed
+reference (fixed, verified clean completion), not incoherent exblk summation (fixed, verified it
+doesn't apply to this system), not a degenerate-ground-state mismatch (resolved, this is the single
+correctly-matched channel). The ratio is not constant, not simply the old "13×→98× growing" pattern
+either — it's noisier (dips below 1× at one delay) but still clearly blows up badly at the largest
+tested delay.
+
+**Also notable and likely diagnostic:** the reference's *dominant global peak* location itself moves
+around with delay — at `delay=0` it jumps to a completely different resonance at `ab=12.240, loss=
+0.50` (`I=9.61e-4`, larger than the `ab=-4.992` feature's `3.33e-4` there), and at `delay=+3.14` to
+`ab=10.325, loss=0.50` (`I=1.39e-4`). Our `chan0` output stays dominated by the `ab=-4.992` feature
+at every delay and never develops a comparably strong peak near `ab=10-12` — i.e. **the reference
+appears to dynamically activate an entirely different spectral feature at certain delays that our
+Mode B output does not reproduce at all**, not just get the magnitude of the same feature wrong. This
+is a much sharper, more specific lead than anything found earlier in this document and should be the
+starting point for the next investigation: what physical resonance sits at `ab≈10-12` (a different
+incident energy channel entirely — check the INCIDENT grid in the INPUT, `-6.9065523978701657
+21.813222178495966 16`, to see what physical transition `ab≈10-12` corresponds to), and why would it
+be delay-dependent in the reference but not (or much less so) in ours? Candidate explanations not yet
+tested: (a) this could be a *different* final valence eigenstate within the *same* `gsblk`/`2Sz=-2`
+block that our `combined_traj` construction should already include (it sums over *all* `nval` valence
+eigenstates in the block) — if so, the discrepancy would have to be in the K(t1,t2) amplitude
+reaching that particular final state, not in which states are summed; (b) a genuine numerical
+convergence issue in the Lanczos propagation (`hparam.td_m`) or timestep (`hparam.td_dt`) for this
+higher-energy-loss channel specifically; (c) still-unruled-out edge-of-window truncation, though the
+v2 test's delays were deliberately kept ≥3 probe-sigma from the boundary specifically to avoid this.
+
+**Checked: the `ab≈12.24` feature is NOT missing from our output** — it's present in `chan0` at every
+delay, at a comparable order of magnitude to the reference (e.g. at `delay=0`: ref=`9.61e-4`,
+mine=`1.166e-3`, only a **1.2× ratio** — dramatically closer than the `ab=-4.992` feature's 23× at
+the same delay). This reframes the diagnosis substantially: **it is not that we're missing a
+transition/pathway. It's that our `ab=-4.992, loss≈2` (dd-excitation) feature specifically is
+systematically too large by up to ~2 orders of magnitude, badly enough that it drowns out an
+`ab≈12.24` feature that our code otherwise gets roughly right.** In the reference, at delays where
+the dd-excitation feature is naturally weak (its own physical `T`-dependence, whatever drives that),
+the `ab≈12.24` feature becomes the visible global max simply because the (correctly-sized) dd feature
+dropped below it — an effect entirely masked in our output because our dd feature never drops enough
+to be overtaken.
+
+**Next step, not yet done:** since the `ab≈12.24` channel is roughly correct, the bug is most likely
+specific to whatever distinguishes the `ab=-4.992, loss≈2` pathway — e.g. a specific final valence
+eigenstate (or narrow group of them) within the `2Sz=-2` block that carries unusually large weight in
+`combined_traj`, or a resonance where `win≈ab=-4.992` sits close to a pole/near-degeneracy in the
+intermediate core-hole propagation that amplifies numerical error. Worth checking: (a) does the
+`ab=-4.992` incident energy sit unusually close to a core-hole eigenvalue (a near-resonant condition
+that could be numerically sensitive to `hparam.td_m`/`hparam.td_dt`); (b) does restricting
+`combined_traj`'s valence sum to progressively fewer eigenstates (instead of all `nval=55`) change the
+`ab=-4.992` magnitude disproportionately, which would point to specific problem eigenstates rather
+than a global scaling bug.
 
 ## What NOT to re-try (already explored exhaustively, dead ends for this specific question)
 
