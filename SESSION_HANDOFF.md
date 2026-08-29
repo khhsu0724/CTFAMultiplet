@@ -269,26 +269,82 @@ files (with different `tlabel` bases, since `tmom` differs by channel), so each 
 compared against its correct matching C++ channel individually, and only genuinely-matching
 channels summed.
 
-**Concrete next steps (v2 Fortran rerun in progress as of this writing, PID/log in
-`validation_modeB/fortran_toy_reference_v2/run.log`):**
-1. Once it completes, inspect the *new* set of `trSPEC_XY_*.dat` tlabel groups it writes (there
-   should now be up to 3 distinct 5-file groups, one per surviving `wsp`, each with its own
-   `100*count+10*tmom` offset — read off the actual `tmom` per group by checking which
-   count-bases appear, analogous to how `tmom=1` was reverse-engineered for the original 19-file
-   run) — see "How the delay/channel labels were reverse-engineered" note below for the method.
-2. Match each Fortran `wsp` group to its corresponding C++ `chan{0,1,2}` by comparing block
-   dimension (55/121/55) and, if that's ambiguous, by comparing which channel's peak location lines
-   up with which reference group's peak location.
-3. Redo the comparison **per-channel** (not summed) first — this is the real apples-to-apples test.
-   Only sum channels that Fortran actually confirms are separate, nonzero, matching contributions.
-4. If per-channel comparison still shows the same rise-then-fall shape mismatch even after removing
-   the summed-incomplete-reference confound, then (and only then) return to the edge-truncation
-   question the v2 test was originally designed to isolate (narrower probe within the same window,
-   already set up and ready to compare once step 1-3 are done).
-5. This also means the original `fortran_toy_reference/` 19-file dataset and every ratio/shape
-   number derived from it earlier in this document should be treated as **provisional and likely
-   revised** once the fixed 3-channel comparison is in hand — don't cite the old 13×-98× table or
-   the "peaks at T≈-1.88 vs T≈0..+1.88" shape claim as settled fact anymore.
+**This turned out to be a dead end in an informative way.** After fixing the crash, the fixed
+Fortran run (a 3rd, then 4th/5th debug-instrumented attempt, all in
+`validation_modeB/fortran_toy_reference_v2/`) revealed that `wsp` (final valence sector) only ever
+takes **one** value in the `do ppp=1,qstates` loop before the code moves to the next polarization
+pair — not because of a bug, but because of a real, hard `if(tspin.eq.0)` selection-rule gate:
+`tspin = sztot(ws) - sztot(wsp)`, and debug prints confirmed `tspin = 0, -2, -4` for `ppp = 1, 2, 3`
+respectively. Only `ppp=1` (Δ(valence Sz)=0) passes. **This is not a Fortran limitation — it is the
+reference correctly enforcing that the electric dipole operator does not touch spin, so a valence→
+core-hole→valence round trip must return the electron to a state of the same total Sz whenever the
+valence sector itself has no spin-orbit coupling mixing Sz** (confirmed: `dlso` is this system's
+*valence* SOC, printed as `Valence spin-orbit coupling: 0.00000000` — the `SO=11.5` in the INPUT is
+the *core* 2p SOC, only relevant to the core-hole state, not to whether valence Sz is a good quantum
+number).
+
+## ROOT CAUSE FOUND: Mode B incoherently sums exblk (core-hole block) channels that should be summed coherently
+
+The natural next question was: does the C++ side make the same mistake, treating `exblk_ind` as a
+loop over *final valence* sectors and failing to filter by Sz? **No** — checking
+`trRIXS_2time`'s own construction (`src/tr_photon.hpp`) shows `combined_traj` is built from
+`gsblk = GS.hblks[gs_blk_ind]` alone, the *same single ground-state block* for every value of
+`ex_blk_ind` in the `chan0/1/2` loop. So the C++ implementation already restricts the **final
+valence state** to the same Sz sector as the initial ground state, for all 3 channels — exactly
+matching Fortran's `ppp=1`-only conclusion. The bug is not there.
+
+The actual difference: `exblk_ind` in the C++ loop enumerates **intermediate core-hole blocks**
+(`EX.hblks`), and `chan0/1/2` correspond to 3 *different* core-hole symmetry blocks that are all
+individually dipole-connected to the same ground state. Checking their actual computed intensities
+confirms all three are genuinely nonzero and comparable in magnitude (at delay=0: chan0 max=7.8e-3,
+chan1 max=6.9e-3, chan2 max=6.1e-3) — not near-zero noise.
+
+The reference has no equivalent split at all: its entire core-hole manifold is **one undifferentiated
+132-dimensional space**, and its `csum` vertex sum (`do k=1,gdegen(ws); do l=...; do i=1,min(nevn,
+cstates(momgs)); csum=csum+dconjg(tfvert(wsp,l,i,t2))*tpivert(ws,k,i,t2,t1); end do...`) coherently
+sums the amplitude over **every** core-hole eigenstate `i` in that manifold into one complex number
+*before* `tkern(t1,t2)=csum` is stored — squaring (`|csum|²`) only happens once, much later, after
+the full `t1,t2` Fourier sum. Physically this must be right: core SOC (`SO[0]=11.5`, present in the
+core-hole Hamiltonian) genuinely mixes what would otherwise be separate Sz sub-blocks within the
+core-hole manifold — the manifold is not physically separable into independent channels, so summing
+per-block **intensities** (`|amplitude_block0|² + |amplitude_block1|² + |amplitude_block2|²`, what
+`main.cpp`'s `trRIXS2_chan{0,1,2}` dispatch currently does, with the 3 files meant to be summed
+*after* squaring — see `validation_modeB/compare_modeb_full.py`) is not the same thing as summing per-
+block **amplitudes and squaring once** (`|amplitude_block0 + amplitude_block1 + amplitude_block2|²`)
+whenever cross-block interference terms are nonzero. Because the blocks are literally different
+`EX.hblks` entries, their propagated states are also orthogonal at fixed time (no cross terms in an
+inner product against a valence deexcitation vector *at one instant*) — but the interference that
+matters here is between the SAME (t1,t2) pair's contributions from different blocks reaching the
+SAME final valence eigenstate via DIFFERENT intermediate paths, which is exactly what coherent
+amplitude summation captures and incoherent intensity summation destroys.
+
+**This is the same category of bug already found and fixed once this session on the valence side**
+(the `combined_traj` fix, coherently summing the de-excitation amplitude over all valence
+eigenstates before the K-row inner product) — it was simply never applied to the intermediate
+core-hole side. This is very likely the dominant remaining cause of both the magnitude and
+delay-shape discrepancies chased through this entire session; the toy validation window's edge-
+truncation questions (the original motivation for the whole v2 test) are almost certainly a much
+smaller secondary effect by comparison, and should only be revisited after this fix is in place and
+verified.
+
+**Concrete fix (not yet implemented as of this writing):** restructure `trRIXS_2time` (and its
+`main.cpp` TRRIXS2 dispatch caller) so that, for a fixed `(gs_blk_ind, gs_eig_ind)`, the `Krows`
+complex-amplitude array is accumulated **coherently across every matching `ex_blk_ind`** — i.e. call
+the K-row-building logic once per `exblk`, but add each `exblk`'s contribution into one shared
+`Krows` (or an equivalent combined array) *before* the final `intensity[d][...] = std::norm(csum)`
+step, rather than writing separate `trRIXS2_chan{N}_*.txt` files intended to be summed after the
+fact. `write_trRIXS_2time` should then be called once with the single combined result. This changes
+the loop structure in `main.cpp`'s TRRIXS2 dispatch block (currently `for (auto& exblk : EX.hblks) {
+trRIXS_2time(...) }`, one independent call per channel) to something that passes all matching
+`exblk`s into a single `trRIXS_2time` call, or accumulates their `Krows` externally before the final
+delay/frequency sum.
+
+**Once implemented:** rerun the v2 toy comparison (Fortran reference is already correct and
+available at `validation_modeB/fortran_toy_reference_v2/trSPEC_XY_1010.dat`...`1410.dat`, one clean
+channel, 5 delays; `TD_Cluster_Xray.f90` there has some now-unnecessary debug prints from this
+session's investigation that should be stripped or ignored before treating it as a clean reference
+going forward) against the corrected, single coherently-summed C++ output. If this fix closes the
+gap, the delay-shape mismatch was never really about probe-window truncation at all.
 
 ## What NOT to re-try (already explored exhaustively, dead ends for this specific question)
 
