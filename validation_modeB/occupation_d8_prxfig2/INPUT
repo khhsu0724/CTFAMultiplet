@@ -1,0 +1,56 @@
+# d8 (Ni, TM L-edge) time-dependent orbital occupation scan, matching PRX 15,011012 Fig. 2(c1)
+# exactly in Hamiltonian/pump parameters (cross-validated against the paper's own Fortran source
+# earlier this session -- see SESSION_HANDOFF.md's "already solidly validated" section) and in
+# time window (Delta t = -3 to 6 eV^-1, covering the same pre-pump/post-pump range shown in the
+# paper's own plot) and dt (2*pi/320, matching the full-scale Fortran reference's own timesteps=320
+# grid, already confirmed to match the reference to ~2-3% at t=0,6,10 eV^-1).
+&CONTROL
+	SO = 11.5 0
+	SC1 = 1.0 0 0.1
+	SC2 = 6.0 0 0.12857 0 0.025
+	SC2EX = 6.0 0 0.12857 0 0.025
+	FG = 6.0 6.18 4.635 2.63
+	CF = 0 0 1.0 1.0 1.0
+	tpd = 1.0
+	tpp = 0
+	tpdzr = 0.25
+	sigpi = 0.225
+	TPPPI = 0.25
+	MLCT = 10.900004
+	DIAG = 2
+	EFFDEL = False
+	EXNEV = 150
+	GSNEV = 150
+	OVERWRITE = True
+/
+&CELL
+	Coordination = "sqpl"
+	Sites = 1
+	Holes = 2
+/
+&PHOTON
+	XAS = false
+	RIXS = false
+	pvin = 1 0 0
+	pvout = 0 1 0
+	solver = 4
+	Edge = L
+	NEDOS = 16
+	AB = -25 25
+	INCIDENT = -6.906552397870166 21.813222178495966 16
+	EM = 6.5
+	EMLO = -1.5
+/
+&PUMP
+	TIMEDEP = True
+	TDOCCSCAN = True
+	PUMPFREQ = 3.14159265
+	PUMPAMPX = 5.0
+	PUMPAMPY = 0
+	PUMPSIGMA = 1.224745
+	PUMPT0 = 0
+	TDDT = 0.019634954084936207
+	TDM = 20
+	TDTMIN = -3.0
+	TDTMAX = 6.0
+/
