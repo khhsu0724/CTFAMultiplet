@@ -1,5 +1,28 @@
 # Next-Session Report: Two-Time-Correlator trRIXS/trXAS
 
+> ## UPDATE: the blocking issue described below has been RESOLVED.
+>
+> The recommended next step (derive `K(t1,t2)` from PRB 99, 104306 Eq. 9-18 from first principles
+> and compare that derivation against the code) was carried out and **found a real structural
+> formula error**: the sum over **final valence states** was being done **coherently** (amplitudes
+> added, then squared once) when Eq. (11) — and its own equilibrium limit, Eq. (15),
+> `I = sum_f |A_f|^2 delta(...)` — require it to be **incoherent** (each amplitude squared, then
+> added). Paper 1's Fortran reference makes the identical error, which is why no amount of
+> comparison against it could ever have isolated this.
+>
+> The coherent form is not an observable: it depends on the arbitrary phase the diagonalizer
+> assigns each eigenvector. Empirically, sign-flipping one valence eigenvector changes it by
+> 57-172%, and it is not even reproducible between runs of the same binary (80-97% variation),
+> whereas the corrected form is stable to ~1e-3.
+>
+> **Read [`THEORY_CROSSCHECK_PRB99.md`](THEORY_CROSSCHECK_PRB99.md) first** — it contains the
+> full term-by-term derivation, the fix, and the verification data. Everything below this banner
+> is the pre-fix state of knowledge, kept for context. In particular, the sections
+> "What's failing right now" and "Recommended next step" are **superseded**, and the earlier
+> "Misdiagnoses ruled out" entry on degenerate-final-state incoherent summing needs the
+> qualification in `THEORY_CROSSCHECK_PRB99.md` §3.2: that experiment was judged by agreement
+> with the Fortran reference, which shares the bug, so it was scored against the wrong yardstick.
+
 **Read this first.** This is a concise orientation document written for a fresh session (possibly
 using a different/higher-capability model) picking up this project. The full, chronological,
 blow-by-blow debugging log from the session that produced this report is

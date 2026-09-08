@@ -1,5 +1,6 @@
 #include "tdynamics.hpp"
 #include "photon.hpp"
+#include <cstdlib>
 #ifndef TR_PHOTON
 #define TR_PHOTON
 
@@ -379,7 +380,8 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 							const vecd& ab_grid, const vecd& loss_grid, const vecd& delays,
 							double probe_sigma, double tau_ch, double dt, int m,
 							double sim_window_mult = 4.0, double t2_max_window = -1,
-							std::string prefix = "trRIXS2") {
+							std::string prefix = "trRIXS2",
+							bool coherent_final_states = false) {
 	std::cout << std::endl << "=== Time-resolved RIXS (two-time correlator, Mode B) ===" << std::endl;
 
 	init_time_dependent_ham(GS, hparam_gs);
@@ -404,26 +406,54 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 	std::cout << "Building ground-state trajectory over [" << t_lo << "," << t_hi << "]..." << std::endl;
 	auto gs_traj = build_trajectory(GS, gs_blk_ind, psi0, t_lo, t_hi, dt, m, hparam_gs);
 
-	// De-excitation side: the reference's tkern coherently sums the de-excitation amplitude
-	// over EVERY valence eigenstate in this block (its "l" index, bounded by nev/binstates),
-	// each independently propagated from its own static eigenvector -- NOT just the one
-	// physical ground-state trajectory. Using only gs_traj here was the actual bug behind the
-	// spurious loss=0 peak (confirmed: excluding the equal-time term alone did not fix it).
-	// Since <a|b> is linear in its bra argument, sum_l <val_l(t2)|X> = <(sum_l val_l(t2))|X> --
-	// so rather than keeping nval separate trajectories and doing nval inner products per
-	// (t1,t2) pair (a large added cost inside the K-row double loop), each valence trajectory
-	// is accumulated into a single combined vector per timestep as it's built, then discarded;
-	// the K-row loop below does exactly the same single inner product per pair as before, just
-	// against combined_traj instead of gs_traj.
+	// De-excitation side. PRB 99, 104306 Eq. (11) contains, between the two de-excitation
+	// dipole operators, a propagator U(t2',t2) acting in the FINAL (core-hole-free) valence
+	// sector. Resolving it with a complete valence basis {|l>} taken at the reference time t_lo,
+	//     U(t2',t2) = sum_l U(t2',t_lo)|l><l|U(t2,t_lo)^dag ,
+	// factorizes the four-time correlator of Eq. (10) as
+	//     S(t1',t2',t2,t1) = sum_l conj(a_l(t1',t2')) a_l(t1,t2),
+	//     a_l(t1,t2) = <val_l(t2)| D_out U_core(t2,t1) D_in |psi_GS(t1)>,   |val_l(t)> = U(t,t_lo)|l>,
+	// so that the (t1,t2,t1',t2') quadruple integral collapses to a sum of moduli squared,
+	//     I = sum_l |A_l|^2,   A_l = sum_{t1<t2} (weights) a_l(t1,t2) e^{-i*win*t1 + i*wout*t2},
+	// i.e. INCOHERENT over the final valence state l, coherent only over (t1,t2). This is the
+	// nonequilibrium form of the paper's own equilibrium limit, their Eq. (15),
+	// I_eq = sum_f |A_f|^2 delta(w - E_f + E_i) -- a sum of squared amplitudes over final
+	// states, not the square of their sum.
+	//
+	// An earlier version of this function summed a_l over l into one scalar kernel and squared
+	// once (|sum_l A_l|^2), mirroring the paper-1 reference Fortran, whose own kernel loop
+	// ("do l=1,min(nev,binstates(wsp)) ... csum=csum+dconjg(tfvert(wsp,l,i,t2))*tpivert(...)",
+	// then a single dreal(csum4*dconjg(csum4)) after the frequency sum) does the same. That is
+	// not an observable: |sum_l <l|M>|^2 = |<u|M>|^2 with |u> = sum_l |l> is a projection onto a
+	// direction fixed entirely by the arbitrary sign/phase LAPACK happens to assign each
+	// eigenvector, whereas sum_l |<l|M>|^2 = <M|M> is basis independent. Set the
+	// TRRIXS2_FLIP_VAL environment variable to a valence index to exercise exactly that
+	// invariance (see below). Measured on the toy d8 validation case: flipping one valence
+	// eigenvector moves the coherent path's intensity by 57-172%, and the corrected path by
+	// <=0.4% -- the latter being this code's own run-to-run numerical noise (two identical runs
+	// differ by up to ~1e-4 here), not a real dependence.
 	size_t nval = gsblk.nev;
+	if (nval < N) std::cerr << "WARNING: trRIXS_2time needs a COMPLETE valence eigenbasis for the "
+							<< "final-state sum (sum_l |l><l| = 1); block dim " << N << " but only "
+							<< nval << " eigenvectors available -- raise GSNEV." << std::endl;
+	// Diagnostic only: flip the sign of one valence eigenvector. A correct cross section cannot
+	// depend on this; the coherent-final-state path visibly does.
+	int flip_val = -1;
+	if (const char* fv = std::getenv("TRRIXS2_FLIP_VAL")) {
+		flip_val = std::atoi(fv);
+		std::cout << "DIAGNOSTIC: sign-flipping valence eigenvector " << flip_val << std::endl;
+	}
+	// Vmat[is] holds every |val_l(t_is)> contiguously (component i of state l at [l*N+i]), so the
+	// K-row loop below can project one de-excited vector onto the whole final-state basis at once.
 	std::cout << "Building " << nval << " valence-eigenstate trajectories (de-excitation basis)..." << std::endl;
-	std::vector<vecc> combined_traj(n_is+1, vecc(N,0));
+	std::vector<vecc> Vmat(n_is+1, vecc(nval*N, dcomp(0,0)));
 	for (size_t l = 0; l < nval; ++l) {
 		vecc l0(N,0);
-		for (size_t i = 0; i < N; ++i) l0[i] = dcomp(gsblk.eigvec[l*N+i],0);
+		double sgn = ((int)l == flip_val) ? -1.0 : 1.0;
+		for (size_t i = 0; i < N; ++i) l0[i] = dcomp(sgn*gsblk.eigvec[l*N+i],0);
 		auto lt = build_trajectory(GS, gs_blk_ind, l0, t_lo, t_hi, dt, m, hparam_gs);
 		for (int is = 0; is <= n_is; ++is)
-			for (size_t i = 0; i < N; ++i) combined_traj[is][i] += lt[is][i];
+			for (size_t i = 0; i < N; ++i) Vmat[is][l*N+i] = lt[is][i];
 		if (l % 20 == 0) std::cout << "  valence trajectory " << l << "/" << nval << std::endl;
 	}
 
@@ -431,17 +461,18 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 	std::cout << "t2 window: " << W_steps << " steps ("
 				<< (t2_max_window > 0 ? t2_max_window : (t_hi-t_lo)) << " eV^-1)" << std::endl;
 
-	// K(t1,t2), causally ordered STRICTLY t2>t1 (matching the reference's own t2 loop, which
+	// a_l(t1,t2), causally ordered STRICTLY t2>t1 (matching the reference's own t2 loop, which
 	// starts at t1+1 and never includes the equal-time t2=t1 term -- that term carries no
 	// energy resolution at all and Fourier-transforms into a spurious peak at zero energy
 	// loss if included), tau_ch-window-truncated, and built ONCE, reused for every requested
-	// delay (the reference rebuilds this once per delay, redundantly). Krows[is1][k-1] holds
-	// K(t1, t1+k*dt) for k=1..kmax, coherently summed over BOTH the full valence final-state
-	// basis (combined_traj, above) AND every matching core-hole block in ex_blk_inds (below) --
-	// each exblk's contribution is ADDED into the same shared Krows entry before any |.|^2 is
-	// ever taken, matching the reference's own single undifferentiated core-hole manifold.
+	// delay (the reference rebuilds this once per delay, redundantly).
+	// Krows[is1][j*nval + l] holds a_l(t1, t1+(j+1)*dt): one amplitude per FINAL valence state l
+	// (kept separate, per Eq. (11) -- see the derivation above), summed coherently over every
+	// matching core-hole block in ex_blk_inds, since those are genuinely different intermediate
+	// pathways to the same final state and interfere.
 	std::vector<std::vector<dcomp>> Krows(n_is+1);
-	for (int is1 = 0; is1 <= n_is; ++is1) Krows[is1].assign(std::min(W_steps, n_is-is1), dcomp(0,0));
+	for (int is1 = 0; is1 <= n_is; ++is1)
+		Krows[is1].assign((size_t)std::min(W_steps, n_is-is1)*nval, dcomp(0,0));
 
 	for (size_t ex_blk_ind : ex_blk_inds) {
 		std::vector<blapIndex> blap_in, blap_out;
@@ -451,7 +482,7 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 
 		std::cout << "  accumulating core-hole block " << ex_blk_ind << "..." << std::endl;
 		for (int is1 = 0; is1 <= n_is; ++is1) {
-			int kmax = (int)Krows[is1].size();
+			int kmax = (int)(Krows[is1].size()/nval);
 			vecc xi = gen_dipole_state(GS, EX, pm, bindex(gs_blk_ind,ex_blk_ind), gs_traj[is1], blap_in, true);
 			if (ed::norm(xi) < TOL) continue;
 			double t = t_lo + is1*dt;
@@ -459,49 +490,119 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 				propagate_block_state(EX, ex_blk_ind, xi, t, dt, hparam_ex, m);
 				t += dt;
 				vecc deexc = gen_dipole_state(GS, EX, pm, bindex(gs_blk_ind,ex_blk_ind), xi, blap_out, false);
-				Krows[is1][k-1] += ed::inner_product(combined_traj[is1+k], deexc);
+				const vecc& V = Vmat[is1+k];
+				dcomp* dst = &Krows[is1][(size_t)(k-1)*nval];
+				for (size_t l = 0; l < nval; ++l) {
+					dcomp acc(0,0);
+					const dcomp* vl = &V[l*N];
+					for (size_t i = 0; i < N; ++i) acc += std::conj(vl[i]) * deexc[i];
+					dst[l] += acc;
+				}
 			}
 			if (is1 % 20 == 0) std::cout << "  K-row " << is1 << "/" << n_is << std::endl;
 		}
 	}
 
-	// DEBUG: dump K(t1=0, t2=k*dt) for k=1..5 to compare directly against the reference's own
-	// tkern(t1=0,t2=1..5) debug dump -- t1=0 sits at is1 = round((0-t_lo)/dt).
+	// DEBUG: dump sum_l a_l(t1=0, t2=k*dt) for k=1..5 -- the l-summed combination is what the
+	// reference stores as tkern(t1,t2), so this stays directly comparable to its own debug dump
+	// even though the l components are now kept separate for the (correct) incoherent final sum.
 	{
 		int is0 = (int)std::round((0.0-t_lo)/dt);
 		if (is0 >= 0 && is0 <= n_is) {
-			for (int k = 1; k <= 5 && k <= (int)Krows[is0].size(); ++k)
-				std::cout << "DEBUG Krows t1=0 t2=" << k << " val=" << Krows[is0][k-1] << std::endl;
+			for (int k = 1; k <= 5 && (size_t)k*nval <= Krows[is0].size(); ++k) {
+				dcomp tk(0,0);
+				for (size_t l = 0; l < nval; ++l) tk += Krows[is0][(size_t)(k-1)*nval+l];
+				std::cout << "DEBUG Krows t1=0 t2=" << k << " val=" << tk << std::endl;
+			}
 		}
 	}
 
 	size_t n_ab = ab_grid.size(), n_loss = loss_grid.size();
 	std::vector<vecd> intensity(delays.size(), vecd(n_loss*n_ab, 0));
 	double gnorm = 1.0/(probe_sigma*std::sqrt(2*PI));
+	if (coherent_final_states)
+		std::cout << "DIAGNOSTIC: summing final valence states COHERENTLY (reproduces the "
+					<< "reference Fortran's convention; not the Eq. (11) cross section)." << std::endl;
 
-	for (size_t d = 0; d < delays.size(); ++d) {
+	// The (t1,t2) sum factorizes: with t2 = t1 + (j+1)*dt, the phase is
+	//     e^{-i*win*t1 + i*wout*t2} = e^{+i*win*(j+1)*dt} * e^{-i*wloss*t2},
+	// so the win-dependent part depends only on the OFFSET j and the wloss-dependent part only
+	// on t2. That lets the whole (win, wloss) grid be filled from ONE pass over the (t1,t2)
+	// pairs per delay, instead of redoing the double sum for every (win, wloss).
+	//
+	// The loop is ordered t2-outer so that everything hot stays in cache: for a fixed t2, the
+	// partial sums Cblk[win][l] are only n_ab*nval complex (tens of kB) and the Krows row being
+	// read is nval complex, while the full accumulator A[win][wloss][l] is touched once per t2.
+	// An earlier, more obvious ordering (win-outer, re-reading all of Krows for every incident
+	// energy) is arithmetically identical but ran ~2 orders of magnitude slower at production
+	// size -- it streamed the multi-GB Krows array n_ab times and scattered its writes over it.
+	int kmax_all = 0;
+	for (int is1 = 0; is1 <= n_is; ++is1) kmax_all = std::max(kmax_all, (int)(Krows[is1].size()/nval));
+	vecd l12tab(kmax_all);
+	for (int j = 0; j < kmax_all; ++j) l12tab[j] = std::exp(-(j+1)*dt/tau_ch);
+	if (coherent_final_states)
+		std::cout << "DIAGNOSTIC: summing final valence states COHERENTLY (reproduces the "
+					<< "reference Fortran's convention; not the Eq. (11) cross section)." << std::endl;
+
+	#pragma omp parallel for schedule(dynamic)
+	for (int d = 0; d < (int)delays.size(); ++d) {
 		double T = delays[d];
-		for (size_t ix = 0; ix < n_ab; ++ix) {
-			double win = ab_grid[ix];
-			for (size_t iy = 0; iy < n_loss; ++iy) {
-				double wloss = loss_grid[iy];
-				double wout = win - wloss;
-				dcomp csum(0,0);
-				for (int is1 = 0; is1 <= n_is; ++is1) {
-					double t1 = t_lo + is1*dt;
-					double g1 = gnorm*std::exp(-(t1-T)*(t1-T)/(2*probe_sigma*probe_sigma));
-					if (g1 < 1e-10) continue;
-					// Krows[is1][j] holds K(t1, t1+(j+1)*dt) -- the equal-time (t2=t1) term is
-					// never present (see the K-building loop's comment above).
-					for (int j = 0; j < (int)Krows[is1].size(); ++j) {
-						double t2 = t1 + (j+1)*dt;
-						double g2 = gnorm*std::exp(-(t2-T)*(t2-T)/(2*probe_sigma*probe_sigma));
-						double l12 = std::exp(-(t2-t1)/tau_ch);
-						dcomp phase = std::exp(dcomp(0,-win*t1+wout*t2));
-						csum += g1*g2*l12*Krows[is1][j]*phase*(dt*dt);
-					}
+		vecd gtab(n_is+1);
+		for (int is = 0; is <= n_is; ++is) {
+			double tt = t_lo + is*dt - T;
+			gtab[is] = gnorm*std::exp(-tt*tt/(2*probe_sigma*probe_sigma));
+		}
+		// ph[ix][j] carries the incident phase, the core-hole decay and the dt^2 measure.
+		std::vector<dcomp> ph((size_t)n_ab*kmax_all);
+		for (size_t ix = 0; ix < n_ab; ++ix)
+			for (int j = 0; j < kmax_all; ++j)
+				ph[ix*kmax_all+j] = std::exp(dcomp(0,ab_grid[ix]*(j+1)*dt))*(l12tab[j]*dt*dt);
+		std::vector<dcomp> A((size_t)n_ab*n_loss*nval, dcomp(0,0));
+		std::vector<dcomp> Cblk((size_t)n_ab*nval);
+
+		for (int it2 = 1; it2 <= n_is; ++it2) {
+			double g2 = gtab[it2];
+			if (g2 < 1e-10) continue;
+			std::fill(Cblk.begin(), Cblk.end(), dcomp(0,0));
+			bool any = false;
+			for (int is1 = 0; is1 < it2; ++is1) {
+				int j = it2-1-is1;
+				if (j >= (int)(Krows[is1].size()/nval)) continue;
+				double g1 = gtab[is1];
+				if (g1 < 1e-10) continue;
+				double base = g1*g2;
+				const dcomp* src = &Krows[is1][(size_t)j*nval];
+				for (size_t ix = 0; ix < n_ab; ++ix) {
+					dcomp w = base*ph[ix*kmax_all+j];
+					dcomp* dst = &Cblk[ix*nval];
+					for (size_t l = 0; l < nval; ++l) dst[l] += w*src[l];
 				}
-				intensity[d][iy*n_ab+ix] = std::norm(csum);
+				any = true;
+			}
+			if (!any) continue;
+			double t2 = t_lo + it2*dt;
+			for (size_t iy = 0; iy < n_loss; ++iy) {
+				dcomp e = std::exp(dcomp(0,-loss_grid[iy]*t2));
+				for (size_t ix = 0; ix < n_ab; ++ix) {
+					dcomp* a = &A[(ix*n_loss+iy)*nval];
+					const dcomp* c = &Cblk[ix*nval];
+					for (size_t l = 0; l < nval; ++l) a[l] += e*c[l];
+				}
+			}
+		}
+		// Eq. (11)/(15): incoherent over the final valence state, coherent over (t1,t2).
+		for (size_t ix = 0; ix < n_ab; ++ix) {
+			for (size_t iy = 0; iy < n_loss; ++iy) {
+				const dcomp* a = &A[(ix*n_loss+iy)*nval];
+				double tot = 0;
+				if (coherent_final_states) {
+					dcomp csum(0,0);
+					for (size_t l = 0; l < nval; ++l) csum += a[l];
+					tot = std::norm(csum);
+				} else {
+					for (size_t l = 0; l < nval; ++l) tot += std::norm(a[l]);
+				}
+				intensity[d][iy*n_ab+ix] = tot;
 			}
 		}
 		std::cout << "  delay " << d+1 << "/" << delays.size() << " done" << std::endl;

@@ -620,3 +620,30 @@ and two-time-correlator RIXS") on `main`, including this handoff doc and everyth
 `validation_modeB/`. Any *new* changes made after reading this handoff (e.g. the growing-ratio
 fix) will show up as fresh working-tree modifications on top of that commit — check `git log`/
 `git status` to confirm you're starting from `287a7e3` before assuming anything is uncommitted.
+
+
+---
+
+# RESOLVED (next session): structural formula error in the final-state sum
+
+See [`THEORY_CROSSCHECK_PRB99.md`](THEORY_CROSSCHECK_PRB99.md) for the full derivation and data.
+Summary of what changed relative to everything above:
+
+- PRB 99, 104306 Eq. (11), with its middle propagator `U(t2',t2)` resolved over a complete valence
+  basis, factorizes into `I = sum_l |A_l|^2` — **incoherent over the final valence state `l`**,
+  coherent only over `(t1,t2)`. Their own equilibrium limit Eq. (15) says the same thing.
+- Both this code's `trRIXS_2time` and paper 1's `TD_Cluster_Xray.f90` were computing
+  `|sum_l A_l|^2` instead. That quantity is basis-dependent and therefore not an observable.
+- Consequence for this document: **every code-vs-code comparison recorded above was scored against
+  a quantity that is not reproducible even against itself.** The "0.7x-575x, delay-dependent"
+  ratio table, the "2.8-4.8x magnitude / irregular phase" raw-kernel comparison, and the
+  conclusion that "breaking coherence makes the already-good `ab~12.24` feature worse" are all
+  artifacts of that. The `ab~12.24` feature appearing to agree at 1.2x was coincidence.
+- The "TESTED AND REJECTED: degenerate-final-state incoherent summing" section above was on the
+  right track theoretically. It was rejected because it worsened agreement with the Fortran —
+  the wrong criterion. Note also that neither variant tried there was the correct one: the
+  incoherent sum must be taken over the **fully (t1,t2)-integrated** amplitudes `A_l`, not over
+  the per-`(t1,t2)` kernel values.
+- Two items from the "where to look next" list are now closed: no `E_gs`-referencing term is
+  missing (the phases already put the incident axis on `E_ch - E_gs` and loss on `E_l - E_gs`,
+  matching the equilibrium solver), and no per-delay normalization is missing.

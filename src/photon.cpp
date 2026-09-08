@@ -1,4 +1,5 @@
 #include <complex>
+#include <cstdlib>
 #include <bitset>
 #include "multiplet.hpp"
 #include "photon.hpp"
@@ -591,6 +592,14 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 			Z += exp(-beta*GS.hblks[i].eig[j]);
 		}
 	}} 
+
+	// Diagnostic only: restrict the initial-state sum to a single (degenerate) ground state, so
+	// an equilibrium spectrum can be compared like-for-like against one Mode B channel.
+	if (const char* gsx = std::getenv("RIXS_GS_INDEX")) {
+		size_t k = (size_t)std::atoi(gsx);
+		if (k < gsi.size()) { gsi = vector<bindex>{gsi[k]}; Z = 1; }
+		cout << "DIAGNOSTIC: restricting RIXS to ground state index " << k << endl;
+	}
 
 	cout << "Calculating cross section..." << endl;
 	auto start = chrono::high_resolution_clock::now();

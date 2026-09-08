@@ -755,8 +755,18 @@ int main(int argc, char** argv){
 				// exactly, since tau_ch=4*pi/3 dominates max(1.0,4.1888) and pi/(4*pi/3)=0.75.
 				trRIXS_2time(GS,EX,hparam_gs,hparam_ex,pm,g.first,g.second,ex_blk_inds,
 								pm.inc_e_points, loss_grid2, trp.delay_points, trp.probe_sigma,
-								hparam.tau_ch, hparam.td_dt, hparam.td_m, 0.75, -1,
-								"trRIXS2_chan"+std::to_string(chan));
+								hparam.tau_ch, hparam.td_dt, hparam.td_m,
+								// sim_window_mult: 0.75 reproduces the toy Fortran reference's own
+								// bounded (nb=nt=1) window. TRRIXS2_WINDOW_MULT overrides it for
+								// runs (e.g. the equilibrium-limit check) that need a wider window.
+								std::getenv("TRRIXS2_WINDOW_MULT") ? std::atof(std::getenv("TRRIXS2_WINDOW_MULT")) : 0.75,
+								-1,
+								"trRIXS2_chan"+std::to_string(chan),
+								// Diagnostic-only: TRRIXS2_COHERENT_FINAL reproduces the paper-1
+								// reference Fortran's coherent sum over final valence states, which
+								// is NOT the Eq. (11) cross section (see trRIXS_2time's own comment).
+								// Set it only to diff against that reference; leave it unset for physics.
+								std::getenv("TRRIXS2_COHERENT_FINAL") != nullptr);
 				chan++;
 			}
 		}
