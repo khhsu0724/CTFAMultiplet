@@ -229,7 +229,16 @@ void calc_CV(Hilbert& hilbs, const double* FG, Hilbert::HTarget target) {
 				qnr[0] = {vmr,s.first,vi}, qnr[1] = {cmr,s.second,ci};
 				entries = hilbs.match(2,qnl,qnr);
 				double meG = calc_U(gaunt(vl,vmr,cl,cml),gaunt(vl,vml,cl,cmr),Gk,cl+vl+1);
-				if (s.first == s.second) meG *= -1; // This is due to the ordering convention of the fermions in this code
+				// Core-valence EXCHANGE sign. Cowan eq. 12.6 gives the exchange coefficient as
+				// g_k = -(-1)^S <l||C^k||l'>^2 {6j}, i.e. the parallel-spin (triplet) combination
+				// is pulled DOWN -- Hund's rule. Getting this sign backwards leaves every term
+				// energy numerically correct but interchanges the singlet and triplet of each L,
+				// which is exactly what the atomic-limit test showed (2p^5 3d^9 with no CF, no
+				// hybridization and no core SOC gave 1F at 4.1138 and 3F at 7.8862, the exact
+				// analytic values but swapped). EXCH_SIGN_LEGACY=1 restores the old sign.
+				static const bool exch_legacy = (std::getenv("EXCH_SIGN_LEGACY") != nullptr);
+				if (exch_legacy) { if (s.first == s.second) meG *= -1; }
+				else             { if (s.first != s.second) meG *= -1; }
 				for (auto& e : entries)
 					hilbs.fill_hblk(meG*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second,target);
 			}

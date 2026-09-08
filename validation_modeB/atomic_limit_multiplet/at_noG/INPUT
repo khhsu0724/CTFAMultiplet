@@ -1,0 +1,44 @@
+# PRX 15,011012 Fig.7/8 reproduction -- 3d8 Ni TM-L3-edge anti-Stokes feature.
+# Hamiltonian/pump identical to the reference Fortran run behind Fig.7/8
+# (Ni-L-RIXS/new_shape_function): dlso=0, e3=e4=e5=1.0, f2=0.12857, f4=0.025,
+# cf2/3/4 = 6.18/4.635/2.63, vppp=0.25, tpd=sqrt(3)*vpds/2=1.0, tpdz=tpd/4, vpdp=0.225,
+# pump A0=10 sin(pi t) exp(-t^2/3)  ->  PUMPAMPX=5.0 here (the reference's Peierls argument
+# is (k+A)/2, this code's is k/2+A, hence the factor 2), PUMPSIGMA=sqrt(1.5).
+# Probe TRPROBESIGMA=5.093 = 1/gauss with gauss=160*pi/(320*8); TAUCH=2*pi/1.5.
+# Incident window = the pre-edge sideband below the TM L3 edge (the dashed box of Fig.7(d)).
+# Loss axis matches the reference grid step (0.0625 eV) over Fig.8's plotted range.
+&CONTROL
+	SO = 0 0
+	SC1 = 1.0 0 0.1
+	SC2 = 6.0 0 0.12857 0 0.025
+	SC2EX = 6.0 0 0.12857 0 0.025
+	FG = 6.0 6.18 0 0
+	CF = 0 0 0 0 0
+	tpd = 0
+	tpp = 0
+	tpdzr = 0
+	sigpi = 0
+	TPPPI = 0
+	MLCT = 0
+	DIAG = 2
+	EFFDEL = False
+	EXNEV = 150
+	GSNEV = 150
+	OVERWRITE = True
+/
+&CELL
+	Coordination = "sqpl"
+	Sites = 1
+	Holes = 2
+/
+&PHOTON
+	XAS = true
+	RIXS = false
+	pvin = 1 0 0
+	pvout = 1 0 0
+	solver = 4
+	Edge = L
+	NEDOS = 2000
+	AB = -20 30
+	EPSAB = 0.238732414637843
+/
