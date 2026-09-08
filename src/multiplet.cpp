@@ -203,13 +203,32 @@ void calc_CV(Hilbert& hilbs, const double* FG, Hilbert::HTarget target) {
 				struct QN qnl[2] = {{vml,s.first,vi},{cml,s.second,ci}};
 				struct QN qnr[2] = {{vmr,s.first,vi},{cmr,s.second,ci}};
 				vpulli entries = hilbs.match(2,qnl,qnr);
-				double meF = calc_U(gaunt(vl,vml,vl,vmr),gaunt(cl,cmr,cl,cml),FG,2*cl+1);
+				// FG holds {F^0, F^2, G^1, G^3} in input order, but calc_U indexes its Slater
+				// array by the MULTIPOLE ORDER k (it contracts SC[k] against the k-th Gaunt
+				// coefficients). Those four integrals belong at k = 0, 2, 1, 3 respectively, so
+				// passing FG straight in put F^2 at k=1 and G^1 at k=2 -- i.e. the Coulomb
+				// channel picked up G^1 where it needed F^2 and the exchange channel picked up
+				// F^2 where it needed G^1. (The k=1 Coulomb / k=0,2 exchange slots are killed by
+				// the Gaunt parity rules, which is why this survived: for l_v=2, l_c=1 the
+				// Coulomb product is nonzero only for even k and the exchange only for odd k.)
+				// Placing them on their own k channels fixes it. For the K edge (cl=0) the code
+				// requires FG[2]=FG[3]=0, so Gk is all zeros there and nothing changes.
+				double Fk[3] = {FG[0], 0.0, FG[1]};        // k = 0, 1, 2
+				double Gk[4] = {0.0, FG[2], 0.0, FG[3]};   // k = 0, 1, 2, 3
+				// FG_KMAP_LEGACY=1 restores the pre-fix (incorrect) mapping, purely so the
+				// before/after effect of this fix can be measured without rebuilding.
+				static const bool kmap_legacy = (std::getenv("FG_KMAP_LEGACY") != nullptr);
+				if (kmap_legacy) {
+					Fk[0]=FG[0]; Fk[1]=FG[1]; Fk[2]=FG[2];
+					Gk[0]=FG[0]; Gk[1]=FG[1]; Gk[2]=FG[2]; Gk[3]=FG[3];
+				}
+				double meF = calc_U(gaunt(vl,vml,vl,vmr),gaunt(cl,cmr,cl,cml),Fk,2*cl+1);
 				for (auto& e : entries)
 					hilbs.fill_hblk(meF*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second,target);
 				qnl[1] = {vml,s.second,vi}, qnl[0] = {cml,s.first,ci};
 				qnr[0] = {vmr,s.first,vi}, qnr[1] = {cmr,s.second,ci};
 				entries = hilbs.match(2,qnl,qnr);
-				double meG = calc_U(gaunt(vl,vmr,cl,cml),gaunt(vl,vml,cl,cmr),FG,cl+vl+1);
+				double meG = calc_U(gaunt(vl,vmr,cl,cml),gaunt(vl,vml,cl,cmr),Gk,cl+vl+1);
 				if (s.first == s.second) meG *= -1; // This is due to the ordering convention of the fermions in this code
 				for (auto& e : entries)
 					hilbs.fill_hblk(meG*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second,target);
@@ -227,6 +246,18 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam, bool nohyb, double t, Hilber
 	int nco = hilbs.cluster->co_persite * hilbs.tot_site_num();
 	// HYBRIDIZATION is momentum dependent, need to rewrite code here
 	vecd hybmat = ed::make_blk_mat(hilbs.cluster->get_tmat_real(t),hilbs.tot_site_num());
+	// Diagnostic: the paper-1 reference Fortran builds the core-hole sector's hopping with the
+	// OPPOSITE overall sign to the valence sector (its line ~1552 vs ~761: +2*tmatx/tmaty/tmato
+	// against -2*tmatx/tmaty/tmato, otherwise byte-identical code). Flipping all three together
+	// is a p -> -p gauge transformation only if the p-p term (tmato, the tpp channel) vanishes;
+	// with tpp_pi = 0.25 it does not, so the two conventions are genuinely different core-hole
+	// Hamiltonians. EX_HOP_SIGN=-1 reproduces the reference's convention for the core-hole
+	// (is_ex) space so the two can be compared.
+	if (hilbs.is_ex) {
+		if (const char* sg = std::getenv("EX_HOP_SIGN")) {
+			if (std::atof(sg) < 0) for (auto& v : hybmat) v = -v;
+		}
+	}
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
 	// Loop through hyb matrix, TODO: Loop through each site
 	for (int i = 0; i < nvo; ++i) {

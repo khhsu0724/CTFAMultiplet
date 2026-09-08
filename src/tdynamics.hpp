@@ -214,7 +214,12 @@ inline void scan_td_occupation(Hilbert& hilbs, const HParam& hparam, double t_mi
 	std::ofstream fout(fname);
 	fout << std::setw(12) << "t";
 	for (auto& nm : names) fout << std::setw(12) << nm;
-	fout << std::endl;
+	// Energy absorbed from the pump. E_inst uses H(t) (pump-modulated hybridization at t);
+	// E_stat uses the A=0 Hamiltonian, so after the pulse E_stat is conserved and its rise
+	// above the static ground-state energy IS the energy deposited. That deposited energy is
+	// what shifts the absorption resonance: the t1-side resonance sits at w_in = E_ch - E_n,
+	// so a pumped state sitting dE higher red-shifts the whole incident-energy axis by dE.
+	fout << std::setw(14) << "E_inst" << std::setw(14) << "E_stat" << std::endl;
 	std::cout << std::setw(10) << "t";
 	for (auto& nm : names) std::cout << std::setw(10) << nm;
 	std::cout << std::endl;
@@ -227,7 +232,20 @@ inline void scan_td_occupation(Hilbert& hilbs, const HParam& hparam, double t_mi
 			vecd occ = occupation_raw(hilbs, gs_blk, psi);
 			fout << std::setw(12) << t;
 			for (int c = 0; c < nvo; ++c) fout << std::setw(12) << occ[c];
-			fout << std::endl;
+			// <psi|H(t_snap)|psi>; snapshot_ham_hyb/instantaneous_energy live in tr_photon.hpp
+			// (which includes this file), so the same clear+refill+mvmult is inlined here.
+			auto energy_at = [&](double t_snap) {
+				for (auto& blk : hilbs.hblks) clear_ham_hyb(blk);
+				if (hilbs.HYB_on)
+					calc_HYB(hilbs, hparam, /*nohyb=*/false, t_snap, Hilbert::HTarget::HAM_HYB);
+				CombinedHam<double> Ht(hilbs.hblks[gs_blk].ham_static, hilbs.hblks[gs_blk].ham_hyb);
+				vecc Hpsi(psi.size(),0);
+				Ht.mvmult_cmplx(psi, Hpsi);
+				return ed::inner_product(psi,Hpsi).real();
+			};
+			double e_inst = energy_at(t);
+			double e_stat = energy_at(hparam.pump_t0 + 1.0e4*std::max(hparam.pump_sigma,1.0));
+			fout << std::setw(14) << e_inst << std::setw(14) << e_stat << std::endl;
 			if (s % (print_every*5) == 0 || s == nsteps) {
 				std::cout << std::setw(10) << t;
 				for (int c = 0; c < nvo; ++c) std::cout << std::setw(10) << occ[c];
