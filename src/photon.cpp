@@ -655,18 +655,33 @@ void RIXS(Hilbert& GS, Hilbert& EX, const PM& pm) {
 					}
 					vecc midvec = BiCGS(exblk.ham,dipole_vec,z,pm.CG_tol,guess_vec);
 					if (pm.precond != 0) std::copy(midvec.begin(), midvec.end(), solved_vec.begin()+exblk.f_ind);
-					// De-excitation
-					midvec = gen_dipole_state(GS,EX,pm,bindex(g.first,exblk_ind),midvec,blap_out,false);
-					if (ed::norm(midvec) < TOL) continue; // exit loop if no overlap
-					// NITERCFE is honored as-is (Lanczos() itself caps it at the block
-					// dimension). A Lanczos step is one mat-vec, so there is no real
-					// cost reason to shrink this on small/medium blocks -- doing so
-					// under-converges the continued fraction relative to a tight
-					// EPSLOSS and produces spurious wiggly structure in the spectrum.
+					// De-excitation. The final state need NOT live in the same ground-sector
+					// symmetry block as the initial state: the core hole carries spin, and
+					// core spin-orbit coupling mixes it while the intermediate state
+					// propagates, so absorbing an up hole and emitting a down one changes
+					// Sz by 1. That is the spin-flip (magnon) RIXS channel. De-exciting only
+					// back into g.first would silently drop it, so loop over every ground
+					// block and accumulate. Blocks with no dipole overlap cost one norm.
 					int niter_CFE_in = pm.niterCFE;
-					cout << "Number of Lanczos Iteration: " << niter_CFE_in << endl;
-					ContFracExpan(GS.hblks[g.first].ham,midvec,gs_en,rixs_em_local,rixs_peaks_local,
-									pm.eps_loss,niter_CFE_in);
+					for (size_t gout = 0; gout < GS.hblks.size(); ++gout) {
+						vector<blapIndex> const* bo;
+						vector<blapIndex> blap_o;
+						if (gout == g.first) bo = &blap_out;
+						else {
+							basis_overlap(GS,EX,bindex(gout,exblk_ind),blap_o,pm,true);
+							bo = &blap_o;
+						}
+						if (bo->empty()) continue;
+						vecc fvec = gen_dipole_state(GS,EX,pm,bindex(gout,exblk_ind),midvec,*bo,false);
+						if (ed::norm(fvec) < TOL) continue; // no overlap with this block
+						// NITERCFE is honored as-is (Lanczos() itself caps it at the block
+						// dimension). A Lanczos step is one mat-vec, so there is no real
+						// cost reason to shrink this on small/medium blocks -- doing so
+						// under-converges the continued fraction relative to a tight
+						// EPSLOSS and produces spurious wiggly structure in the spectrum.
+						ContFracExpan(GS.hblks[gout].ham,fvec,gs_en,rixs_em_local,rixs_peaks_local,
+										pm.eps_loss,niter_CFE_in);
+					}
 				}
 			}
 			bool write_init = (ab_en == pm.inc_e_points[0]);

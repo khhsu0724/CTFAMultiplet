@@ -280,10 +280,25 @@ inline void trRIXS(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, const HPar
 					double ab_en = pm.inc_e_points[ix];
 					dcomp z(E_gs_t1+ab_en, -Gamma_ch);
 					vecc midvec = BiCGS(&Ht_EX, dipole_vec, z, pm.CG_tol);
-					midvec = gen_dipole_state(GS, EX, pm, bindex(g.first,exblk_ind), midvec, blap_out, false);
-					if (ed::norm(midvec) < TOL) continue;
+					// De-excite into EVERY ground-sector block, not just g.first: core
+					// spin-orbit coupling mixes the core-hole spin while the intermediate
+					// state propagates, so Sz can change by 1 between absorption and
+					// emission. That spin-flip channel carries a large fraction of the
+					// L-edge intensity and lives in a different symmetry block.
 					vecd col(nedos,0);
-					ContFracExpan(GS.hblks[g.first].ham, midvec, E_gs_t1, rixs_em, col, pm.eps_loss, pm.niterCFE);
+					for (size_t gout = 0; gout < GS.hblks.size(); ++gout) {
+						std::vector<blapIndex> const* bo;
+						std::vector<blapIndex> blap_o;
+						if (gout == g.first) bo = &blap_out;
+						else {
+							basis_overlap(GS, EX, bindex(gout,exblk_ind), blap_o, pm, true);
+							bo = &blap_o;
+						}
+						if (bo->empty()) continue;
+						vecc fvec = gen_dipole_state(GS, EX, pm, bindex(gout,exblk_ind), midvec, *bo, false);
+						if (ed::norm(fvec) < TOL) continue;
+						ContFracExpan(GS.hblks[gout].ham, fvec, E_gs_t1, rixs_em, col, pm.eps_loss, pm.niterCFE);
+					}
 					for (int iy = 0; iy < nedos; ++iy) shape[iy*n_ab+ix] = col[iy];
 				}
 
@@ -432,10 +447,25 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 	// eigenvector moves the coherent path's intensity by 57-172%, and the corrected path by
 	// <=0.4% -- the latter being this code's own run-to-run numerical noise (two identical runs
 	// differ by up to ~1e-4 here), not a real dependence.
-	size_t nval = gsblk.nev;
-	if (nval < N) std::cerr << "WARNING: trRIXS_2time needs a COMPLETE valence eigenbasis for the "
-							<< "final-state sum (sum_l |l><l| = 1); block dim " << N << " but only "
-							<< nval << " eigenvectors available -- raise GSNEV." << std::endl;
+	// The final-state basis {|l>} must span EVERY ground-sector block, not just gs_blk_ind.
+	// The core hole carries spin, and core spin-orbit coupling mixes it while the intermediate
+	// state propagates, so Sz can change by 1 between absorption and emission -- the spin-flip
+	// (magnon) channel, whose final states live in a different symmetry block. Measured against
+	// Quanty 0.81 on the equilibrium limit of this same cluster, restricting the final-state sum
+	// to gs_blk_ind loses 43% (X in / Y out) to 54% (X in / X out) of the total cross section.
+	// With core SOC off this costs nothing: basis_overlap then finds no dipole overlap between
+	// a core-hole block and any other ground block, and the extra blocks are skipped.
+	size_t n_gb = GS.hblks.size();
+	std::vector<size_t> gb_off(n_gb+1, 0);
+	for (size_t gb = 0; gb < n_gb; ++gb) {
+		if (GS.hblks[gb].nev < GS.hblks[gb].size)
+			std::cerr << "WARNING: trRIXS_2time needs a COMPLETE valence eigenbasis for the "
+						<< "final-state sum (sum_l |l><l| = 1); ground block " << gb << " has dim "
+						<< GS.hblks[gb].size << " but only " << GS.hblks[gb].nev
+						<< " eigenvectors available -- raise GSNEV." << std::endl;
+		gb_off[gb+1] = gb_off[gb] + GS.hblks[gb].nev;
+	}
+	size_t nval = gb_off[n_gb];
 	// Diagnostic only: flip the sign of one valence eigenvector. A correct cross section cannot
 	// depend on this; the coherent-final-state path visibly does.
 	int flip_val = -1;
@@ -445,16 +475,26 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 	}
 	// Vmat[is] holds every |val_l(t_is)> contiguously (component i of state l at [l*N+i]), so the
 	// K-row loop below can project one de-excited vector onto the whole final-state basis at once.
-	std::cout << "Building " << nval << " valence-eigenstate trajectories (de-excitation basis)..." << std::endl;
-	std::vector<vecc> Vmat(n_is+1, vecc(nval*N, dcomp(0,0)));
-	for (size_t l = 0; l < nval; ++l) {
-		vecc l0(N,0);
-		double sgn = ((int)l == flip_val) ? -1.0 : 1.0;
-		for (size_t i = 0; i < N; ++i) l0[i] = dcomp(sgn*gsblk.eigvec[l*N+i],0);
-		auto lt = build_trajectory(GS, gs_blk_ind, l0, t_lo, t_hi, dt, m, hparam_gs);
-		for (int is = 0; is <= n_is; ++is)
-			for (size_t i = 0; i < N; ++i) Vmat[is][l*N+i] = lt[is][i];
-		if (l % 20 == 0) std::cout << "  valence trajectory " << l << "/" << nval << std::endl;
+	std::cout << "Building " << nval << " valence-eigenstate trajectories (de-excitation basis, "
+				<< n_gb << " ground block(s))..." << std::endl;
+	// Vmat[gb][is] holds every |val_l(t_is)> of block gb contiguously (component i of that
+	// block's state l at [l*N_gb+i]), so the K-row loop can project one de-excited vector onto a
+	// whole block's final-state basis at once. flip_val indexes the GLOBAL final state.
+	std::vector<std::vector<vecc>> Vmat(n_gb);
+	for (size_t gb = 0; gb < n_gb; ++gb) {
+		Block<double>& blk = GS.hblks[gb];
+		size_t Ngb = blk.size, nvgb = blk.nev;
+		Vmat[gb].assign(n_is+1, vecc(nvgb*Ngb, dcomp(0,0)));
+		for (size_t l = 0; l < nvgb; ++l) {
+			vecc l0(Ngb,0);
+			double sgn = ((int)(gb_off[gb]+l) == flip_val) ? -1.0 : 1.0;
+			for (size_t i = 0; i < Ngb; ++i) l0[i] = dcomp(sgn*blk.eigvec[l*Ngb+i],0);
+			auto lt = build_trajectory(GS, gb, l0, t_lo, t_hi, dt, m, hparam_gs);
+			for (int is = 0; is <= n_is; ++is)
+				for (size_t i = 0; i < Ngb; ++i) Vmat[gb][is][l*Ngb+i] = lt[is][i];
+			if ((gb_off[gb]+l) % 20 == 0)
+				std::cout << "  valence trajectory " << gb_off[gb]+l << "/" << nval << std::endl;
+		}
 	}
 
 	int W_steps = (t2_max_window > 0) ? (int)std::round(t2_max_window/dt) : n_is;
@@ -475,10 +515,12 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 		Krows[is1].assign((size_t)std::min(W_steps, n_is-is1)*nval, dcomp(0,0));
 
 	for (size_t ex_blk_ind : ex_blk_inds) {
-		std::vector<blapIndex> blap_in, blap_out;
+		std::vector<blapIndex> blap_in;
 		basis_overlap(GS, EX, bindex(gs_blk_ind,ex_blk_ind), blap_in, pm);
-		if (pm.pvin != pm.pvout) basis_overlap(GS, EX, bindex(gs_blk_ind,ex_blk_ind), blap_out, pm, true);
-		else blap_out = blap_in;
+		// One outgoing overlap per target ground block (see the final-state note above).
+		std::vector<std::vector<blapIndex>> blap_out_gb(n_gb);
+		for (size_t gb = 0; gb < n_gb; ++gb)
+			basis_overlap(GS, EX, bindex(gb,ex_blk_ind), blap_out_gb[gb], pm, true);
 
 		std::cout << "  accumulating core-hole block " << ex_blk_ind << "..." << std::endl;
 		for (int is1 = 0; is1 <= n_is; ++is1) {
@@ -489,14 +531,19 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 			for (int k = 1; k <= kmax; ++k) {
 				propagate_block_state(EX, ex_blk_ind, xi, t, dt, hparam_ex, m);
 				t += dt;
-				vecc deexc = gen_dipole_state(GS, EX, pm, bindex(gs_blk_ind,ex_blk_ind), xi, blap_out, false);
-				const vecc& V = Vmat[is1+k];
-				dcomp* dst = &Krows[is1][(size_t)(k-1)*nval];
-				for (size_t l = 0; l < nval; ++l) {
-					dcomp acc(0,0);
-					const dcomp* vl = &V[l*N];
-					for (size_t i = 0; i < N; ++i) acc += std::conj(vl[i]) * deexc[i];
-					dst[l] += acc;
+				for (size_t gb = 0; gb < n_gb; ++gb) {
+					if (blap_out_gb[gb].empty()) continue;
+					vecc deexc = gen_dipole_state(GS, EX, pm, bindex(gb,ex_blk_ind), xi,
+													blap_out_gb[gb], false);
+					size_t Ngb = GS.hblks[gb].size, nvgb = GS.hblks[gb].nev;
+					const vecc& V = Vmat[gb][is1+k];
+					dcomp* dst = &Krows[is1][(size_t)(k-1)*nval + gb_off[gb]];
+					for (size_t l = 0; l < nvgb; ++l) {
+						dcomp acc(0,0);
+						const dcomp* vl = &V[l*Ngb];
+						for (size_t i = 0; i < Ngb; ++i) acc += std::conj(vl[i]) * deexc[i];
+						dst[l] += acc;
+					}
 				}
 			}
 			if (is1 % 20 == 0) std::cout << "  K-row " << is1 << "/" << n_is << std::endl;
