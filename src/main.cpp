@@ -590,7 +590,12 @@ int main(int argc, char** argv){
 		cout << "Hybridization turned on: "; 
 		cout << "tpd = " << hparam.tpd; 
 		cout << ", tpp = " << hparam.tpp; 
-		if (GS.coord == "oct") cout << ", z distortion = " << hparam.octJT << endl; 
+		if (GS.coord == "oct") cout << ", z distortion = " << hparam.octJT << endl;
+		if (GS.coord == "oct" && std::abs(hparam.octJT - 1.0) > 1e-12)
+			std::cerr << "WARNING: OCTJT = " << hparam.octJT << " is parsed and printed but NOT "
+						<< "APPLIED -- Octahedral::get_tmat pins its distance factor to 1, so the "
+						<< "tpd/tpp distance modulation is inert and this run is identical to "
+						<< "OCTJT = 1." << std::endl;
 		if (GS.coord != "ion") {
 			cout << ", sigma pi bond ratio = " << hparam.sig_pi; 
 			// if (hparam.tppsigma_on) cout << ", tppsigma on (only tppzpi!!!)" << endl; 

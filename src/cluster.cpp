@@ -296,8 +296,19 @@ vecc Octahedral::get_tmat(double t) {
 	// relative oxygen positions, Peierls-shifted by the pump field (zero if no pump)
 	double kx = PI/2 + pump_shift(t,0), ky = PI/2 + pump_shift(t,1), kz = PI/2 + pump_shift(t,2);
 	double sx = 2*sin(kx), sy = 2*sin(ky), sz = 2*sin(kz);
-	double cx = 2*cos(kx), cy = 2*cos(ky), cz = 2*sin(kz);
-	// double d = octJT;
+	// cz was written as 2*sin(kz) while cx and cy use cos. That is a typo, and it is invisible
+	// at equilibrium -- every c-product below contains cx or cy, and both are 2*cos(pi/2) = 0
+	// there, which is why the NiO equilibrium reference reproduces bit-identically either way.
+	// Under a pump it is NOT invisible: with A = (1,0,0) the sin form gives cx*cz = -3.37 where
+	// the correct value is 0, i.e. spurious ligand-ligand hopping. It also breaks the cubic
+	// symmetry of the octahedron -- an x-polarized pump would modulate the p-p terms while an
+	// equivalent z-polarized pump would not.
+	double cx = 2*cos(kx), cy = 2*cos(ky), cz = 2*cos(kz);
+	// NOTE: octJT (input OCTJT, printed as "z distortion") is parsed, stored and printed but is
+	// NOT applied here -- d is pinned to 1 and the intended tpd/tpp distance modulation
+	// (pow(d,-4), pow(d,-3) below) is therefore inert. Setting OCTJT currently changes nothing
+	// in the Hamiltonian; calc_ham warns if it is set to anything but 1 so that it cannot pass
+	// silently. Wiring it up needs the intended geometry convention, which is not recorded.
 	double d = 1;
 	// Printed once, as in SquarePlanar::get_tmat: called at every propagation time step.
 	static bool printed_oct = false;
