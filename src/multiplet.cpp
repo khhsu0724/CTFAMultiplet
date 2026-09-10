@@ -218,30 +218,17 @@ void calc_CV(Hilbert& hilbs, const double* FG, Hilbert::HTarget target) {
 				qnr[0] = {vmr,s.first,vi}, qnr[1] = {cmr,s.second,ci};
 				entries = hilbs.match(2,qnl,qnr);
 				double meG = calc_U(gaunt(vl,vmr,cl,cml),gaunt(vl,vml,cl,cmr),FG,cl+vl+1);
-				// Core-valence EXCHANGE sign.
-				//
-				// DEFAULT = the upstream CTFAMultiplet behaviour, so inputs written for the
-				// previous code reproduce their previous results with no flags set. Opt into the
-				// corrected sign with EXCH_SIGN_FIX=1.
-				//
-				// Why there is a choice at all: Cowan eq. 12.6 gives the exchange coefficient as
-				// g_k = -(-1)^S <l||C^k||l'>^2 {6j}, i.e. the parallel-spin (triplet) combination
-				// is pulled DOWN -- Hund's rule. The upstream sign is the opposite, which leaves
-				// every term energy of the 2p^5 3d^9 multiplet numerically correct but interchanges
-				// the singlet and triplet of each L. Since degeneracy is spectral weight, that
-				// means correct peak POSITIONS with wrong peak INTENSITIES. Measured in the atomic
-				// limit against exact Slater-Condon theory (validation_modeB/pdterms.py, NiO
-				// parameters): upstream is off by up to 3.77 eV with 1D lowest, EXCH_SIGN_FIX=1
-				// matches to 2.67e-05 with 3D lowest. See
+				// Core-valence exchange sign. This is the upstream CTFAMultiplet convention and
+				// it is CORRECT -- verified against Quanty 0.81 (Haverkort et al.) on the atomic
+				// 2p^5 3d^9 multiplet with only the 2p-3d Coulomb interaction: Quanty gives the
+				// degeneracy sequence 5, 21, 15, 9, 3, 7 in ascending energy and this code
+				// reproduces both that sequence and Quanty's energies to 4.7e-05 eV. See
 				// validation_modeB/atomic_limit_multiplet/README.md.
 				//
-				// Note this disagrees with calc_coulomb, which gives the Hund-correct S=1 triplet
-				// d^8 valence ground state, so the two functions currently use opposite exchange
-				// conventions. Worth resolving against experiment or an independent multiplet code
-				// (CTM4XAS/Quanty) before changing the default.
-				static const bool exch_fix = (std::getenv("EXCH_SIGN_FIX") != nullptr);
-				if (exch_fix) { if (s.first != s.second) meG *= -1; }
-				else          { if (s.first == s.second) meG *= -1; } // upstream default
+				// An earlier revision of this branch flipped this sign, on the strength of an
+				// analytic Slater-Condon calculation that itself had the exchange sign wrong.
+				// That is retracted; do not flip it again without checking against Quanty.
+				if (s.first == s.second) meG *= -1; // This is due to the ordering convention of the fermions in this code
 				for (auto& e : entries)
 					hilbs.fill_hblk(meG*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second,target);
 			}

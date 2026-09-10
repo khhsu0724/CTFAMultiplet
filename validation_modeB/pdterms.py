@@ -33,7 +33,12 @@ def pd_terms(F0,F2,G1,G3,l=1,lp=2):
             for k,v in Fk.items():
                 e+=((-1)**(l+lp+L))*sixj(l,lp,L,lp,l,k)*red(l,k,l)*red(lp,k,lp)*v
             for k,v in Gk.items():
-                e+=-((-1)**S)*sixj(l,lp,L,l,lp,k)*red(l,k,lp)**2*v
+                # Exchange coefficient. The sign here was WRONG in the first version of this
+                # file (written as -(-1)^S), which swapped the singlet and triplet of every L
+                # and led me to wrongly conclude the code's exchange sign was inverted.
+                # Cross-checked against Quanty 0.81 for 2p^5 3d^9: the correct sign reproduces
+                # Quanty's degeneracy sequence [5,21,15,9,3,7] and its energies to 4.7e-05 eV.
+                e+=((-1)**S)*sixj(l,lp,L,l,lp,k)*red(l,k,lp)**2*v
             out[("%d%s"%(2*S+1,"SPDFGH"[L]))]=e
     return out
 if __name__=="__main__":
