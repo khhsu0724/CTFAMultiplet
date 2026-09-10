@@ -1,0 +1,57 @@
+# Mode B (two-time correlator) v2 diagnostic test: SAME nb=nt=1, timesteps=80 window as the
+# original toy validation (so the expensive K-row/tpivert build cost is unchanged), but with a
+# narrowed probe (TRPROBESIGMA=1.0 vs the original 5.093) and delays chosen to sit >=3 probe-sigma
+# from either edge of the simulated window, to test whether the previously-observed delay-shape
+# mismatch (mine peaks later and falls off slower than the reference) was a shared edge-truncation
+# artifact of the original narrow-margin toy setup.
+&CONTROL
+	SO = 11.5 0
+	SC1 = 1.0 0 0.1
+	SC2 = 6.0 0 0.12857 0 0.025
+	SC2EX = 6.0 0 0.12857 0 0.025
+	FG = 6.0 4.635 6.18 2.63
+	CF = 0 0 1.0 1.0 1.0
+	tpd = 1.0
+	tpp = 0
+	tpdzr = 0.25
+	sigpi = 0.225
+	TPPPI = 0.25
+	MLCT = 10.900004
+	DIAG = 2
+	EFFDEL = False
+	EXNEV = 150
+	GSNEV = 150
+	OVERWRITE = True
+/
+&CELL
+	Coordination = "sqpl"
+	Sites = 1
+	Holes = 2
+/
+&PHOTON
+	XAS = false
+	RIXS = false
+	pvin = 1 0 0
+	pvout = 0 1 0
+	solver = 4
+	Edge = L
+	NEDOS = 16
+	AB = -25 25
+	INCIDENT = -6.906552397870166 21.813222178495966 16
+	EM = 6.5
+	EMLO = -1.5
+/
+&PUMP
+	TIMEDEP = True
+	TRRIXS2 = True
+	PUMPFREQ = 3.14159265
+	PUMPAMPX = 5.0
+	PUMPAMPY = 0
+	PUMPSIGMA = 1.224745
+	PUMPT0 = 0
+	TDDT = 0.07853981633974483
+	TDM = 20
+	TAUCH = 4.1887902047863905
+	TRPROBESIGMA = 1.0
+	TRDELAY = -3.14159265 3.14159265 5
+/
