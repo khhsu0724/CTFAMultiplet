@@ -78,12 +78,37 @@ inter-site monopole; and its pump and equilibrium valence Hamiltonian match ours
 
 ## 4. Known open question
 
-**The pump-induced total-intensity decay.** The reference loses ~2.8x of its trRIXS intensity
-across the pump and saturates; ours is flat with a slight rise. Measured on the converged delays
-only (6, 7, 8), delay 6 -> 8: reference 0.800, ours 0.986, ours + legacy core-hole sign 0.944,
-ours + coherent final states 1.157. Not truncation, not the core-hole sign, not the coherent sum
-alone. Note our behaviour is what the paper's own text describes ("During the pump, there is a
-slight increase in intensity... these changes are not pronounced").
+**The pump-induced total-intensity decay.** The reference loses ~2.6x of its trRIXS intensity
+across the pump and saturates; ours is flat. Pre-pump (t = -6.283) to post-pump (t = +22.305),
+channel 0, Fig. 7 window:
+
+| | ratio | incident peak |
+|---|---|---|
+| reference | **0.385** | -4.51 -> **-6.55** |
+| ours, both fixes | 1.011 | -4.55 -> -4.75 |
+| ours + legacy core-hole sign | 0.824 | -4.55 -> **-6.53** |
+| ours + coherent final states | 3.318 | -4.55 -> -4.75 |
+| ours + both legacy conventions | 2.298 | -4.55 -> **-6.53** |
+
+Excluded as causes: the core-hole hopping sign, the coherent final-state sum, **the two together**,
+probe-window truncation, and the propagator's time step. The coherent sum moves our intensity the
+wrong way (up, not down). Our flat behaviour is what the paper's own text describes ("During the
+pump, there is a slight increase in intensity... these changes are not pronounced"), but the pumped
+tr-RIXS has no external validation, so that is a hint and not a verdict.
+
+The red shift, by contrast, is fully attributed: every variant carrying the core-hole sign lands at
+-6.53 against the reference's -6.55; every variant without it stays at -4.75.
+
+**Not affected by any of this:** the -0.9 eV anti-Stokes feature, the paper's central Fig. 7/8
+claim. Post-pump in the Fig. 7(d) box it is a weak shoulder on the elastic tail in the reference
+(0.15 of the profile maximum) but a distinct peak at **-0.938 eV** in our corrected code (1.00),
+matching the quoted -0.9 eV. The legacy core-hole sign suppresses it. Loss-axis physics generally
+is sound in both codes -- it is set by the valence spectrum, which Quanty confirms.
+
+**When comparing to the reference, mind its irregular delay grid.** Its `allowed_tm` list picks 19
+times and the file index is `count`: `trSPEC_*_1710.dat` is t = +22.305, not `*_1410.dat`
+(t = +17.239). Our uniform `TRDELAY` grid coincides with it at only three times. Index-to-index
+comparison is wrong; `plot_fig7.py` handles it correctly.
 
 ## 5. Gotchas that have each cost real time
 
