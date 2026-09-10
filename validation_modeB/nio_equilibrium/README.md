@@ -8,10 +8,10 @@ Reference: `~/Documents/GradSchool/Devereaux Group/Herr_Jost/NiO_ED_tr_magnons/e
 
 | variant | XAS_X vs reference | RIXS_X_Y vs reference |
 |---|---|---|
-| reference INPUT + `FG_KMAP_LEGACY=1 EXCH_SIGN_FIX=1` | **0.00e+00**, r = 1.00000 | 1.4e-4, r = 1.00000 |
+| reference INPUT + `FG_KMAP_LEGACY=1 EXCH_SIGN_FIX=1` (both flags since removed) | **0.00e+00**, r = 1.00000 | 1.4e-4, r = 1.00000 |
 | reference INPUT, current code | 0.72, r = 0.749 | 0.99, r = 0.463 |
 | F2/G1 unswapped, current code | 0.55, r = 0.861 | 0.88, r = 0.623 |
-| F2/G1 unswapped + `EXCH_SIGN_FIX=1` (absent = upstream) | **0.00e+00**, r = 1.00000 | 1.4e-4, r = 1.00000 |
+| F2/G1 unswapped + `EXCH_SIGN_FIX=1` (flag since removed) | **0.00e+00**, r = 1.00000 | 1.4e-4, r = 1.00000 |
 
 `eig.txt`, `dos.txt` and `tmat.txt` are **bit-identical** in every variant: the valence sector,
 octahedral geometry, `EFFDEL`, `MF`, `HFscale` and the `SC2` reduced/unreduced conversion all
@@ -75,8 +75,10 @@ switched off) the 2p^5 3d^9 multiplet matches exact Slater-Condon theory to **2.
 | 3P | 9 | +8.2204 | +8.2204 |
 | 3F | 21 | +8.2357 | +8.2357 |
 
-So the stored NiO reference carries the same Hund's-rule-violating exchange sign as the PRX
-Fortran, and `nio_unsw/` (unswapped `FG`, fixed sign) is the physically correct calculation.
+*(The paragraph that stood here, concluding that the stored reference "carries the same
+Hund's-rule-violating exchange sign as the PRX Fortran", is retracted -- see the RETRACTED section
+below. The analytic table above is from `pdterms.py`, which had the exchange sign wrong at the
+time; it has since been corrected and now agrees with Quanty and with the code.)*
 
 ## Default behaviour (final)
 
@@ -100,7 +102,25 @@ Making RIXS bit-reproducible would mean tightening `CG_tol` and serialising the 
 elementwise loops in `BiCGS`; the physics is unaffected at this level, since spectral features are
 compared at the percent level.
 
-Use `EXCH_SIGN_FIX=1` to opt into the Hund-correct core-valence exchange sign (see
-`validation_modeB/atomic_limit_multiplet/README.md`), which changes XAS to r = 0.861 and RIXS to
-r = 0.623 against this reference. Recommended only after cross-checking against experiment or an
-independent multiplet code.
+## RETRACTED: the "exchange sign" discussion
+
+An earlier version of this file said the stored reference "carries the same Hund's-rule-violating
+exchange sign as the PRX Fortran" and pointed at an `EXCH_SIGN_FIX=1` flag. **Both claims are
+withdrawn and the flag is gone.**
+
+The upstream convention in `multiplet.cpp` (`if (s.first == s.second) meG *= -1;`) is **correct**.
+It was verified against Quanty 0.81: the 2p^5 3d^9 multiplet on the NiO integrals reproduces
+Quanty's degeneracy sequence 5, 21, 15, 9, 3, 7 and its energies to 4.7e-05 eV, and the full
+atomic d^8 L-edge XAS agrees pole-for-pole to 4e-05 eV with every dipole weight matching to 2e-06
+(`../atomic_limit_multiplet/QUANTY_XAS_CROSSCHECK.md`). The "Hund's-rule" argument behind the
+retracted claim was misapplied: for two holes in *inequivalent* shells with a large F^2, the
+lowest term need not be high-spin, and here it is genuinely 1D.
+
+## Also verified here: the spin-flip RIXS fix does not touch this reference
+
+`SO = 11.507 0.083 0.102` turns on **valence** spin-orbit coupling and `MF = 0.11` adds a mean
+field, so this system's ground sector is a **single** 168-dimensional block rather than being split
+into Sz blocks. Every RIXS final state was therefore already included, and the spin-flip fix
+(`../rixs_spinflip_channel/`) leaves this reference reproduced identically -- `RIXS_Ledge_X_Y`
+totals 172.896567 before and after, max|diff| 1.4e-4 against the reference in both cases (BiCGStab
+tolerance). The bug only bites Sz-blocked ground sectors, i.e. valence SOC off and no field.
