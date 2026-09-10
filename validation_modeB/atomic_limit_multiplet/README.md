@@ -9,7 +9,7 @@ Run any of these INPUTs and compare `exdos.txt` against `pdterms.pd_terms(F0,F2,
 
 | directory | exchange sign | what it shows |
 |---|---|---|
-| `atomic`, `at_onlyG`, `at_noF2` | pre-fix | every term energy exactly right but **singlet and triplet of each L interchanged** |
+| `atomic`, `at_onlyG`, `at_noF2` | pre-fix | every term energy exactly right but **singlet and triplet of each L interchanged**. NOTE: these were run with the since-reverted k-map change and an INPUT whose F2/G1 were swapped; `at2_leg`/`at2_fix` below repeat the test cleanly |
 | `at_noG` | n/a (G=0) | direct channel alone: singlet/triplet exactly degenerate (deg 20, 28, 12) -- the direct part was always correct |
 | `x_atomic`, `x_at_onlyG`, `x_at_noF2` | fixed | matches exact theory to **5e-5** |
 | `fortran_atomic_limit` | -- | the paper-1 Fortran run in the same limit |
@@ -44,3 +44,19 @@ violation -- and that propagates into its XAS, trXAS, RIXS and trRIXS, including
 have been chosen to match experimental Ni L-edge spectra *under* that sign. With the corrected sign
 the same numbers give a different spectrum, so reproducing the published figures and doing correct
 atomic physics are, for now, two different things.
+
+## Re-done after reverting the k-map change (authoritative)
+
+The k-channel change referenced above was **wrong and has been reverted** -- upstream documents
+`FG` as `F0,G1,F2,G3` and `calc_U`'s indexing already matched that. The exchange-sign conclusion is
+unaffected, and was re-established from scratch using the NiO INPUT exactly as written
+(F2 = 6.176, G1 = 4.626, G3 = 2.632 after `HFscale = 0.8`):
+
+| exchange sign | max |diff| vs exact Slater-Condon theory |
+|---|---|
+| upstream (`EXCH_SIGN_LEGACY=1`) | **3.77 eV**, singlet and triplet of each L interchanged |
+| fixed (default) | **2.67e-05** |
+
+Term by term with the fix: 3D +4.0651, 1F +4.4701, 1D +5.4645, 1P +6.2500, 3P +8.2204,
+3F +8.2357 -- all exact. So the exchange sign was genuinely wrong, independently of the `FG`
+ordering question, and both the stored NiO reference and the PRX Fortran carry it.

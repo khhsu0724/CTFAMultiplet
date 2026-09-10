@@ -203,32 +203,21 @@ void calc_CV(Hilbert& hilbs, const double* FG, Hilbert::HTarget target) {
 				struct QN qnl[2] = {{vml,s.first,vi},{cml,s.second,ci}};
 				struct QN qnr[2] = {{vmr,s.first,vi},{cmr,s.second,ci}};
 				vpulli entries = hilbs.match(2,qnl,qnr);
-				// FG holds {F^0, F^2, G^1, G^3} in input order, but calc_U indexes its Slater
-				// array by the MULTIPOLE ORDER k (it contracts SC[k] against the k-th Gaunt
-				// coefficients). Those four integrals belong at k = 0, 2, 1, 3 respectively, so
-				// passing FG straight in put F^2 at k=1 and G^1 at k=2 -- i.e. the Coulomb
-				// channel picked up G^1 where it needed F^2 and the exchange channel picked up
-				// F^2 where it needed G^1. (The k=1 Coulomb / k=0,2 exchange slots are killed by
-				// the Gaunt parity rules, which is why this survived: for l_v=2, l_c=1 the
-				// Coulomb product is nonzero only for even k and the exchange only for odd k.)
-				// Placing them on their own k channels fixes it. For the K edge (cl=0) the code
-				// requires FG[2]=FG[3]=0, so Gk is all zeros there and nothing changes.
-				double Fk[3] = {FG[0], 0.0, FG[1]};        // k = 0, 1, 2
-				double Gk[4] = {0.0, FG[2], 0.0, FG[3]};   // k = 0, 1, 2, 3
-				// FG_KMAP_LEGACY=1 restores the pre-fix (incorrect) mapping, purely so the
-				// before/after effect of this fix can be measured without rebuilding.
-				static const bool kmap_legacy = (std::getenv("FG_KMAP_LEGACY") != nullptr);
-				if (kmap_legacy) {
-					Fk[0]=FG[0]; Fk[1]=FG[1]; Fk[2]=FG[2];
-					Gk[0]=FG[0]; Gk[1]=FG[1]; Gk[2]=FG[2]; Gk[3]=FG[3];
-				}
-				double meF = calc_U(gaunt(vl,vml,vl,vmr),gaunt(cl,cmr,cl,cml),Fk,2*cl+1);
+				// FG is {F^0, G^1, F^2, G^3} -- the upstream CTFAMultiplet convention, see
+				// https://github.com/khhsu0724/CTFAMultiplet/wiki/Input-Parameters ("F0,G1,F2,G3").
+				// calc_U contracts its array by multipole order k, and that ordering is already
+				// the right one: the Coulomb channel reads FG[0]=F^0 at k=0 and FG[2]=F^2 at k=2,
+				// the exchange channel reads FG[1]=G^1 at k=1 and FG[3]=G^3 at k=3, and the
+				// mismatched slots are killed by the Gaunt parity rules (for l_v=2, l_c=1 the
+				// Coulomb product is nonzero only for even k and the exchange only for odd k).
+				// The Udp printout in main.cpp, F^0 - G^1/15 - 3G^3/70, encodes the same ordering.
+				double meF = calc_U(gaunt(vl,vml,vl,vmr),gaunt(cl,cmr,cl,cml),FG,2*cl+1);
 				for (auto& e : entries)
 					hilbs.fill_hblk(meF*hilbs.Fsign(qnl,e.first,2)*hilbs.Fsign(qnr,e.second,2),e.first,e.second,target);
 				qnl[1] = {vml,s.second,vi}, qnl[0] = {cml,s.first,ci};
 				qnr[0] = {vmr,s.first,vi}, qnr[1] = {cmr,s.second,ci};
 				entries = hilbs.match(2,qnl,qnr);
-				double meG = calc_U(gaunt(vl,vmr,cl,cml),gaunt(vl,vml,cl,cmr),Gk,cl+vl+1);
+				double meG = calc_U(gaunt(vl,vmr,cl,cml),gaunt(vl,vml,cl,cmr),FG,cl+vl+1);
 				// Core-valence EXCHANGE sign. Cowan eq. 12.6 gives the exchange coefficient as
 				// g_k = -(-1)^S <l||C^k||l'>^2 {6j}, i.e. the parallel-spin (triplet) combination
 				// is pulled DOWN -- Hund's rule. Getting this sign backwards leaves every term

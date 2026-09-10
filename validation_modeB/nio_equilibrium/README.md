@@ -18,32 +18,47 @@ octahedral geometry, `EFFDEL`, `MF`, `HFscale` and the `SC2` reduced/unreduced c
 reproduce exactly. Both `calc_CV` fixes are core-hole-only, as intended. (The 1e-4 RIXS residual is
 BiCGStab's iterative tolerance, not a discrepancy.)
 
-## THE IMPORTANT PART: this INPUT has F2 and G1 in each other's slots
+## CORRECTION: this INPUT is CORRECT as written
 
-`FG` is documented as `F^0, F^2, G^1, G^3`. The stored INPUT has
+An earlier version of this file claimed the stored INPUT had F2 and G1 swapped. **That was wrong.**
+Upstream CTFAMultiplet documents `FG` as **"F0,G1,F2,G3"**
+(https://github.com/khhsu0724/CTFAMultiplet/wiki/Input-Parameters), so
 
-    FG = 6.0  5.783  7.720  3.290
+    FG = 6.0  5.783  7.720  3.290     # F0, G1, F2, G3
 
-but the Hartree-Fock values for Ni2+ 2p3d are **F2 = 7.721, G1 = 5.787, G3 = 3.291** -- so F2 and
-G1 are swapped. That swap **exactly cancels** the k-channel bug fixed in d44d4f0 (which fed FG[1]
-into the k=1 exchange slot and FG[2] into the k=2 Coulomb slot): unswapping the INPUT and
-restoring the old exchange sign reproduces the reference bit-for-bit.
+means F2 = 7.720 and G1 = 5.783, which after `HFscale = 0.8` gives F2 = 6.176, G1 = 4.626,
+G3 = 2.632 -- against Hartree-Fock for Ni2+ 2p3d x0.8 of 6.177, 4.630, 2.633. The INPUT is right,
+and `calc_U`'s indexing by multipole order k was already right for that ordering: the Coulomb
+channel reads FG[0] at k=0 and FG[2] at k=2, the exchange channel FG[1] at k=1 and FG[3] at k=3,
+with the mismatched slots killed by Gaunt parity. The `Udp = F0 - G1/15 - 3G3/70` printout in
+main.cpp encodes the same convention.
 
-So someone compensated for the bug by swapping the input values. **Consequence: with the fix in,
-every INPUT written under that workaround is now wrong and must be corrected**, e.g. for NiO
+The "k-channel fix" that briefly lived in this branch has therefore been **reverted**: inputs
+written for the upstream code work unchanged, as they must.
 
-    FG = 6.0  7.720  5.783  3.290     # F^0, F^2, G^1, G^3
+## Result with the k-map change reverted
 
-Note the two datasets in this project used *opposite* conventions, which is why the k-channel fix
-improved one and appeared to break the other:
-
-| dataset | `FG` as written | ordering | effect of the fix |
+| variant | XAS_X | RIXS_X_Y | eig/dos/exeig/exdos |
 |---|---|---|---|
-| PRX / toy (`modeb_pumpon_v2_fixed`) | `6.0 6.18 4.635 2.63` | correct (F2, G1, G3) | improves it -- equilibrium XAS r 0.83 -> 0.93 |
-| NiO (`equlibrium_NiO`) | `6.0 5.783 7.720 3.290` | **swapped** | breaks it until the INPUT is corrected |
+| INPUT as written, upstream exchange sign | **0.00e+00**, r = 1.00000 | 1.4e-4, r = 1.00000 | **all IDENTICAL** |
+| INPUT as written, exchange-sign fix | 0.55, r = 0.861 | 0.88, r = 0.623 | valence identical |
 
-After `HFscale = 0.8`, NiO's unswapped integrals are F2 = 6.176, G1 = 4.626, G3 = 2.632 --
-identical to the PRX Fortran's `cf2/cf3/cf4`. Both datasets describe the same core-valence physics.
+So the code reproduces this NiO reference **completely** -- valence sector, core-hole sector, XAS
+and RIXS -- and the only behavioural change from this branch is the exchange-sign fix.
+
+## Translating Fortran parameters into this convention
+
+The Fortran declares `cf2` = F^2, `cf3` = G^1, `cf4` = G^3, i.e. **F0, F2, G1, G3** order. Our
+`FG` is **F0, G1, F2, G3**, so F2 and G1 must be exchanged when translating:
+
+    Fortran: cf0=6.0  cf2=6.18 (F2)  cf3=4.635 (G1)  cf4=2.63 (G3)
+    ours   : FG = 6.0  4.635  6.18  2.63
+
+`validation_modeB/modeb_pumpon_v2_fixed/INPUT` (and every INPUT derived from it during the PRX
+work) has `FG = 6.0 6.18 4.635 2.63`, which under our convention means G1 = 6.18, F2 = 4.635 --
+i.e. **that translation was done wrong**. Correcting it improves the equilibrium XAS against the
+Fortran from r = 0.832 to r = 0.932 with the main L3 peak moving from -5.10 to -4.600 (reference
+-4.633). Use `FG = 6.0 4.635 6.18 2.63` for that dataset.
 
 ## Exchange sign, on these parameters
 

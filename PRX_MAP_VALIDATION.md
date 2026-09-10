@@ -106,7 +106,19 @@ agreement is unchanged (r 0.832 -> 0.834). **Real convention difference, not the
 
 ## 4b. Rung 2 of the ladder: equilibrium XAS -- one real bug found and fixed
 
-### The bug: core-valence Slater integrals on the wrong multipole channels
+### CORRECTED: this was an INPUT translation error, not a code bug
+
+**The "k-channel bug" described below was a misreading and the code change has been reverted.**
+Upstream CTFAMultiplet documents `FG` as `F0,G1,F2,G3`, and `calc_U`'s indexing by multipole
+order already matched that convention. What was actually wrong is
+`validation_modeB/modeb_pumpon_v2_fixed/INPUT`: translating the Fortran's `cf2`(F2)=6.18,
+`cf3`(G1)=4.635 into our order requires `FG = 6.0 4.635 6.18 2.63`, but it was written
+`FG = 6.0 6.18 4.635 2.63`. Correcting the INPUT gives numerically the same improvement the
+code change did (r 0.832 -> 0.932, peak -5.10 -> -4.600), because swapping the inputs and
+swapping the k-channels are the same operation. The section below is kept for the reasoning
+trail; read "fix" as "corrected FG ordering in the INPUT".
+
+### Original (superseded) description
 
 `calc_CV` passed the `FG` array straight into `calc_U`, but **`calc_U` contracts its Slater array
 by multipole order k** (`u += gaunt1[k]*gaunt2[k]*SC[k]`). `FG` holds `{F^0, F^2, G^1, G^3}` in
