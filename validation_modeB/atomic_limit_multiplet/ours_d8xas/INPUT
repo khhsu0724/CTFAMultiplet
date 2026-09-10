@@ -1,0 +1,29 @@
+# Atomic limit: Ni2+ d^8 -> 2p^5 3d^9, no coordination (no ligands), no crystal field.
+# Direct comparison against Quanty q_d8xas.lua with the same Slater integrals.
+&CONTROL
+	SO = 11.5 0
+	SC1 = 1.0 0 0.1
+	SC2 = 6.0 0 0.12857 0 0.025
+	SC2EX = 6.0 0 0.12857 0 0.025
+	FG = 6.0 4.635 6.18 2.63
+	DIAG = 4
+	EFFDEL = False
+	EXNEV = 200
+	GSNEV = 200
+	OVERWRITE = True
+/
+&CELL
+	Sites = 1
+	Holes = 2
+/
+&PHOTON
+	XAS = true
+	RIXS = false
+	pvin = 1 0 0
+	pvout = 0 1 0
+	epsab = 0.2
+	solver = 1
+	Edge = L
+	NEDOS = 50000
+	AB = -15 35
+/
