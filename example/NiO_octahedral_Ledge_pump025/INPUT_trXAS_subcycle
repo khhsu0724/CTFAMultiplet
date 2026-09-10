@@ -1,0 +1,52 @@
+&CONTROL
+        SO = 11.507 0.083 0.102 # Spin Orbit Coupling
+        SC1 = 1.0 0 0.1 #F_0,2 for l = 1 
+        SC2 = 6.0 0 12.233 0 7.597
+        SC2EX = 6.0 0 13.005 0 8.084
+        FG = 6.0 5.783 7.720 3.290
+        HFscale = 0.8
+        CF = 0 0 0.8 0.8 0.8
+        tpd = 0.35
+        tpp = 0.0
+        MLCT = 4.5
+        sigpi = 0.25
+        MF = 0.11
+        #TPDZR = 1.0
+        DIAG = 4
+        EFFDEL = True
+        EXNEV = 10
+        GSNEV = 10 
+        OVERWRITE = True # Overwrite photon file in the directory
+
+&CELL
+        Coordination = "Octahedral" # Defaults to no coordination
+        Sites = 1 # x,y,z, Defaults to 1 site
+        Holes = 2
+
+/
+&PHOTON
+	XAS = false
+	RIXS = false
+	pvin = 1 0 0
+	pvout = 1 0 0
+	solver = 4
+	Edge = L
+	NEDOS = 500
+	AB = -15 25
+/
+&PUMP
+	TIMEDEP = True
+	TRXAS = True
+	PUMPFREQ = 0.25
+	PUMPAMPX = 5.0
+	PUMPAMPY = 0
+	PUMPSIGMA = 1.2247448713915890
+	PUMPT0 = 0
+	TDDT = 0.05
+	TDM = 20
+	TAUCH = 2.5
+	TRPROBESIGMA = 2.0
+	TRDELAY = -12.0 20.0 17
+	#TDTMIN = -40
+	#TDTMAX = 120
+/
