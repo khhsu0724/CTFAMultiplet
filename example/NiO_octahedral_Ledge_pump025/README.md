@@ -72,3 +72,63 @@ Non-monotonic between 2.5 and 5, then explosive by 20. There is no clean power l
 The two low-energy excitations are 0.105 eV apart, so `epsloss` must be well under that -- the
 default 0.1 will merge them. Use `epsloss ~ 0.02` and a loss grid fine enough to sample it
 (`EM`/`NEDOS` giving <= 0.01 eV steps).
+
+---
+
+# Charge oscillations (PRX Fig. 2 style)
+
+`plot_charge_oscillations.py` produces the Fig. 2 analogue: (a1) `A(t)`, (a2) `F[A(t)]`,
+(b1) occupations, (b2) `F[occupations]`. Inputs `INPUT_charge_subcycle` and
+`INPUT_charge_1cycle`, both with `tpp = 0.05`.
+
+Two deliberate departures from the paper's presentation, because NiO at 0.25 eV is a far
+weaker perturbation than the PRX clusters at pi eV:
+
+- (b1) plots the **change** `d<n> = <n>(t) - <n>(-inf)` scaled by 1e3. The paper's raw 0..1 axis
+  works because its occupations swing by ~0.7; ours move by ~0.02 and would look flat.
+- (b2) uses a **log** ordinate over 0-6 eV, because what matters here is which frequencies are
+  *absent* as much as which are present.
+
+Sampling: `TDDT = 0.00785` and a window of -50..400 eV^-1. `scan_td_occupation` hardcodes
+`print_every = 20`, so the output step is `20*TDDT = 0.157` eV^-1 (Nyquist 20 eV), and the
+450 eV^-1 window gives 0.014 eV resolution -- needed because the magnon period is 60 eV^-1.
+Each run is ~57000 propagation steps.
+
+## Result: the charge rings at the CT and dd scales, NOT at the magnon frequencies
+
+Fraction of post-pulse (`t > 60`) spectral weight in each band:
+
+| orbital | magnon 0.105 | 2-magnon 0.210 | dd ~1.0 | CT ~4.8 |
+|---|---|---|---|---|
+| **sub-cycle envelope** | | | | |
+| d_x2-y2 | 0.13 % | 0.18 % | 34.4 % | **53.4 %** |
+| d_z2 | 0.17 % | 0.22 % | 18.7 % | **65.1 %** |
+| p_xx | 0.01 % | 0.24 % | 1.5 % | **94.4 %** |
+| p_yy | 0.01 % | 0.35 % | 1.7 % | **94.5 %** |
+| d_xy | 0.34 % | 0.05 % | **92.8 %** | 0.4 % |
+| **1-cycle envelope** | | | | |
+| d_x2-y2 | 1.42 % | 0.12 % | **69.1 %** | 23.9 % |
+| d_z2 | 1.79 % | 0.14 % | **62.8 %** | 29.0 % |
+| p_xx | 0.13 % | 0.27 % | 6.4 % | **89.1 %** |
+| p_yy | 0.07 % | 0.37 % | 8.9 % | **86.6 %** |
+| d_xy | 3.07 % | 0.08 % | **94.5 %** | 0.1 % |
+
+- The **ligands ring at the charge-transfer scale** (~4.8 eV, 87-94 % of their weight), the
+  **d_xy at the dd scale** (~1.0 eV, 93-95 %), and d_x2-y2 / d_z2 split between the two.
+- **The magnon frequencies carry essentially nothing** (0.01-3.1 %). That is the expected
+  consequence of the model's structure: the Peierls pump is a *charge* coupling, and the magnon
+  splitting is set by the static `MF`, which `calc_ham` puts in `ham_static` -- the pump cannot
+  modulate it. The longer 1-cycle pulse does couple slightly better to the low-energy sector
+  (1.4-3.1 % vs 0.1-0.3 %), but it stays small.
+
+Amplitudes: `p_xx` swings by up to `-25e-3` about an equilibrium value of `0.028`, i.e. the ligand
+hole is nearly fully depleted at moments, while `d_x2-y2` moves `+20e-3` on `0.951` (2 %). Large
+*relative* modulation of a small occupancy, small absolute charge transfer.
+
+## A note on how the two envelopes excite
+
+Panel (a2) shows the difference clearly. The **sub-cycle** pulse has a broad spectrum peaking near
+0.7 eV with real weight past 1 eV, so it can excite the dd manifold *directly*. The **1-cycle**
+pulse is narrow at 0.25 eV and has fallen eight decades by 1 eV -- yet its response still shows dd
+and CT peaks. That excitation is therefore **nonlinear**, which is consistent with `PUMPAMPX = 5`
+being a large Peierls phase rather than a perturbation.
