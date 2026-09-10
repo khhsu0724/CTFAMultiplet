@@ -203,7 +203,31 @@ The two things that do **not** agree are exactly the two already diagnosed:
   for (-1.78 eV when we adopt it), and
 - the **total intensity ratio** (0.98 vs 0.385), which nothing accounts for.
 
-One qualitative difference worth noting in the maps themselves: our spectra carry a diagonal
-constant-emission-energy streak running up and to the right (visible from omega ~ 1 to 4 eV) that
-the reference does not have. It is fluorescence-like weight, and it is present in both
-polarizations and at both delays, so it is not pump-induced.
+### The diagonal streak is real physics that the reference is missing
+
+Our maps carry a constant-emission-energy ("fluorescence-like") streak running up and to the right
+that the reference largely lacks. Measuring it as the weight at `omega > 2.6` and
+`Omega_i > resonance + 1.5` -- above the highest dd line and off resonance -- as a percentage of
+the Fig. 7 window:
+
+| | pre-pump | post-pump |
+|---|---|---|
+| reference | **1.18 %** | 2.44 % |
+| ours corrected | **7.67 %** | 2.80 % |
+| ours + legacy sign | 8.61 % | -- |
+| **equilibrium RIXS, same grid** (Quanty-validated path) | **6.55 %** | n/a |
+
+The decisive number is the last row. The equilibrium Kramers-Heisenberg path -- the one verified
+against Quanty to an absolute scale of 0.999999 -- puts **6.55 %** there on the same grid. So the
+streak is correct physics, Mode B's pre-pump limit reproduces it (7.67 % against 6.55 %, the
+residual being unmatched broadening and the truncated delay-0 probe), and it is the **reference**
+that under-represents it, by a factor ~5.5 pre-pump.
+
+The streak is also not a truncation artifact of ours: it does not track the probe-window margin.
+Delay 0 and delay 14 are both 0.75 probe-sigma from an edge, yet carry 7.67 % and 2.80 %; the
+quantity falls monotonically across the pump and then flattens.
+
+A plausible cause on the reference's side is its coherent final-state summation -- fluorescence-like
+weight is spread over many final states at different energy losses, and summing their amplitudes
+before squaring invites exactly the cancellation that would suppress it -- but that is a
+hypothesis, not something measured here.

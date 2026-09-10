@@ -99,6 +99,11 @@ tr-RIXS has no external validation, so that is a hint and not a verdict.
 The red shift, by contrast, is fully attributed: every variant carrying the core-hole sign lands at
 -6.53 against the reference's -6.55; every variant without it stays at -4.75.
 
+Also resolved in our favour: the constant-emission-energy ("fluorescence-like") diagonal weight
+that our maps carry and the reference largely lacks (7.67 % vs 1.18 % of the Fig. 7 window
+pre-pump). The Quanty-validated equilibrium path puts **6.55 %** there on the same grid, so the
+streak is real and the reference is the one missing it.
+
 **Not affected by any of this:** the -0.9 eV anti-Stokes feature, the paper's central Fig. 7/8
 claim. Post-pump in the Fig. 7(d) box it is a weak shoulder on the elastic tail in the reference
 (0.15 of the profile maximum) but a distinct peak at **-0.938 eV** in our corrected code (1.00),
