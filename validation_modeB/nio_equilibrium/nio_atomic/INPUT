@@ -1,0 +1,43 @@
+&CONTROL
+        SO = 0 0 0
+        SC1 = 1.0 0 0.1 #F_0,2 for l = 1 
+        SC2 = 6.0 0 12.233 0 7.597
+        SC2EX = 6.0 0 13.005 0 8.084
+        FG = 6.0 7.720 5.783 3.290
+        HFscale = 0.8
+        CF = 0 0 0 0 0
+        tpd = 0
+        tpp = 0.0
+        MLCT = 0
+        sigpi = 0
+        MF = 0
+        #TPDZR = 1.0
+        DIAG = 4
+        EFFDEL = True
+        EXNEV = 400
+        GSNEV = 400
+        OVERWRITE = True # Overwrite photon file in the directory
+/
+&CELL
+        Coordination = "Octahedral" # Defaults to no coordination
+        Sites = 1 # x,y,z, Defaults to 1 site
+        Holes = 2
+/
+&PHOTON
+        XAS = false
+        RIXS = false
+        CROSS = True
+        pvin = 1 1 1 
+        pvout = 1 1 1  
+        #pvin = 1 0 0  
+        #pvout = 0 1 0  
+        epsloss = 0.01
+        epsab = 0.4
+        solver = 4
+        Edge = L
+        NEDOS = 1000          # If XAS, number of bins for XAS. If RIXS, number of bins for loss energy
+        AB = -25 25           ## 2 values: range
+        #ABMAX = 30            ## auto determine the start, overrides AB
+        INCIDENT = -7.9 2.3 100      ### From first feature how much energy, nu  points, telling program that we are using this.
+        EM = 10               ### max_loss
+/
