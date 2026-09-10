@@ -247,14 +247,30 @@ void calc_HYB(Hilbert& hilbs, const HParam& hparam, bool nohyb, double t, Hilber
 	vecd hybmat = ed::make_blk_mat(hilbs.cluster->get_tmat_real(t),hilbs.tot_site_num());
 	// Diagnostic: the paper-1 reference Fortran builds the core-hole sector's hopping with the
 	// OPPOSITE overall sign to the valence sector (its line ~1552 vs ~761: +2*tmatx/tmaty/tmato
-	// against -2*tmatx/tmaty/tmato, otherwise byte-identical code). Flipping all three together
-	// is a p -> -p gauge transformation only if the p-p term (tmato, the tpp channel) vanishes;
-	// with tpp_pi = 0.25 it does not, so the two conventions are genuinely different core-hole
-	// Hamiltonians. EX_HOP_SIGN=-1 reproduces the reference's convention for the core-hole
-	// (is_ex) space so the two can be compared.
+	// against -2*tmatx/tmaty/tmato, otherwise byte-identical code).
+	//
+	// Flipping tmatx/tmaty (the TM-ligand bonds) alone is the p -> -p gauge transformation
+	// G = diag(+1 x 5 d, -1 x 6 ligand), which leaves tmato (ligand-ligand) invariant. Verified
+	// explicitly: G (xcef - 2TX - 2TY - 4TO) G = xcef + 2TX + 2TY - 4TO, same spectrum. So the
+	// reference's actual core-hole matrix, xcef + 2TX + 2TY *+* 4TO, is NOT gauge-equivalent to
+	// its own valence matrix: the physical difference is the SIGN OF THE LIGAND-LIGAND HOPPING
+	// between the two sectors, worth up to 0.70 eV on the one-body levels here. An O-O hopping
+	// cannot depend on whether a core hole sits on the metal, so that is a defect in the
+	// reference, and it lives in the sector that sets the incident-energy axis.
+	//
+	// EX_HOP_SIGN=-1 reproduces that convention in the core-hole (is_ex) space so the two can be
+	// compared. It flips only the OFF-DIAGONAL entries: the ligand charge-transfer energy `del`
+	// sits on the diagonal of this same matrix, and the reference keeps it in `xcef`, which it
+	// does not flip. (An earlier version of this diagnostic flipped the diagonal too, turning
+	// del = +10.9 into -10.9 -- a 21.8 eV error that made agreement worse and was mistakenly
+	// read as evidence against the convention itself.) Flipping every off-diagonal is physically
+	// identical to flipping tmato alone, since the tmatx/tmaty part is the gauge above.
 	if (hilbs.is_ex) {
 		if (const char* sg = std::getenv("EX_HOP_SIGN")) {
-			if (std::atof(sg) < 0) for (auto& v : hybmat) v = -v;
+			if (std::atof(sg) < 0)
+				for (int i = 0; i < nvo; ++i)
+					for (int j = 0; j < nvo; ++j)
+						if (i != j) hybmat[i*nvo+j] = -hybmat[i*nvo+j];
 		}
 	}
 	// Get Hybridization Information, there should be num_orb x num_orb matrix providing hybdrization information
