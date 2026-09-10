@@ -207,8 +207,14 @@ vecc SquarePlanar::get_tmat(double t) {
 	double kx = PI/2 + pump_shift(t,0), ky = PI/2 + pump_shift(t,1), kz = 0;
 	double sx = 2*sin(kx), sy = 2*sin(ky), cx = 2*cos(kx), cy = 2*cos(ky);
 	int nvo = vo_persite;
-	cout << "tpd: " << tpd << ", tdpz: " << tpdz << ", tpdxy: " << tpdxy << ", tpdxz: " << tpdxz << endl;
-	cout << "tpp: " << tpp << ", tpp_pi: " << tpp_pi << endl;
+	// Printed once: get_tmat is called at every propagation time step, and printing here
+	// produced multi-hundred-MB logs on production trRIXS runs (and measurable I/O cost).
+	static bool printed_sqpl = false;
+	if (!printed_sqpl) {
+		cout << "tpd: " << tpd << ", tdpz: " << tpdz << ", tpdxy: " << tpdxy << ", tpdxz: " << tpdxz << endl;
+		cout << "tpp: " << tpp << ", tpp_pi: " << tpp_pi << endl;
+		printed_sqpl = true;
+	}
 	vecc tmat(nvo*nvo,0);
 	tmat[0*nvo+5] = {0,-tpd*sx};
 	tmat[5*nvo+0] = -tmat[0*nvo+5];
@@ -293,11 +299,16 @@ vecc Octahedral::get_tmat(double t) {
 	double cx = 2*cos(kx), cy = 2*cos(ky), cz = 2*sin(kz);
 	// double d = octJT;
 	double d = 1;
-	std::cout << "tpd modulation: " << pow(d,-4) << ", tpp modulation: " << pow(d,-3) << std::endl;
-	cout << "tpd: " << tpd << ", tdpz: " << tpdz << ", tpdxy: " << tpdxy << ", tpdxz: " << tpdxz;
-	cout << ", tpdyz: " << tpdyz << endl;
-	cout << "tpp: " << tpp << ", vppsigma: " << vppsigma << ", vpppi: " << vpppi << endl;
-	cout << "tppsigma 1: " << tppsigma_1 << ", tppsigma 2: " << tppsigma_2 << ", tpppi: " << tpppi << endl;
+	// Printed once, as in SquarePlanar::get_tmat: called at every propagation time step.
+	static bool printed_oct = false;
+	if (!printed_oct) {
+		std::cout << "tpd modulation: " << pow(d,-4) << ", tpp modulation: " << pow(d,-3) << std::endl;
+		cout << "tpd: " << tpd << ", tdpz: " << tpdz << ", tpdxy: " << tpdxy << ", tpdxz: " << tpdxz;
+		cout << ", tpdyz: " << tpdyz << endl;
+		cout << "tpp: " << tpp << ", vppsigma: " << vppsigma << ", vpppi: " << vpppi << endl;
+		cout << "tppsigma 1: " << tppsigma_1 << ", tppsigma 2: " << tppsigma_2 << ", tpppi: " << tpppi << endl;
+		printed_oct = true;
+	}
 	int nvo = vo_persite;
 	vecc tmat(nvo*nvo,0);
 

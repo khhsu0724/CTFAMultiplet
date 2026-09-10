@@ -418,6 +418,30 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 	double t_lo = *std::min_element(delays.begin(),delays.end()) - window;
 	double t_hi = *std::max_element(delays.begin(),delays.end()) + window;
 	int n_is = (int)std::round((t_hi-t_lo)/dt);
+	// Convergence guard. Each delay is weighted by a probe Gaussian centred on it, so a delay
+	// sitting close to a window edge has its own weight truncated and comes out low. Nothing else
+	// in the code notices; an earlier PRX Fig. 7 run had 13 of 15 delays under 3 sigma (both
+	// figure delays at 0.75 sigma) and lost ~12% of their intensity silently.
+	{
+		int n_bad = 0;
+		for (double T : delays) {
+			double margin = std::min(T - t_lo, t_hi - T) / probe_sigma;
+			if (margin < 3.0) {
+				if (n_bad == 0)
+					std::cerr << "WARNING: trRIXS_2time probe-window truncation -- these delays sit "
+								<< "closer than 3 probe-sigma to a simulated-window edge, so their "
+								<< "intensity is systematically low. Raise sim_window_mult "
+								<< "(TRRIXS2_WINDOW_MULT) or narrow the delay range." << std::endl;
+				std::cerr << "         delay " << T << " is " << margin
+							<< " probe-sigma from an edge" << std::endl;
+				++n_bad;
+			}
+		}
+		if (n_bad) std::cerr << "         (" << n_bad << " of " << delays.size()
+								<< " delays affected; window [" << t_lo << "," << t_hi
+								<< "], probe_sigma " << probe_sigma << ")" << std::endl;
+	}
+
 	std::cout << "Building ground-state trajectory over [" << t_lo << "," << t_hi << "]..." << std::endl;
 	auto gs_traj = build_trajectory(GS, gs_blk_ind, psi0, t_lo, t_hi, dt, m, hparam_gs);
 
@@ -498,9 +522,13 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 	}
 
 	int W_steps = (t2_max_window > 0) ? (int)std::round(t2_max_window/dt) : n_is;
+	if (W_steps > n_is) W_steps = n_is;
 	std::cout << "t2 window: " << W_steps << " steps ("
-				<< (t2_max_window > 0 ? t2_max_window : (t_hi-t_lo)) << " eV^-1)" << std::endl;
-
+				<< (t2_max_window > 0 ? t2_max_window : (t_hi-t_lo)) << " eV^-1"
+				<< (t2_max_window > 0 ? ", = " + std::to_string(t2_max_window/tau_ch) + " tau_ch, "
+										"relative weight discarded " +
+										std::to_string(std::exp(-t2_max_window/tau_ch)) : "")
+				<< ")" << std::endl;
 	// a_l(t1,t2), causally ordered STRICTLY t2>t1 (matching the reference's own t2 loop, which
 	// starts at t1+1 and never includes the equal-time t2=t1 term -- that term carries no
 	// energy resolution at all and Fourier-transforms into a spurious peak at zero energy

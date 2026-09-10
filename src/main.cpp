@@ -744,23 +744,35 @@ int main(int argc, char** argv){
 					ex_blk_inds.push_back(exblk_ind);
 				}
 				if (ex_blk_inds.empty()) continue;
-				// NOTE: sim_window_mult is hardcoded here (not trp.n_sigma_probe) for this
-				// validation-only path -- chosen so the simulated (t1,t2) range matches the
-				// reference toy Fortran run's own bounded (nb,nt) window exactly. t2_max_window
-				// is left at -1 (no truncation) to match the reference's own un-truncated
-				// (t1,t2) sum exactly for this comparison.
-				// v2 diagnostic test (narrowed probe_sigma=1.0, delays kept well inside the same
-				// nb=nt=1 window): window = sim_window_mult*max(probe_sigma,tau_ch) must equal
-				// pi (= 2*pi window half-width minus max(delay)=pi) -- sim_window_mult=0.75
-				// exactly, since tau_ch=4*pi/3 dominates max(1.0,4.1888) and pi/(4*pi/3)=0.75.
+				// Simulated (t1,t2) range and t2 truncation.
+				//
+				// sim_window_mult sets how far [t_lo,t_hi] extends beyond the extreme requested
+				// delays, as sim_window_mult*max(probe_sigma,tau_ch). It defaults to
+				// trp.n_sigma_probe (4), consistent with trXAS() and trRIXS_snapshot(), so that
+				// every requested delay sits >=4 probe-sigma inside the window and its Gaussian
+				// is not truncated. trRIXS_2time warns if any delay ends up under 3 sigma.
+				//
+				// This default USED TO BE 0.75, chosen only to match the toy Fortran reference's
+				// own bounded (nb=nt=1) window. That silently under-converged every production
+				// run: on the PRX Fig. 7 grid it put 13 of 15 delays under 3 sigma from an edge,
+				// including both delays used for the figure (0.75 sigma each), costing ~12% of
+				// their intensity. Set TRRIXS2_WINDOW_MULT=0.75 to reproduce those runs.
+				//
+				// t2_max_window bounds how far t2 runs past t1. The core-hole propagator carries
+				// exp(-|t2-t1|/tau_ch), so truncating at 8*tau_ch discards a relative 3e-4 while
+				// turning the (t1,t2) cost from O(n_is^2) into O(n_is * tau_ch/dt) -- the
+				// difference between an affordable production run and an unaffordable one. Set
+				// TRRIXS2_T2_WINDOW=-1 for the un-truncated sum (needed only to match the
+				// reference's own un-truncated (t1,t2) sum exactly).
 				trRIXS_2time(GS,EX,hparam_gs,hparam_ex,pm,g.first,g.second,ex_blk_inds,
 								pm.inc_e_points, loss_grid2, trp.delay_points, trp.probe_sigma,
 								hparam.tau_ch, hparam.td_dt, hparam.td_m,
-								// sim_window_mult: 0.75 reproduces the toy Fortran reference's own
-								// bounded (nb=nt=1) window. TRRIXS2_WINDOW_MULT overrides it for
-								// runs (e.g. the equilibrium-limit check) that need a wider window.
-								std::getenv("TRRIXS2_WINDOW_MULT") ? std::atof(std::getenv("TRRIXS2_WINDOW_MULT")) : 0.75,
-								-1,
+								std::getenv("TRRIXS2_WINDOW_MULT")
+									? std::atof(std::getenv("TRRIXS2_WINDOW_MULT"))
+									: (double)trp.n_sigma_probe,
+								std::getenv("TRRIXS2_T2_WINDOW")
+									? std::atof(std::getenv("TRRIXS2_T2_WINDOW"))
+									: 8.0*hparam.tau_ch,
 								"trRIXS2_chan"+std::to_string(chan),
 								// Diagnostic-only: TRRIXS2_COHERENT_FINAL reproduces the paper-1
 								// reference Fortran's coherent sum over final valence states, which
@@ -769,6 +781,12 @@ int main(int argc, char** argv){
 								std::getenv("TRRIXS2_COHERENT_FINAL") != nullptr);
 				chan++;
 			}
+			std::cout << std::endl
+				<< "=== trRIXS2 wrote " << chan << " channel(s) ===" << std::endl
+				<< "Each trRIXS2_chan<n>_* set is ONE degenerate ground state, not the cross" << std::endl
+				<< "section. The observable is their SUM over the " << gsi.size() << " degenerate" << std::endl
+				<< "ground state(s). Use util/sum_trrixs2_channels.py, or sum them yourself --" << std::endl
+				<< "reading chan0 alone silently drops the rest." << std::endl;
 		}
 		else if (trp.trRIXS) trRIXS(GS,EX,hparam_gs,hparam_ex,pm,trp);
 		else if (trp.trXAS) trXAS(GS,EX,hparam_gs,hparam_ex,pm,trp);
