@@ -21,7 +21,10 @@
 #include <arpack.hpp>
 #endif
 
-#pragma omp declare reduction(+:dcomp:omp_out=omp_out+omp_in) initializer (omp_priv=omp_orig)
+// A sum reduction must initialise the private copy to the IDENTITY, not to omp_orig:
+// with omp_priv=omp_orig the incoming value is added once per thread. Every current
+// use pre-zeroes its accumulator so it was latent, but it is wrong as written.
+#pragma omp declare reduction(+:dcomp:omp_out=omp_out+omp_in) initializer (omp_priv=dcomp(0,0))
 
 void ed_dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n);
 void ed_dsyev(double *_mat, double *_eigval, size_t n);
@@ -123,7 +126,6 @@ int Lanczos(Matrix<T>* ham, const vecc& v0, vecc& alpha, vecc& betha, int niter_
 		if (V_out) V_out->push_back(phi);
 		ham->mvmult_cmplx(phi,phip);
 		dcomp alpha_element(0);
-		#pragma omp parallel for reduction (+:alpha_element)
 		for (int j = 0; j < hsize; ++j) alpha_element += std::conj(phi[j])*phip[j];
 		alpha[i] = alpha_element;
 		if (i != 0) {
@@ -209,8 +211,12 @@ vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8,
 	        if (i!=0) std::cout << ", s:" << ed::norm(s,true);
 	        std::cout << std::endl;
 	    }
+    	// Serial on purpose -- deterministic summation order. BiCGStab is rounding-sensitive
+    	// enough that an OMP reduction's thread-count-dependent order flips it into breakdown:
+    	// measured on the equilibrium RIXS solver, 1 thread gives total weight 51.0004
+    	// reproducibly while 3 threads zeroed 29-31 of 40 incident columns and 4 threads zeroed
+    	// all 40, with nothing in the output marking the failure.
     	rho  = 0;
-    	#pragma omp parallel for reduction (+:rho)
 		for (int j = 0; j < hsize; ++j) rho += r0[j]*r[j];
 		// if (std::real(rho) < 1e-12) {
 		// 	std::cout << "New search direction cannot be found in BiCGStab" << std::endl;
@@ -237,7 +243,6 @@ vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8,
         	v[j] -= phat[j]*z;
         // STEP 5: alpha = rho/(r0,v)
         dcomp rv = 0;
-        #pragma omp parallel for reduction (+:rv)
 		for (int j = 0; j < hsize; ++j) rv += r0[j]*v[j];
         alpha = rho/rv;
 		// std::cout << "alpha: " << alpha << std::endl;
@@ -266,7 +271,6 @@ vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8,
         	t[j] -= shat[j]*z;
         // STEP 9: w = (t,s)/(t,t)
         dcomp omega = 0;
-        #pragma omp parallel for reduction (+:omega)
 		for (int j = 0; j < hsize; ++j) omega += std::conj(t[j])*s[j];
 		omega /= ed::norm(t,true);
 		// std::cout << "omega: " << omega << std::endl;
