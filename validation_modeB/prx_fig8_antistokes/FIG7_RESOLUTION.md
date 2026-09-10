@@ -50,38 +50,76 @@ but the total-intensity column is not, and a converged rerun is impractical: rai
 3x pushes `n_is` from 923 to 1506, and the K-row assembly scales as `n_is^2 * nval`, giving ~32 h
 per channel (measured, not estimated: 7.8% of channel 0 in 2.5 h).
 
-### What the converged delays do say
+### Delay dependence, with the reference's own (irregular) delay grid
 
-Total intensity in the Fig. 7 window, each curve normalized to its own delay-6 value (the first
-converged delay), summed over the degenerate ground states as `2*chan0 + chan1` (`chan2` is
-identical to `chan0` to r = 1.000000 by the Sz = +-1 symmetry):
+**The reference's delays are not a uniform grid.** Its `allowed_tm` list picks 19 irregular
+times, `tmeas = pi*2*tm/timesteps` with `timesteps = 320`:
 
-| i | delay | conv. | reference | ours | ours + legacy sign | ours coherent |
-|---|---|---|---|---|---|---|
-| 0 | -6.28 | | 2.203 | 0.878 | 1.000 | 0.503 |
-| 3 | -0.16 | | 1.933 | 1.099 | 1.314 | 0.942 |
-| 4 | +1.88 | | 1.273 | 1.068 | 1.224 | 0.983 |
-| 6 | +5.97 | **yes** | 1.000 | 1.000 | 1.000 | 1.000 |
-| 7 | +8.01 | **yes** | 0.823 | 1.000 | 0.960 | 1.123 |
-| 8 | +10.05 | **yes** | 0.800 | 0.986 | 0.944 | 1.157 |
-| 14 | +22.31 | | 0.762 | 0.862 | 0.820 | 1.160 |
+    tm  = -320, -52, 0, 32, 140, 160, 200, 284, 362, 446, 536, 626, 710, 788, 878, 968, 1052, 1136, 1214
+    t   = -6.283, -1.021, 0, +0.628, +2.749, +3.142, +3.927, +5.576, +7.108, +8.757, +10.524,
+          +12.291, +13.941, +15.472, +17.239, +19.007, +20.656, +22.305, +23.837
 
-The reference decays monotonically by ~2.8x across the pump and saturates by delay 7. **Ours is
-flat**, with a slight *rise* during the pump (1.07-1.10 at delays 3-4). That difference is not a
-truncation artifact: in the converged region (6, 7, 8) the reference is already on its low plateau
-while our curve is flat, and the legacy core-hole sign does not change this (0.944 vs the
-reference's 0.800). The coherent final-state convention goes the wrong way entirely.
+and the file index is `count`, so `trSPEC_XX_1710.dat` is `count = 17`, i.e. **t = +22.305**. Our
+`TRDELAY = -6.2832 22.3053 15` is a *uniform* 15-point grid, so the two coincide only at
+t = -6.283 (both index 0), t = +3.927 (ours 5 = ref 6) and t = +22.305 (ours 14 = **ref 17**).
+Comparing index-to-index is wrong everywhere else; `plot_fig7.py` gets this right (it uses
+`(0, 17)` for the reference against `(0, 14)` for ours), but an earlier version of the table below
+did not, and reported the reference at t = +17.24 as though it were t = +22.31.
 
-**This remains unexplained**, and it is the one quantity where we still disagree with the
-reference. Note though that our behaviour is what the paper's own text describes: *"During the
-pump, there is a slight increase in intensity... However, these changes are not pronounced,
-suggesting that the immediate effect of the pump on the energy dynamics of the 3d8 cluster is
-relatively modest."* A 2.8x collapse is not a modest change. Fig. 8's caption likewise reports a
-flat pre-pump response and an intensity that "increases only marginally" at `t ~ t0`.
+Total intensity in the Fig. 7 window, reference interpolated onto our times, each curve
+normalized to its own t = -6.283 value, channel 0:
 
-Also note the absolute normalizations differ by 12-38x (conventions in the (t1,t2) measure, the
-probe normalization, the spin-flip channel, and the ground-state sum), so only shapes and ratios
-are comparable.
+| t | reference | ours | + legacy sign | + coherent | + BOTH |
+|---|---|---|---|---|---|
+| -6.283 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
+| -0.157 | 0.967 | 1.283 | 1.300 | 2.155 | 1.496 |
+| +1.885 | 0.700 | 1.253 | 1.210 | 2.420 | 1.641 |
+| +3.927 | 0.454 | 1.195 | 1.084 | 2.455 | 1.798 |
+| +8.011 | 0.362 | 1.173 | 0.963 | 3.173 | 2.395 |
+| +14.137 | 0.369 | 1.168 | 0.953 | 3.793 | 2.775 |
+| +22.305 | 0.385 | 1.011 | 0.824 | 3.318 | 2.298 |
+
+| pre -> post (t = -6.283 -> +22.305) | ratio | incident peak |
+|---|---|---|
+| reference | **0.385** | -4.51 -> **-6.55** |
+| ours, both fixes | 1.011 | -4.55 -> -4.75 |
+| ours + legacy core-hole sign | 0.824 | -4.55 -> **-6.53** |
+| ours + coherent final states | 3.318 | -4.55 -> -4.75 |
+| ours + **BOTH** legacy conventions | 2.298 | -4.55 -> **-6.53** |
+
+Two clean conclusions:
+
+- **The red shift is the core-hole sign, and only that.** Every variant carrying it lands at
+  -6.53 against the reference's -6.55; every variant without it stays at -4.75. The coherent
+  final-state sum contributes nothing to the incident axis.
+- **The intensity decay is explained by none of them, including the two together.** The reference
+  falls to 0.385. The coherent sum makes our intensity *grow* (3.318); combined with the legacy
+  sign it still grows (2.298). The reference's delay dependence is qualitatively opposite to what
+  its own two known conventions produce in this code. Also ruled out: probe-window truncation (the
+  reference is already on its plateau at the delays where our window is converged) and the
+  first-order propagator (a ~2% occupation error at the production dt, see
+  `../pump_dynamics_crosscheck/`).
+
+**So this stays open.** Note our flat behaviour is what the paper's own text describes ("During the
+pump, there is a slight increase in intensity... these changes are not pronounced"), and a 2.7x
+collapse is not; but our pumped tr-RIXS has no external validation, so that is a hint, not a
+verdict.
+
+### The -0.9 eV anti-Stokes feature survives, and is cleaner with the physical sign
+
+Post-pump (t = +22.305) energy-gain loss profile in the Fig. 7(d) box, each normalized to its own
+maximum over -1.9 < omega < -0.1:
+
+| | -1.31 | -1.12 | **-0.94** | -0.75 | -0.19 (elastic tail) |
+|---|---|---|---|---|---|
+| reference | 0.02 | 0.09 | **0.15** | 0.11 | 0.78 |
+| **ours, both fixes** | 0.32 | 0.74 | **1.00** | 0.85 | 0.89 |
+| ours + legacy sign | 0.08 | 0.19 | **0.30** | 0.33 | 0.90 |
+
+In the reference it is a weak shoulder on the elastic tail; in our corrected calculation it is a
+distinct peak at **-0.938 eV**, matching the paper's quoted -0.9 eV and its attribution to J_H and
+the 1.0 eV crystal-field splitting. The legacy core-hole sign suppresses it. So the paper's central
+Fig. 7/8 claim is intact and better supported by the corrected code than by the original.
 
 ## Why it is a defect and not a convention
 
