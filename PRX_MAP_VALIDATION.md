@@ -75,6 +75,28 @@ because nothing has.
 
 ## 4. Where the discrepancy is: the core-hole sector
 
+> **RETRACTED (see `validation_modeB/sqpl_cluster_quanty/README.md`).** Everything in
+> sections 4, 4b and 5 that is premised on a legacy-Fortran *XAS* reference is withdrawn:
+> **both** Fortran reference runs set `flag_skip_XAS = 1` and neither ever computed an XAS
+> spectrum, so the "reference" column in the tables below has no source. The only core-hole
+> output in those datasets is `cDOS.dat`, an *unweighted* core-hole DOS on 16 grid points.
+>
+> What replaced it: the square-planar cluster XAS is now verified **exact** against
+> Quanty 0.81 -- 120 dipole-allowed poles to 4e-05 eV, every weight ratio 1.0000, sum rule
+> to 1e-7 -- and the atomic limit likewise (`validation_modeB/atomic_limit_multiplet/`).
+> In the corrected Hamiltonian the disputed 4-9 eV window carries *zero* weight in our code
+> and in Quanty alike.
+>
+> Two things below are NOT retracted and were confirmed:
+> - The `FG` ordering correction (`FG = 6.0 4.635 6.18 2.63` for this dataset) is right.
+> - The "open structural difference" (a possible inter-site monopole in the Fortran) is
+>   **resolved, and the answer is no**: the Fortran's `checkint` gate enforces strictly
+>   on-site interactions, exactly as our `calc_coulomb` does.
+>
+> And one real bug in *our* code was found in the process: `SquarePlanar::get_tmat` gave the
+> two inter-ligand hopping elements opposite signs where Slater-Koster requires them equal.
+> Fixed; backward compatible (`TPPPI` defaults to 0); NiO regression bit-identical.
+
 The equilibrium XAS, with both spectra broadened identically (0.35 eV Gaussian), X polarization:
 
 | | main L3 peak | satellite | L2 region | Pearson r vs ref |

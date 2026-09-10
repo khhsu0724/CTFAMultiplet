@@ -228,16 +228,19 @@ vecc SquarePlanar::get_tmat(double t) {
 	tmat[10*nvo+4] =  -tmat[4*nvo+10];
 	tmat[5*nvo+5] = tmat[6*nvo+6] = tmat[7*nvo+7] = del;
 	tmat[8*nvo+8] = tmat[9*nvo+9] = tmat[10*nvo+10] = del;
-	// [xx<->yx] and [xy<->yy] are neglected here (kept at zero) to keep the Hamiltonian
-	// real, matching the reference implementation's own choice for this geometry -- only
-	// [xx<->yy] and [xy<->yx] survive, with the ligand-ligand pi-bonding term (tpp_pi)
-	// entering with opposite relative sign between the two (a genuine Slater-Koster
-	// sign structure, not an arbitrary choice): xx<->yy get (tppsigma-tpp_pi), xy<->yx
-	// get (tppsigma+tpp_pi). tpp_pi defaults to 0, so this is identical to the previous
-	// tppsigma-only formula unless a nonzero TPPPI is explicitly requested.
+	// Ligand-ligand hopping between the O_x and O_y sublattices. Slater-Koster for the
+	// four O_x-O_y neighbour vectors (+-1/2,+-1/2), Bloch-summed, gives
+	//     <O_x p_x| H |O_y p_y> = <O_x p_y| H |O_y p_x> = -2(Vsig-Vpi) sin(kx/2) sin(ky/2)
+	// and puts the diagonal channels [xx<->yx], [xy<->yy], [xz<->yz] on cos(kx/2)cos(ky/2),
+	// which vanishes at the (pi,pi) momentum used here -- hence only these two elements.
+	// The two surviving elements carry the SAME coefficient: that is what makes the block
+	// symmetric in the real basis (equivalently, antisymmetric in m, since p_y carries an i).
+	// tpp_pi enters with the opposite sign to tppsigma because Slater-Koster gives
+	// -(Vsig-Vpi); the overall sign and factor of the legacy tppsigma-only form are absorbed
+	// into the definition of tpp, and tpp_pi defaults to 0, so every input written for the
+	// upstream code is unaffected by the tpp_pi term.
 	tmat[5*nvo+9] = tmat[9*nvo+5] = {(tppsigma-tpp_pi)*sx*sy,0};
-	tmat[6*nvo+8] = tmat[8*nvo+6] = {(tppsigma+tpp_pi)*sx*sy,0};
-	// [xz<->yz] (out-of-plane pz-pz) is also neglected, same reality-preserving reason.
+	tmat[6*nvo+8] = tmat[8*nvo+6] = {(tppsigma-tpp_pi)*sx*sy,0};
 	return tmat;
 };
 // End of Square-Planar Implementation
