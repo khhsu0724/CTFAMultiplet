@@ -75,27 +75,36 @@ because nothing has.
 
 ## 4. Where the discrepancy is: the core-hole sector
 
-> **RETRACTED (see `validation_modeB/sqpl_cluster_quanty/README.md`).** Everything in
-> sections 4, 4b and 5 that is premised on a legacy-Fortran *XAS* reference is withdrawn:
-> **both** Fortran reference runs set `flag_skip_XAS = 1` and neither ever computed an XAS
-> spectrum, so the "reference" column in the tables below has no source. The only core-hole
-> output in those datasets is `cDOS.dat`, an *unweighted* core-hole DOS on 16 grid points.
+> **RESOLVED (see `validation_modeB/sqpl_cluster_quanty/README.md`).** The satellite
+> discrepancy reported in sections 4 and 4b is **real** -- the reference is
+> `Ni-L-RIXS/new_shape_function/XX/16_points_new_shape_function_XX/XAS_X.dat`, from the
+> production run -- and it is now **fully explained**.
 >
-> What replaced it: the square-planar cluster XAS is now verified **exact** against
-> Quanty 0.81 -- 120 dipole-allowed poles to 4e-05 eV, every weight ratio 1.0000, sum rule
-> to 1e-7 -- and the atomic limit likewise (`validation_modeB/atomic_limit_multiplet/`).
-> In the corrected Hamiltonian the disputed 4-9 eV window carries *zero* weight in our code
-> and in Quanty alike.
+> Cause: the legacy Fortran gives the **ligand-ligand hopping the opposite sign in the
+> core-hole sector to the valence sector** (its line ~1555 vs ~764). That is not a gauge
+> choice; the p -> -p gauge on the ligands leaves that term invariant. Running our code with
+> the same convention (`EX_HOP_SIGN=-1`) reproduces the reference XAS **exactly** -- all four
+> window weights to four decimals and r = 1.0000, including w[+4..+9] = 0.1238 against our
+> default's 0.0067. Since an O-O hopping cannot depend on whether a core hole sits on the
+> metal, our default is the physical one and the reference's +1.9 eV "charge-transfer
+> satellite" appears to be an artifact of that sign.
 >
-> Two things below are NOT retracted and were confirmed:
-> - The `FG` ordering correction (`FG = 6.0 4.635 6.18 2.63` for this dataset) is right.
-> - The "open structural difference" (a possible inter-site monopole in the Fortran) is
->   **resolved, and the answer is no**: the Fortran's `checkint` gate enforces strictly
->   on-site interactions, exactly as our `calc_coulomb` does.
+> Section 4's conclusion -- "an error in the core-hole Hamiltonian is the remaining
+> candidate" -- was therefore correct. Its `EX_HOP_SIGN` test looked negative only because
+> that diagnostic also flipped the ligand charge-transfer energy `del`, which lives on the
+> diagonal of the same matrix (a 21.8 eV error); it has been fixed to flip only off-diagonals.
 >
-> And one real bug in *our* code was found in the process: `SquarePlanar::get_tmat` gave the
-> two inter-ligand hopping elements opposite signs where Slater-Koster requires them equal.
-> Fixed; backward compatible (`TPPPI` defaults to 0); NiO regression bit-identical.
+> Also confirmed since: the `FG` ordering correction is right; the "open structural
+> difference" (a possible inter-site monopole in the Fortran) is **resolved, and the answer is
+> no** -- its `checkint` gate enforces strictly on-site interactions, as our `calc_coulomb`
+> does. And the square-planar cluster XAS is verified **exact** against Quanty 0.81 (120
+> dipole-allowed poles to 4e-05 eV, every weight ratio 1.0000, sum rule to 1e-7), as is the
+> atomic limit.
+>
+> Two real bugs in *our* code were found in the process: `SquarePlanar::get_tmat` gave the two
+> inter-ligand hopping elements opposite signs where Slater-Koster requires them equal, and all
+> three RIXS paths dropped the spin-flip channel (43-54% of the cross section). Both fixed;
+> both backward compatible; NiO regression bit-identical.
 
 The equilibrium XAS, with both spectra broadened identically (0.35 eV Gaussian), X polarization:
 

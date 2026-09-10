@@ -8,8 +8,9 @@ for the `PRX_d8_sqpl_Ledge` parameter set. Three results:
 2. **A real bug in `SquarePlanar::get_tmat`**: the two surviving inter-ligand hopping
    elements were given *opposite* signs. Slater-Koster says they must be equal. Fixed.
    Backward compatible -- it only bites when `TPPPI != 0`.
-3. **The "12.4% XAS satellite" discrepancy is retracted**: both Fortran reference runs
-   set `flag_skip_XAS = 1`, so neither ever computed an XAS. There is no reference.
+3. **The "12.4% XAS satellite" discrepancy is REAL, and now fully explained**: it is caused
+   entirely by the legacy code's core-hole ligand-ligand hopping sign. See the CORRECTION
+   at the end of this file -- an intermediate version of this document wrongly retracted it.
 
 ## Method
 
@@ -109,24 +110,51 @@ move by <0.001 and the main-line position not at all), but it changes the valenc
 eigenvalues by up to 0.03 eV and it is the ligand-ligand channel, so it should be
 re-checked for anything driven by ligand dynamics -- which includes the pumped tr-RIXS.
 
-## Result 3: the satellite discrepancy is retracted
+## Result 3: the satellite discrepancy is real, and it is the core-hole hopping sign
 
-`PRX_MAP_VALIDATION.md` sections 4 and 4b reported that the legacy Fortran puts **12.4%**
-of the L3 XAS weight 4-9 eV above the main line (a "+1.90 eV satellite") where we put
-1.3%, and treated that as the outstanding defect in our code.
+> **CORRECTION.** An intermediate version of this file retracted the satellite discrepancy on the
+> grounds that `flag_skip_XAS = 1` meant the Fortran runs skipped their XAS. **That was a misreading
+> of the flag**: the comment beside it reads "flag_skip_XAS **ne** 1 will skip XAS", so `= 1` means
+> the XAS *is* computed. The toy directories happen not to contain one, but the **production** run
+> behind Fig. 7 does: `Ni-L-RIXS/new_shape_function/XX/16_points_new_shape_function_XX/XAS_X.dat`
+> (256 points, columns: incident energy, dipole-weighted XAS, unweighted core DOS, incident energy).
+> The discrepancy is real and the numbers in `PRX_MAP_VALIDATION.md` section 4b were right.
 
-**Both Fortran reference runs set `flag_skip_XAS = 1`** (`fortran_toy_reference` and
-`fortran_toy_reference_v2`, line 31), i.e. neither computed an XAS spectrum, and neither
-directory contains one. The only core-hole output is `cDOS.dat`, which is the
-**unweighted** core-hole density of states -- a plain sum of Lorentzians over the core-hole
-eigenvalues with no dipole matrix elements -- on **16** grid points spanning -1.4 to 24.5 eV
-(1.73 eV spacing). The quoted reference numbers cannot be reproduced from it, and no other
-file in the dataset is a candidate. So that comparison had no reference behind it and the
-discrepancy is withdrawn.
+Equilibrium L-edge XAS, X polarization, both broadened with the reference's own Lorentzian
+(`gammax = 0.1`) on the reference's own grid, windows relative to each spectrum's main L3 peak:
 
-For the record, in the corrected Hamiltonian the window 4-10 eV above the main L3 line
-carries **exactly zero** weight, in our code *and in Quanty*. The L3/L2 branching ratio is
-2.2288 in both, matching the atomic-limit value verified in `../atomic_limit_multiplet/`.
+| | main L3 | w[-3..+1] | w[+1..+4] | **w[+4..+9]** | w[+14..+22] | r vs ref |
+|---|---|---|---|---|---|---|
+| reference (Fortran production) | -4.633 | 0.4212 | 0.1294 | **0.1238** | 0.2505 | 1.0000 |
+| ours, default | -4.633 | 0.5062 | 0.1614 | **0.0067** | 0.3091 | 0.8691 |
+| **ours + `EX_HOP_SIGN=-1`** | **-4.633** | **0.4212** | **0.1294** | **0.1238** | **0.2505** | **1.0000** |
+
+So the entire satellite discrepancy is **one sign in the core-hole sector**, and with the
+reference's convention we reproduce its XAS exactly, to four decimal places in every window.
+
+### Which sign is right
+
+`EX_HOP_SIGN=-1` reproduces the reference's core-hole convention. As derived in `multiplet.cpp`
+and verified by explicit conjugation, that convention amounts to giving the **ligand-ligand
+hopping the opposite sign in the core-hole sector to the valence sector**:
+
+- the reference's valence sector is `xcef - 2TX - 2TY - 4TO`;
+- its core-hole sector is `xcef + 2TX + 2TY + 4TO`;
+- the p -> -p gauge transformation `G = diag(+1 x5 d, -1 x6 ligand)` maps the first to
+  `xcef + 2TX + 2TY - 4TO` (same spectrum, as any gauge must give);
+- so the two sectors differ by the sign of `TO` alone, worth up to **0.70 eV** on the one-body
+  levels -- not a gauge choice.
+
+**An O-O hopping integral cannot depend on whether a core hole sits on the metal atom.** The
+Slater-Koster overall sign of `Vppπ` is a physical input to the model and must be the same in both
+sectors. Nothing in the geometry or in the core-hole potential changes it. On that argument our
+default (same sign in both sectors) is correct and the reference's is a defect -- and it is the
+defect that creates its +1.9 eV "charge-transfer satellite", which therefore appears to be an
+artifact rather than physics.
+
+That conclusion is stated as an argument, not as a measurement: no experimental Ni L3 XAS is being
+compared here, and the published Fig. 7 maps inherit the same convention (see below). Anyone
+relying on the +1.9 eV satellite should decide this point deliberately rather than inherit it.
 
 ## Also resolved: the "open structural difference"
 
