@@ -1,3 +1,10 @@
+> # SUPERSEDED -- read [`STATUS.md`](STATUS.md) first.
+>
+> `STATUS.md` is the current orientation document: what is validated and against what, the
+> three bugs fixed in this code, the four defects that make the legacy Fortran unusable as a
+> validation target, the one open question, and the gotchas. This file and
+> `SESSION_HANDOFF.md` are kept as the reasoning trail.
+
 # Next-Session Report: Two-Time-Correlator trRIXS/trXAS
 
 > ## UPDATE: the blocking issue described below has been RESOLVED.
