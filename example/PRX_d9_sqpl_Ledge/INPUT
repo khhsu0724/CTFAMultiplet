@@ -1,0 +1,60 @@
+# PRX 15, 011012 (2025) 3d9 (CuO) square-planar cluster, TM L3 edge.
+#
+# Translated from  Herr_Jost/tr_spectroscopy/Cu/Cu-K_X/TD_Cluster_Xray.f90 , which is the
+# 3d9 cluster set up for the LIGAND K edge (edge=2, ncore=4 -- the paper's Fig. 3(a)-(c));
+# here it is switched to the TM L edge for the paper's Fig. 3(d)-(f), for which no Fortran
+# output exists in that dataset.
+#
+# Fortran -> here:
+#   nholes = nd = 1                     -> Holes = 1
+#   e2..e5 = 2.2, 1.0, 1.5, 1.5         -> CF = 0 2.2 1.0 1.5 1.5   (dx2, dz2, dxy, dxz, dyz)
+#   delxx..delyz = 2.8                  -> MLCT = 2.8, EFFDEL = False
+#   f0, f2, f4 = 6.0, 0.12857, 0.025    -> SC2 (F2_dd = 0.12857*49, F4_dd = 0.025*441)
+#   upp0, upp2 = 1.0, 0.1               -> SC1
+#   cf0, cf2(F2), cf3(G1), cf4(G3)      -> FG = F0, G1, F2, G3  (F2 and G1 SWAP on translation)
+#         = 6.0, 6.18, 4.635, 2.63      -> FG = 6.0 4.635 6.18 2.63
+#   lso = 11.5, dlso = 0                -> SO = 11.5 0
+#   vpds = 2/sqrt(3), tpd = sqrt(3)*vpds/2 = 1.0, tpdz = tpd/4 -> tpd = 1.0, tpdzr = 0.25
+#   vpdp = 0.225                        -> sigpi = 0.225
+#   vpps = 0, vppp = 0.25               -> tpp = 0, TPPPI = 0.25
+#   pump_freq = 0.5 (cycles) -> omega = pi;  pump_ampx = 10 with sin((k+A)/2) -> PUMPAMPX = 5
+#   pump_sigma = 1.5 in exp(-0.5 t^2/pump_sigma) -> PUMPSIGMA = sqrt(1.5) = 1.224744871391589
+#
+# The paper's appendix [45] quotes eps_p = 2.8 for the 3d9 cluster, which matches this
+# Fortran. (It quotes eps_p = 6 for the 3d8 cluster, where that Fortran instead computes
+# nd*aveu = 10.900006 -- a documented-vs-implemented mismatch, noted but not used here.)
+&CONTROL
+	SO = 11.5 0
+	SC1 = 1.0 0 0.1
+	SC2 = 6.0 0 0.12857 0 0.025
+	SC2EX = 6.0 0 0.12857 0 0.025
+	FG = 6.0 4.635 6.18 2.63
+	CF = 0 2.2 1.0 1.5 1.5
+	tpd = 1.0
+	tpp = 0
+	tpdzr = 0.25
+	sigpi = 0.225
+	TPPPI = 0.25
+	MLCT = 2.8
+	DIAG = 4
+	EFFDEL = False
+	EXNEV = 300
+	GSNEV = 300
+	OVERWRITE = True
+/
+&CELL
+	Coordination = "sqpl"
+	Sites = 1
+	Holes = 1
+/
+&PHOTON
+	XAS = true
+	RIXS = false
+	pvin = 1 0 0
+	pvout = 1 0 0
+	epsab = 0.2
+	solver = 4
+	Edge = L
+	NEDOS = 1000
+	AB = -25 25
+/
