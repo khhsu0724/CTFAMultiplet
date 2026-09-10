@@ -8,10 +8,10 @@ Reference: `~/Documents/GradSchool/Devereaux Group/Herr_Jost/NiO_ED_tr_magnons/e
 
 | variant | XAS_X vs reference | RIXS_X_Y vs reference |
 |---|---|---|
-| reference INPUT + `FG_KMAP_LEGACY=1 EXCH_SIGN_LEGACY=1` | **0.00e+00**, r = 1.00000 | 1.4e-4, r = 1.00000 |
+| reference INPUT + `FG_KMAP_LEGACY=1 EXCH_SIGN_FIX=1` | **0.00e+00**, r = 1.00000 | 1.4e-4, r = 1.00000 |
 | reference INPUT, current code | 0.72, r = 0.749 | 0.99, r = 0.463 |
 | F2/G1 unswapped, current code | 0.55, r = 0.861 | 0.88, r = 0.623 |
-| F2/G1 unswapped + `EXCH_SIGN_LEGACY=1` | **0.00e+00**, r = 1.00000 | 1.4e-4, r = 1.00000 |
+| F2/G1 unswapped + `EXCH_SIGN_FIX=1` (absent = upstream) | **0.00e+00**, r = 1.00000 | 1.4e-4, r = 1.00000 |
 
 `eig.txt`, `dos.txt` and `tmat.txt` are **bit-identical** in every variant: the valence sector,
 octahedral geometry, `EFFDEL`, `MF`, `HFscale` and the `SC2` reduced/unreduced conversion all
@@ -77,3 +77,30 @@ switched off) the 2p^5 3d^9 multiplet matches exact Slater-Condon theory to **2.
 
 So the stored NiO reference carries the same Hund's-rule-violating exchange sign as the PRX
 Fortran, and `nio_unsw/` (unswapped `FG`, fixed sign) is the physically correct calculation.
+
+## Default behaviour (final)
+
+**The upstream exchange sign is the default.** An input written for the previous code, run with no
+environment variables set, reproduces its previous results:
+
+| output | default run vs stored reference |
+|---|---|
+| `eig.txt`, `dos.txt`, `tmat.txt` | **bit-identical** |
+| `exeig.txt`, `exdos.txt` | **bit-identical** |
+| `XAS_Ledge_X/Y/Z.txt` | **bit-identical** |
+| `RIXS_Ledge_*.txt` | max rel 1e-4 ... 1.3e-3 |
+
+The RIXS residual is BiCGStab's own convergence tolerance, not a discrepancy: `CG_tol = 1e-8` is
+tested against the **squared** residual norm, so it converges to `||r|| ~ 1e-4`. Iteration counts
+match (7 per solve) and the maps correlate at r = 1.0000000 with median difference exactly 0.
+
+Related caveat: RIXS is not bit-reproducible across thread counts for the same reason -- runs at
+3/6/9 threads agree to ~1e-4 but not exactly. XAS and all eigen/DOS output *are* bit-reproducible.
+Making RIXS bit-reproducible would mean tightening `CG_tol` and serialising the remaining
+elementwise loops in `BiCGS`; the physics is unaffected at this level, since spectral features are
+compared at the percent level.
+
+Use `EXCH_SIGN_FIX=1` to opt into the Hund-correct core-valence exchange sign (see
+`validation_modeB/atomic_limit_multiplet/README.md`), which changes XAS to r = 0.861 and RIXS to
+r = 0.623 against this reference. Recommended only after cross-checking against experiment or an
+independent multiplet code.

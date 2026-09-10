@@ -38,7 +38,7 @@ Four independently resolved levels, all matching the wrong sign. (The 8.221/8.23
 
 So the reference's 2p-3d exchange favours **low** spin in the core-hole multiplet -- a Hund's-rule
 violation -- and that propagates into its XAS, trXAS, RIXS and trRIXS, including PRX Fig. 7/8.
-`EXCH_SIGN_LEGACY=1` reproduces that convention in this code for diffing against it.
+The upstream sign is the **default**; `EXCH_SIGN_FIX=1` opts into the corrected one.
 
 **Caveat worth raising with the paper's authors:** the values `cf2=6.18, cf3=4.635, cf4=2.63` may
 have been chosen to match experimental Ni L-edge spectra *under* that sign. With the corrected sign
@@ -54,8 +54,8 @@ unaffected, and was re-established from scratch using the NiO INPUT exactly as w
 
 | exchange sign | max |diff| vs exact Slater-Condon theory |
 |---|---|
-| upstream (`EXCH_SIGN_LEGACY=1`) | **3.77 eV**, singlet and triplet of each L interchanged |
-| fixed (default) | **2.67e-05** |
+| upstream (**default**, no flag) | **3.77 eV**, singlet and triplet of each L interchanged |
+| fixed (`EXCH_SIGN_FIX=1`) | **2.67e-05** |
 
 Term by term with the fix: 3D +4.0651, 1F +4.4701, 1D +5.4645, 1P +6.2500, 3P +8.2204,
 3F +8.2357 -- all exact. So the exchange sign was genuinely wrong, independently of the `FG`

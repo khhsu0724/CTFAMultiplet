@@ -109,9 +109,9 @@ namespace ed {
 	};
 
 	template <typename T> void norm_vec(std::vector<T>& invec) {
+		// Serial for the same reason as ed::norm above: deterministic summation order.
 		double norm = 0;
-		#pragma omp parallel for reduction (+:norm)
-		for (int i = 0; i < invec.size(); ++i) norm += pow(abs(invec[i]),2);
+		for (size_t i = 0; i < invec.size(); ++i) norm += pow(abs(invec[i]),2);
 		norm = sqrt(norm);
 		#pragma omp parallel for
 		for (int i = 0; i < invec.size(); ++i) invec[i] = invec[i] / norm;
