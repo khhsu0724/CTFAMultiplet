@@ -10,30 +10,78 @@ three RIXS paths dropping the spin-flip channel -- see `../sqpl_cluster_quanty/`
    (-4.51 -> -6.55 in code units; Omega_i ~ 855 -> ~853 eV in the published figure), and
 2. its total intensity **drops to ~35%**.
 
-Both come from the same place: the legacy Fortran gives the **ligand-ligand hopping the opposite
-sign in the core-hole sector to the valence sector**.
+**(1) is explained**: the legacy Fortran gives the **ligand-ligand hopping the opposite sign in
+the core-hole sector to the valence sector**, and that reproduces the shift to 0.02 eV as well as
+the equilibrium XAS satellite exactly. **(2) is still open** -- see the caveat below; it is not
+truncation, not that sign, and not the coherent final-state sum.
 
 ## The measurement
 
-XX polarization, channel 0, delay 0 (`-6.28`, pre-pump) against delay 14 (`+22.31`, post-pump),
-over the Fig. 7 window `Omega_i` in [-8.75, -1.0], `omega` in [-2, 6]. "box" is the Fig. 7(d)
-dashed box (`omega` in [-1.9, 0.5], `Omega_i` in [-8.702, -5.4]).
+XX polarization, delay 0 (`-6.28`, pre-pump) against delay 14 (`+22.31`, post-pump), over the
+Fig. 7 window `Omega_i` in [-8.75, -1.0], `omega` in [-2, 6].
 
-| | total ratio | incident peak | box ratio |
-|---|---|---|---|
-| reference (Fortran production) | 0.346 | -4.51 -> **-6.55** | 1.137 |
-| ours, both fixes | 1.011 | -4.55 -> -4.75 | 1.516 |
-| **ours + legacy core-hole sign** (`EX_HOP_SIGN=-1`) | 0.824 | -4.55 -> **-6.53** | 3.406 |
-| ours, coherent final states (diagnostic) | 3.318 | -4.55 -> -4.75 | 3.594 |
+| | total ratio | incident peak |
+|---|---|---|
+| reference (Fortran production) | 0.346 | -4.51 -> **-6.55** |
+| ours, both fixes | 1.011 | -4.55 -> -4.75 |
+| **ours + legacy core-hole sign** (`EX_HOP_SIGN=-1`) | 0.824 | -4.55 -> **-6.53** |
+| ours, coherent final states (diagnostic) | 3.318 | -4.55 -> -4.75 |
 
 The red shift is reproduced to **0.02 eV** by that sign alone, and by nothing else tried. In
 particular the reference's *coherent* final-state summation -- the other known convention
 difference, and the subject of `../../THEORY_CROSSCHECK_PRB99.md` -- produces **no shift at all**
-and moves the intensity the wrong way (x3.3 instead of x0.35), so it explains neither.
+and moves the intensity the wrong way, so it explains neither.
 
 The same sign also reproduces the reference's equilibrium XAS **exactly**, including its +1.9 eV
 satellite: every window weight to four decimals, r = 1.0000
-(`../sqpl_cluster_quanty/xas_vs_reference/`). One sign, both observables.
+(`../sqpl_cluster_quanty/xas_vs_reference/`). One sign, two observables.
+
+### Caveat on the intensity column: these delays are probe-window truncated
+
+Our simulated window is `[delay_min, delay_max] +- 0.75*max(probe_sigma, tau_ch)` = [-10.10,
+26.13], with `probe_sigma = 5.093`. **13 of the 15 delays sit less than 3 probe-sigma from an
+edge**, including *both* Fig. 7 delays: delay 0 and delay 14 are each only **0.75 sigma** from one.
+The reference's own window is [-25.13, +50.27] (`nb = 4`, `nt = 8`, `timesteps = 320`), so its
+delays are fully converged. Only delays **6, 7 and 8** (+5.97, +8.01, +10.05) clear 3 sigma in our
+runs, and measured against them our endpoint values are ~12% low.
+
+So the *incident-peak position* above is robust -- it is a resonance energy, not a normalization --
+but the total-intensity column is not, and a converged rerun is impractical: raising the window to
+3x pushes `n_is` from 923 to 1506, and the K-row assembly scales as `n_is^2 * nval`, giving ~32 h
+per channel (measured, not estimated: 7.8% of channel 0 in 2.5 h).
+
+### What the converged delays do say
+
+Total intensity in the Fig. 7 window, each curve normalized to its own delay-6 value (the first
+converged delay), summed over the degenerate ground states as `2*chan0 + chan1` (`chan2` is
+identical to `chan0` to r = 1.000000 by the Sz = +-1 symmetry):
+
+| i | delay | conv. | reference | ours | ours + legacy sign | ours coherent |
+|---|---|---|---|---|---|---|
+| 0 | -6.28 | | 2.203 | 0.878 | 1.000 | 0.503 |
+| 3 | -0.16 | | 1.933 | 1.099 | 1.314 | 0.942 |
+| 4 | +1.88 | | 1.273 | 1.068 | 1.224 | 0.983 |
+| 6 | +5.97 | **yes** | 1.000 | 1.000 | 1.000 | 1.000 |
+| 7 | +8.01 | **yes** | 0.823 | 1.000 | 0.960 | 1.123 |
+| 8 | +10.05 | **yes** | 0.800 | 0.986 | 0.944 | 1.157 |
+| 14 | +22.31 | | 0.762 | 0.862 | 0.820 | 1.160 |
+
+The reference decays monotonically by ~2.8x across the pump and saturates by delay 7. **Ours is
+flat**, with a slight *rise* during the pump (1.07-1.10 at delays 3-4). That difference is not a
+truncation artifact: in the converged region (6, 7, 8) the reference is already on its low plateau
+while our curve is flat, and the legacy core-hole sign does not change this (0.944 vs the
+reference's 0.800). The coherent final-state convention goes the wrong way entirely.
+
+**This remains unexplained**, and it is the one quantity where we still disagree with the
+reference. Note though that our behaviour is what the paper's own text describes: *"During the
+pump, there is a slight increase in intensity... However, these changes are not pronounced,
+suggesting that the immediate effect of the pump on the energy dynamics of the 3d8 cluster is
+relatively modest."* A 2.8x collapse is not a modest change. Fig. 8's caption likewise reports a
+flat pre-pump response and an intensity that "increases only marginally" at `t ~ t0`.
+
+Also note the absolute normalizations differ by 12-38x (conventions in the (t1,t2) measure, the
+probe normalization, the spin-flip channel, and the ground-state sum), so only shapes and ratios
+are comparable.
 
 ## Why it is a defect and not a convention
 
