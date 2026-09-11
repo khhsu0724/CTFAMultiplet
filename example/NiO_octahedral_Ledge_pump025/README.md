@@ -77,22 +77,36 @@ default 0.1 will merge them. Use `epsloss ~ 0.02` and a loss grid fine enough to
 
 # Charge oscillations (PRX Fig. 2 style)
 
-`plot_charge_oscillations.py` produces the Fig. 2 analogue: (a1) `A(t)`, (a2) `F[A(t)]`,
-(b1) occupations, (b2) `F[occupations]`. Inputs `INPUT_charge_subcycle` and
-`INPUT_charge_1cycle`, both with `tpp = 0.05`.
+`plot_charge_oscillations.py` produces the Fig. 2 analogue for **one** pump configuration:
+(a1) `A(t)`, (a2) `F[A(t)]`, (b1) e_g occupations, (c1) t2g + ligand occupations,
+(b2) `F[<n>]`, (c2) total hole count as a conservation check. Input
+`INPUT_charge_subcycle` (the envelope carried over unchanged from the earlier runs).
+`INPUT_charge_1cycle` is kept for the envelope comparison but is a separate calculation, not
+part of this figure.
 
-Two deliberate departures from the paper's presentation, because NiO at 0.25 eV is a far
-weaker perturbation than the PRX clusters at pi eV:
+**Occupations are HOLE occupations per orbital, summed over spin**, so each runs 0..2 and they
+sum to the input `Holes`. NiO has `Holes = 2`:
 
-- (b1) plots the **change** `d<n> = <n>(t) - <n>(-inf)` scaled by 1e3. The paper's raw 0..1 axis
-  works because its occupations swing by ~0.7; ours move by ~0.02 and would look flat.
-- (b2) uses a **log** ordinate over 0-6 eV, because what matters here is which frequencies are
-  *absent* as much as which are present.
+| orbital | equilibrium `<n>` |
+|---|---|
+| d_x2-y2 | 0.95051 |
+| d_z2 | 0.95981 |
+| p_xx, p_yy | 0.02804 each |
+| p_zz | 0.02149 |
+| d_xy | 0.00614 |
+| d_xz, d_yz | 0.00297 each |
+| **sum** | **2.00000** (conserved to 1e-6 through the pump) |
 
-Sampling: `TDDT = 0.00785` and a window of -50..400 eV^-1. `scan_td_occupation` hardcodes
-`print_every = 20`, so the output step is `20*TDDT = 0.157` eV^-1 (Nyquist 20 eV), and the
-450 eV^-1 window gives 0.014 eV resolution -- needed because the magnon period is 60 eV^-1.
-Each run is ~57000 propagation steps.
+The e_g pair carries ~0.95 holes each and everything else is small, which is why (b1) and (c1)
+use split y-ranges rather than the paper's single 0..1 axis: the paper can use 0..1 because its
+occupations swing by ~0.7, whereas NiO at 0.25 eV moves by ~0.02. Everything is in absolute hole
+units -- an earlier version of this figure plotted `d<n> x 1e3`, whose +-20 axis reads like an
+occupancy of 20 and was simply a bad choice.
+
+Sampling: `TDDT = 0.00785` and a window of -20..400 eV^-1. `scan_td_occupation` hardcodes
+`print_every = 20`, so the output step is `20*TDDT = 0.157` eV^-1 (Nyquist 20 eV), and the window
+gives 0.015 eV resolution -- needed because the magnon period is 60 eV^-1. ~53000 propagation
+steps.
 
 ## Result: the charge rings at the CT and dd scales, NOT at the magnon frequencies
 
