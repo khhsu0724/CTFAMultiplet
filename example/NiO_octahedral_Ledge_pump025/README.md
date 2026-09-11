@@ -146,3 +146,95 @@ Panel (a2) shows the difference clearly. The **sub-cycle** pulse has a broad spe
 pulse is narrow at 0.25 eV and has fallen eight decades by 1 eV -- yet its response still shows dd
 and CT peaks. That excitation is therefore **nonlinear**, which is consistent with `PUMPAMPX = 5`
 being a large Peierls phase rather than a perturbation.
+
+---
+
+# Amplitude: why A0 = 5 gave no oscillations, and what A0 = 25.3 does
+
+## The pump is a hybridization modulation, and it enters as cos(A)
+
+Peierls substitution puts `kx = pi/2 + A_x(t)`, so `sx = 2 sin(kx) = 2 cos(A_x(t))` and **every**
+TM-ligand and ligand-ligand matrix element is multiplied by `cos(A(t))`. On-site energies (`CF`,
+`MLCT`), Coulomb (`SC1`/`SC2`/`FG`), spin-orbit and `MF` are untouched. Two consequences:
+`|cos| <= 1` means the pump can only *reduce* the hybridization magnitude or flip its sign, never
+raise it; and the response is not linear in `A`.
+
+| | peak &#124;A&#124; | cos(A) range | sign changes of t_eff in the pulse |
+|---|---|---|---|
+| A0 = 5 | 0.914 | +0.610 .. +1.000 | **0** |
+| A0 = 25.3 | 4.627 | -1.000 .. +1.000 | **4** |
+
+At `A0 = 5` the hopping is squeezed smoothly by at most 39 % with no sign reversal -- a monotonic
+adiabatic pinch, which is why nothing oscillated. `A0 = 25.3` (chosen to match the PRX peak field
+at this frequency, since a fixed `A0` gives a 5x weaker field at 0.25 eV than at pi eV) sweeps the
+full range and reverses the hopping four times.
+
+## What changes
+
+| | A0 = 5 | A0 = 25.3 |
+|---|---|---|
+| deposited energy | 0.00012 eV | **3.5182 eV** |
+| transient E excursion | 0.0278 eV | 4.5845 eV |
+| d_x2-y2 peak-to-peak | 0.0187 | **0.6068** |
+| p_xx peak-to-peak | 0.0249 | **0.8342** |
+| d_x2-y2 post-pulse p-p | 0.0022 | 0.3526 |
+| p_xx post-pulse p-p | 0.0018 | 0.6430 |
+
+`p_xx` now runs from its equilibrium 0.028 up to 0.84 -- the ligand hole goes from 3 % to 42 % of
+the cluster's two holes -- and the oscillations persist long after the pulse with a clear beat.
+Hole number stays conserved to 2e-6.
+
+## CAUTION: at this amplitude the spectral band labels stop being diagnostic
+
+At `A0 = 25.3` the post-pulse weight near 0.20 eV rises to 28-41 %, which is tempting to read as
+the two-magnon line at 0.2097 eV. **That reading is not justified here.** With 3.52 eV deposited,
+the populated manifold is dense: among the 372 valence levels, **355 level pairs** have spacings
+in [0.19, 0.23] eV, the spacing density is ~3000 pairs per eV, and the frequency resolution of a
+340 eV^-1 window is 0.0185 eV -- about 56 pairs per resolution element. The measured peak sits at
+0.203 eV, within one resolution element of the 2-magnon, but so are hundreds of unrelated pairs.
+
+The band assignments *are* meaningful at `A0 = 5`, where only 1.2e-4 eV is deposited and the
+dynamics stays in a small neighbourhood of the ground state. There the conclusion stands: the
+charge rings at CT (~4.8 eV) and dd (~1.0 eV), and the magnon frequencies carry essentially
+nothing.
+
+## The useful amplitude window
+
+`E_stat` is conserved after the pulse, so a short window suffices to scan this:
+
+| `PUMPAMPX` | peak &#124;A&#124; | min cos(A) | E_dep | regime |
+|---|---|---|---|---|
+| 5 | 0.914 | +0.610 | 0.00012 eV | adiabatic, no real excitation |
+| 8 | 1.463 | +0.108 | 0.00317 eV | adiabatic |
+| **12** | **2.194** | **-0.584** | **0.1234 eV** | **within the magnon manifold** |
+| 16 | 2.926 | -0.977 | 0.8508 eV | below the dd gap (0.9381) |
+| 20 | 3.657 | -1.000 | 2.0717 eV | above the gap, dense manifold |
+| 25.3 | 4.627 | -1.000 | 3.5182 eV | above the gap, dense manifold |
+
+For magnon-specific physics `PUMPAMPX ~ 12` is the interesting setting: the hopping reverses sign
+(so there is real driving, not an adiabatic squeeze) while the deposited energy 0.123 eV stays
+inside the Sz ladder, below the 0.9381 eV dd gap. Then a feature at 0.105 or 0.210 eV can actually
+be attributed to the magnon manifold.
+
+# Hybridization: this parameter set vs the Fortran d8 set
+
+| | NiO octahedral | PRX/Fortran d8 square-planar |
+|---|---|---|
+| geometry | 6 ligands, 9 p orbitals | 2 effective ligands, 6 p |
+| `tpd` | 0.35 | 1.00 |
+| tpd_z | `tpd`/sqrt(3) = 0.2021 | `tpd`*`tpdzr` = 0.25 |
+| tpd_pi | `tpd`*`sigpi` = 0.0875 | `tpd`*`sigpi` = 0.225 |
+| `tpp` | 0.0 | 0.0 |
+| tpp_pi | not settable (`tpp_sig_pi` = 0) | `TPPPI` = 0.25 |
+| Delta (`MLCT`) | 4.5 | 10.900004 |
+| `EFFDEL` | True (effective Delta) | False (bare Delta) |
+| equilibrium 2*`tpd` | 0.700 eV | 2.000 eV |
+| **2*`tpd`/Delta** | **0.1556** | **0.1835** |
+| ground-state ligand-hole character | **3.88 %** | **6.11 %** |
+
+The bare hopping is 2.9x smaller in NiO, but Delta is 2.4x smaller too, so the dimensionless
+mixing parameter comes out within 17 % and the ligand-hole character differs by only 1.6x -- not
+the factor 3 the bare `tpd` suggests. Two asymmetries: the d8 set has a much harder pi channel
+(tpd_pi 0.225 vs 0.0875, plus a live `TPPPI` that the octahedral geometry cannot reach), and the
+two use different Delta conventions (`EFFDEL = True` vs `False`), so the `Delta` row is not
+strictly like-for-like and the ratio inherits that caveat.
