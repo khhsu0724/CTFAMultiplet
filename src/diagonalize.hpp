@@ -162,6 +162,12 @@ void ContFracExpan(Matrix<T>* ham, const vecc& v0, double E0, vecd& specX, vecd&
 	vecc alpha(niter_CFE,0);
 	vecc betha(niter_CFE,0);
 	niter_CFE = Lanczos(ham,v0,alpha,betha,niter_CFE);
+	// Lanczos() reports niter_CFE = i (not i+1) when betha[i+1] vanishes at iteration i, so it
+	// can return 0 even though alpha[0] was validly computed -- which happens whenever v0 is
+	// already an eigenvector of ham. Without this guard the loop below would read alpha[-1].
+	// LanczosPropagate() carries the same guard for the same reason; this is the other caller.
+	// n = 1 is the correct continued fraction on a one-dimensional Krylov space: z - alpha[0].
+	if (niter_CFE < 1) niter_CFE = 1;
 	// for (int i = 0; i < niter_CFE; ++i) std::cout << "a: " << alpha[i] << ", b: " << betha[i] << std::endl;
 	#pragma omp parallel for shared(intensity,specY,alpha,betha)
 	for (int i = 0; i < nedos; ++i) {
