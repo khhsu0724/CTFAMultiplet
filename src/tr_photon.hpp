@@ -88,6 +88,33 @@ inline void write_trXAS(const vecd& aben, const std::vector<vecd>& intensity,
 // process_hilbert_space leaves hparam mutated to core-hole values after building EX and
 // never restores them). GS/EX must already be built+diagonalized via the ordinary
 // equilibrium pipeline (calc_ham+Block::diagonalize), exactly as for validate_propagator.
+// Every time-resolved path here starts its trajectory from the STATIC ground-state eigenvector
+// at t_lo and propagates forward. If t_lo falls after the pump pulse, the pump is simply never
+// applied and the result is silently the equilibrium one -- identical for every delay and every
+// amplitude. That is easy to hit when a run is set up per-delay (the window is
+// [delay - n*sigma, delay + n*sigma], so a late delay opens its window after the pulse), and
+// nothing else in the code notices. Warn.
+inline void warn_window_misses_pump(const HParam& hp, double t_lo, const char* who) {
+	bool pump_on = hp.pump_sigma > 0 &&
+		(std::abs(hp.pump_amp_x) > 0 || std::abs(hp.pump_amp_y) > 0 || std::abs(hp.pump_amp_z) > 0);
+	if (!pump_on) return;
+	double pulse_start = hp.pump_t0 - 3.0*hp.pump_sigma;
+	if (t_lo <= pulse_start) return;
+	double pulse_end = hp.pump_t0 + 3.0*hp.pump_sigma;
+	std::cerr << "WARNING: " << who << " starts its trajectory at t_lo = " << t_lo
+				<< " from the STATIC ground state, but the pump pulse spans ["
+				<< pulse_start << "," << pulse_end << "] (t0 = " << hp.pump_t0
+				<< ", sigma = " << hp.pump_sigma << ")." << std::endl;
+	if (t_lo >= pulse_end)
+		std::cerr << "         The pulse is entirely BEFORE the window: the pump is never applied "
+					<< "and this run returns the EQUILIBRIUM result for every delay." << std::endl;
+	else
+		std::cerr << "         The window opens mid-pulse, so only part of the pump acts."
+					<< std::endl;
+	std::cerr << "         Fix: include an early delay so t_lo < " << pulse_start
+				<< " (e.g. TRDELAY = <early> <late> <n>), or widen the window." << std::endl;
+}
+
 inline void trXAS(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, const HParam& hparam_ex,
 					const PM& pm, TRParam& trp) {
 	std::cout << std::endl << "=== Time-resolved XAS ===" << std::endl;
@@ -99,6 +126,7 @@ inline void trXAS(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, const HPara
 	double t_hi = *std::max_element(trp.delay_points.begin(),trp.delay_points.end())
 					+ trp.n_sigma_probe*trp.probe_sigma;
 	int n_is = (int)std::round((t_hi-t_lo)/dt_probe);
+	warn_window_misses_pump(hparam_gs, t_lo, "trXAS");
 
 	double gs_en = GS.hblks[0].eig[0];
 	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.nev; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
@@ -218,6 +246,7 @@ inline void trRIXS(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, const HPar
 	double t_hi = *std::max_element(trp.delay_points.begin(),trp.delay_points.end())
 					+ trp.n_sigma_probe*trp.probe_sigma;
 	int n_is = (int)std::round((t_hi-t_lo)/dt_probe);
+	warn_window_misses_pump(hparam_gs, t_lo, "trRIXS_snapshot");
 
 	double gs_en = GS.hblks[0].eig[0];
 	for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.nev; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
@@ -418,6 +447,7 @@ inline void trRIXS_2time(Hilbert& GS, Hilbert& EX, const HParam& hparam_gs, cons
 	double t_lo = *std::min_element(delays.begin(),delays.end()) - window;
 	double t_hi = *std::max_element(delays.begin(),delays.end()) + window;
 	int n_is = (int)std::round((t_hi-t_lo)/dt);
+	warn_window_misses_pump(hparam_gs, t_lo, "trRIXS_2time");
 	// Convergence guard. Each delay is weighted by a probe Gaussian centred on it, so a delay
 	// sitting close to a window edge has its own weight truncated and comes out low. Nothing else
 	// in the code notices; an earlier PRX Fig. 7 run had 13 of 15 delays under 3 sigma (both
