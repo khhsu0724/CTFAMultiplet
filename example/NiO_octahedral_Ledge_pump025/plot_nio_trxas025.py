@@ -21,7 +21,7 @@ for lab, d, c in RUNS:
     T, C, W = np.array(T), np.array(C), np.array(W)
     ax[0].plot(T, (C-C[0])*1000, "o-", ms=3, color=c, lw=1.3, label=lab)
     ax[1].plot(T, (W/W[0]-1)*100, "o-", ms=3, color=c, lw=1.3, label=lab)
-ax[0].axhspan(-85, -65, color="grey", alpha=0.25, lw=0)
+ax[0].axhspan(-110, -90, color="grey", alpha=0.25, lw=0)
 ax[0].text(52, -75, "expt ~100 meV", fontsize=7.5, color="dimgrey", va="center", ha="right")
 ax[0].axhline(0, color="grey", lw=0.6)
 ax[0].set_ylabel("$L_3$ centroid shift  (meV)")
