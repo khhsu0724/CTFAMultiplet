@@ -97,20 +97,31 @@ namespace ed {
 	};
 
 	template <typename T> double norm(const std::vector<T>& vin, bool squared = false) {
+		// Deterministic on purpose: see the note in BiCGS (src/diagonalize.hpp). An OMP
+		// reduction here reorders the summation with the thread count, and BiCGStab is
+		// marginally stable enough that the resulting ~1e-16 differences flip it into
+		// breakdown -- silently zeroing whole incident-energy columns of the spectrum.
+		// These loops are a few hundred elements; the pragma cost far exceeded the work.
 		double n = 0;
-		#pragma omp parallel for reduction (+:n)
-		for (int i = 0; i < vin.size(); ++i) n += pow(abs(vin[i]),2);
+		for (size_t i = 0; i < vin.size(); ++i) n += pow(abs(vin[i]),2);
 		if (squared) return n;
 		else return sqrt(n);
 	};
 
 	template <typename T> void norm_vec(std::vector<T>& invec) {
+		// Serial for the same reason as ed::norm above: deterministic summation order.
 		double norm = 0;
-		#pragma omp parallel for reduction (+:norm)
-		for (int i = 0; i < invec.size(); ++i) norm += pow(abs(invec[i]),2);
+		for (size_t i = 0; i < invec.size(); ++i) norm += pow(abs(invec[i]),2);
 		norm = sqrt(norm);
 		#pragma omp parallel for
 		for (int i = 0; i < invec.size(); ++i) invec[i] = invec[i] / norm;
+	};
+
+	// <a|b> = sum_i conj(a_i) * b_i
+	inline dcomp inner_product(const vecc& a, const vecc& b) {
+		dcomp s(0,0);
+		for (size_t i = 0; i < a.size(); ++i) s += std::conj(a[i]) * b[i];
+		return s;
 	};
 
 	template <typename T> void norm_ev(T* ev, int n) {

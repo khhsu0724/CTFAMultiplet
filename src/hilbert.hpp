@@ -11,7 +11,7 @@ public:
 	int num_at = 0, at_per_site = 0;
 	int val_ati = 0, val_ind = 0; // Index/Orbital index of first valence atom
 	int num_ch = 0, num_vh = 0, num_corb = 0, num_vorb = 0; // This is number of orbital*2 (number of electron sites)
-	bool SO_on = false, CV_on = false, CF_on = false, HYB_on = false;
+	bool SO_on = false, CV_on = false, CF_on = false, HYB_on = false, MF_on = false;
 	bool is_ex, BLOCK_DIAG = false;
 	std::string coord = "none", edge, inp_hyb_file;
 	std::vector<Atom> atlist; // atlist is ordered
@@ -33,7 +33,17 @@ public:
 	std::vector<ulli> enum_hspace(ulli inc_val = 0, ulli inc_core = 0, int vmod = 0, int cmod = 0);
 	ulli qn2ulli(int snum, QN* qn, bool only_val = false, bool only_core = false);
 	vpulli match(int snum, QN* lhs, QN* rhs);
-	void fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs);
+	// HTarget selects which of a block's matrices a term is filled into.
+	// HAM (default): the existing, always-used equilibrium Hamiltonian (Block::ham) --
+	//   every existing call site is unaffected by this addition.
+	// HAM_STATIC: Block::ham_static, the time-independent (Coulomb+SOC+CF+CV+MF) piece
+	//   built once for real-time propagation (src/tdynamics.hpp), kept separate from
+	//   Block::ham so the equilibrium ground-state diagonalization is never disturbed.
+	// HAM_HYB: Block::ham_hyb, the pump-modulated one-body hybridization term, rebuilt
+	//   every propagation timestep.
+	enum class HTarget { HAM, HAM_STATIC, HAM_HYB };
+	void fill_hblk(double const& matelem, ulli const& lhs, ulli const& rhs,
+					HTarget target = HTarget::HAM);
 	void print_bits(ulli state);
 	double Fsign(QN* op, ulli state, int opnum);
 	double Fsign(ulli* op, ulli state, int opnum);
