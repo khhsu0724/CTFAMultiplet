@@ -144,6 +144,11 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite, TRParam& t
 		if (input.is_open()) {
 			bool read_control = false, read_photon = false, read_pump = false;
 			int atind = 0;
+			// Keys the parser did not recognise, reported together at the end. The section
+			// flags below mean a key placed in the wrong &SECTION never reaches its branch,
+			// so it was previously dropped in silence -- TAUCH in &CONTROL, say, would leave
+			// the core-hole lifetime at its default with nothing to say so. Same for a typo.
+			std::vector<std::string> unknown_keys;
 			while (getline(input,line)) {
 				if (line[0] == '#') continue;
 				if (line[0] == '/') {
@@ -195,6 +200,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite, TRParam& t
 								skip = read_num(line.substr(s+1,line.size()-1),&hparam.gs_diag_option,1);
 								hparam.ex_diag_option = hparam.gs_diag_option;
 							}
+							else if (!p.empty()) {unknown_keys.push_back("&CONTROL: " + p); skip = true;}
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -255,6 +261,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite, TRParam& t
 							}
 						else if (p == "EM") skip = read_num(line.substr(s+1,line.size()-1),&pm.em_energy,1,p=p);
 							else if (p == "EMLO") skip = read_num(line.substr(s+1,line.size()-1),&pm.em_lo,1,p=p);
+							else if (!p.empty()) {unknown_keys.push_back("&PHOTON: " + p); skip = true;}
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -290,6 +297,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite, TRParam& t
 								skip = read_num(line.substr(s+1,line.size()-1),delay_temp,3,p=p);
 								for (int i = 0; i < 3; ++i) trp.delay[i] = delay_temp[i];
 							}
+							else if (!p.empty()) {unknown_keys.push_back("&PUMP: " + p); skip = true;}
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -310,6 +318,22 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite, TRParam& t
 					read_control = false;
 					read_photon = false;
 				}
+				else if (line == "&CELL") {
+					// &CELL is parsed separately, in Hilbert's own pass over this file. Clearing the
+					// flags here means its keys are not fed to the previous section's chain, which
+					// happens whenever an input omits the '/' closing the section before it.
+					read_control = false;
+					read_photon = false;
+					read_pump = false;
+				}
+			}
+			if (!unknown_keys.empty()) {
+				std::cerr << "WARNING: " << unknown_keys.size() << " unrecognised input key(s); "
+						<< "these were IGNORED and their defaults used:" << std::endl;
+				for (auto& k : unknown_keys) std::cerr << "           " << k << std::endl;
+				std::cerr << "         A key only takes effect inside its own section: pump, probe and\n"
+						<< "         propagator keys in &PUMP, spectrum keys in &PHOTON, Hamiltonian\n"
+						<< "         keys in &CONTROL. Check spelling and placement." << std::endl;
 			}
 		} else throw invalid_argument("Cannot open " + IDIR + " file");
 	} catch (const exception &ex) {

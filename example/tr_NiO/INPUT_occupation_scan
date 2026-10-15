@@ -18,6 +18,7 @@
         GSNEV = 10 
         OVERWRITE = True # Overwrite photon file in the directory
 
+/
 &CELL
         Coordination = "Octahedral" # Defaults to no coordination
         Sites = 1 # x,y,z, Defaults to 1 site
