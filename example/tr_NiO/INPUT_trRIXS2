@@ -1,0 +1,52 @@
+&CONTROL
+        SO = 11.507 0.083 0.102 # Spin Orbit Coupling
+        SC1 = 1.0 0 0.1 #F_0,2 for l = 1
+        SC2 = 6.0 0 12.233 0 7.597
+        SC2EX = 6.0 0 13.005 0 8.084
+        FG = 6.0 5.783 7.720 3.290
+        HFscale = 0.8
+        CF = 0 0 0.8 0.8 0.8
+        tpd = 0.35
+        tpp = 0.0
+        MLCT = 4.5
+        sigpi = 0.25
+        MF = 0.11                # molecular field on the d spin; splits the Ms sublevels
+        DIAG = 4
+        EFFDEL = True
+        EXNEV = 400              # Mode B needs a COMPLETE eigenbasis in both sectors
+        GSNEV = 200
+        OVERWRITE = True
+/
+&CELL
+        Coordination = "Octahedral"
+        Sites = 1
+        Holes = 2
+/
+&PHOTON
+	XAS = false
+	RIXS = false
+	pvin = 1 0 0
+	pvout = 1 0 0
+	solver = 4
+	Edge = L
+	NEDOS = 180              # bins on the energy-loss axis
+	AB = -14 2
+	INCIDENT = -14 2 40      # incident-energy grid: start, end, count
+	EM = 6.5                 # loss-axis upper bound
+	EMLO = -2.5              # loss-axis LOWER bound (negative = anti-Stokes). Default -2.
+	epsloss = 0.05
+/
+&PUMP
+	TIMEDEP = True
+	TRRIXS2 = True           # time-resolved RIXS, two-time correlator (Mode B)
+	PUMPFREQ = 0.25
+	PUMPAMPX = 25.3
+	PUMPAMPY = 0
+	PUMPSIGMA = 1.2247448713915890
+	PUMPT0 = 0
+	TDDT = 0.05
+	TDM = 20
+	TAUCH = 2.5
+	TRPROBESIGMA = 3.0       # sets the LOSS resolution: FWHM ~ 2.25/TRPROBESIGMA
+	TRDELAY = -5.0 20.0 2    # one pre-pump and one post-pump delay
+/
