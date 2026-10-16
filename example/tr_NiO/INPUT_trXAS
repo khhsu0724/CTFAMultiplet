@@ -1,0 +1,48 @@
+&CONTROL
+        SO = 11.507 0.083 0.102 # Spin Orbit Coupling
+        SC1 = 1.0 0 0.1 #F_0,2 for l = 1
+        SC2 = 6.0 0 12.233 0 7.597
+        SC2EX = 6.0 0 13.005 0 8.084
+        FG = 6.0 5.783 7.720 3.290
+        HFscale = 0.8
+        CF = 0 0 0.8 0.8 0.8
+        tpd = 0.35
+        tpp = 0.0
+        MLCT = 4.5
+        sigpi = 0.25
+        MF = 0.11                # molecular field on the d spin; splits the Ms sublevels
+        DIAG = 4
+        EFFDEL = True
+        EXNEV = 400              # Mode B needs a COMPLETE eigenbasis in both sectors
+        GSNEV = 200
+        OVERWRITE = True
+/
+&CELL
+        Coordination = "Octahedral"
+        Sites = 1
+        Holes = 2
+/
+&PHOTON
+	XAS = false
+	RIXS = false
+	pvin = 1 0 0
+	pvout = 1 0 0
+	solver = 4
+	Edge = L
+	NEDOS = 700
+	AB = -20 30
+/
+&PUMP
+	TIMEDEP = True
+	TRXAS = True             # time-resolved XAS
+	PUMPFREQ = 0.25          # pump angular frequency (eV); NOT cycles
+	PUMPAMPX = 5.0           # Peierls-phase amplitude, dimensionless -- see util/pump_units.py
+	PUMPAMPY = 0
+	PUMPSIGMA = 1.2247448713915890   # Gaussian envelope width (eV^-1)
+	PUMPT0 = 0
+	TDDT = 0.02              # propagator time step (eV^-1)
+	TDM = 20                 # Krylov dimension per propagator step
+	TAUCH = 2.5              # core-hole lifetime (eV^-1); physical, not a numerical broadening
+	TRPROBESIGMA = 1.0       # probe-pulse width (eV^-1)
+	TRDELAY = -10.0 45.0 56  # pump-probe delays: start, end, count
+/

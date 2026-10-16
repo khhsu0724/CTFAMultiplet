@@ -21,7 +21,10 @@
 #include <arpack.hpp>
 #endif
 
-#pragma omp declare reduction(+:dcomp:omp_out=omp_out+omp_in) initializer (omp_priv=omp_orig)
+// A sum reduction must initialise the private copy to the IDENTITY, not to omp_orig:
+// with omp_priv=omp_orig the incoming value is added once per thread. Every current
+// use pre-zeroes its accumulator so it was latent, but it is wrong as written.
+#pragma omp declare reduction(+:dcomp:omp_out=omp_out+omp_in) initializer (omp_priv=dcomp(0,0))
 
 void ed_dgees(double *_mat, double *_eigvec, double* _eigReal, size_t n);
 void ed_dsyev(double *_mat, double *_eigval, size_t n);
@@ -96,10 +99,20 @@ void ed_dsarpack(Matrix<Real>* ham, Real *_eigvec, Real* _eigval, size_t n, size
 #endif
 
 template <typename T>
-int Lanczos(Matrix<T>* ham, const vecc& v0, vecc& alpha, vecc& betha, int niter_CFE=150) {
-	// Lanczos iteration, obtains tridiagonal matrix alpha_i, beta_i. 
+int Lanczos(Matrix<T>* ham, const vecc& v0, vecc& alpha, vecc& betha, int niter_CFE=150,
+				std::vector<vecc>* V_out = nullptr) {
+	// Lanczos iteration, obtains tridiagonal matrix alpha_i, beta_i.
 	// returns new niter_CFE value
+	// V_out, if provided, records each orthonormal Krylov basis vector phi_i as built --
+	// used by LanczosPropagate (src/tdynamics.hpp) to reconstruct exp(-iH dt)|psi>. Left
+	// as nullptr (default) this is a no-op and behaves exactly as before for every
+	// existing caller (ContFracExpan).
 	int hsize = ham->get_mat_dim();
+	// Without reorthogonalization, iterating past the matrix dimension exhausts
+	// the true Krylov space; further steps pick up numerical noise as spurious
+	// ghost eigenvalues (the breakdown check below rarely catches this in finite
+	// precision). Cap here so every caller is protected.
+	if (niter_CFE > hsize) niter_CFE = hsize;
 	// std::cout << "Hdim: " << hsize  << "," << v0.size() << std::endl;
 	vecc phip(hsize,0);
 	vecc phipp(hsize,0);
@@ -107,11 +120,12 @@ int Lanczos(Matrix<T>* ham, const vecc& v0, vecc& alpha, vecc& betha, int niter_
 	// Normalize the vector
 	vecc phi(v0);
 	ed::norm_vec(phi);
+	if (V_out) V_out->reserve(niter_CFE);
 
 	for (int i = 0; i < niter_CFE; ++i) {
+		if (V_out) V_out->push_back(phi);
 		ham->mvmult_cmplx(phi,phip);
 		dcomp alpha_element(0);
-		#pragma omp parallel for reduction (+:alpha_element)
 		for (int j = 0; j < hsize; ++j) alpha_element += std::conj(phi[j])*phip[j];
 		alpha[i] = alpha_element;
 		if (i != 0) {
@@ -148,6 +162,12 @@ void ContFracExpan(Matrix<T>* ham, const vecc& v0, double E0, vecd& specX, vecd&
 	vecc alpha(niter_CFE,0);
 	vecc betha(niter_CFE,0);
 	niter_CFE = Lanczos(ham,v0,alpha,betha,niter_CFE);
+	// Lanczos() reports niter_CFE = i (not i+1) when betha[i+1] vanishes at iteration i, so it
+	// can return 0 even though alpha[0] was validly computed -- which happens whenever v0 is
+	// already an eigenvector of ham. Without this guard the loop below would read alpha[-1].
+	// LanczosPropagate() carries the same guard for the same reason; this is the other caller.
+	// n = 1 is the correct continued fraction on a one-dimensional Krylov space: z - alpha[0].
+	if (niter_CFE < 1) niter_CFE = 1;
 	// for (int i = 0; i < niter_CFE; ++i) std::cout << "a: " << alpha[i] << ", b: " << betha[i] << std::endl;
 	#pragma omp parallel for shared(intensity,specY,alpha,betha)
 	for (int i = 0; i < nedos; ++i) {
@@ -197,8 +217,12 @@ vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8,
 	        if (i!=0) std::cout << ", s:" << ed::norm(s,true);
 	        std::cout << std::endl;
 	    }
+    	// Serial on purpose -- deterministic summation order. BiCGStab is rounding-sensitive
+    	// enough that an OMP reduction's thread-count-dependent order flips it into breakdown:
+    	// measured on the equilibrium RIXS solver, 1 thread gives total weight 51.0004
+    	// reproducibly while 3 threads zeroed 29-31 of 40 incident columns and 4 threads zeroed
+    	// all 40, with nothing in the output marking the failure.
     	rho  = 0;
-    	#pragma omp parallel for reduction (+:rho)
 		for (int j = 0; j < hsize; ++j) rho += r0[j]*r[j];
 		// if (std::real(rho) < 1e-12) {
 		// 	std::cout << "New search direction cannot be found in BiCGStab" << std::endl;
@@ -225,7 +249,6 @@ vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8,
         	v[j] -= phat[j]*z;
         // STEP 5: alpha = rho/(r0,v)
         dcomp rv = 0;
-        #pragma omp parallel for reduction (+:rv)
 		for (int j = 0; j < hsize; ++j) rv += r0[j]*v[j];
         alpha = rho/rv;
 		// std::cout << "alpha: " << alpha << std::endl;
@@ -254,7 +277,6 @@ vecc BiCGS(Matrix<T>* ham, const vecc& b, const dcomp z, double CG_tol = 1e-8,
         	t[j] -= shat[j]*z;
         // STEP 9: w = (t,s)/(t,t)
         dcomp omega = 0;
-        #pragma omp parallel for reduction (+:omega)
 		for (int j = 0; j < hsize; ++j) omega += std::conj(t[j])*s[j];
 		omega /= ed::norm(t,true);
 		// std::cout << "omega: " << omega << std::endl;
@@ -288,6 +310,13 @@ public:
 	int diag_option;
 
 	Matrix<T>* ham;
+	// Propagation-only, populated lazily by the real-time propagator (src/tdynamics.hpp).
+	// ham_static holds Coulomb+SOC+CF+CV+MF (built via calc_ham(...,nohyb=true)); ham_hyb
+	// holds only the (possibly pump-modulated) one-body hybridization term, rebuilt every
+	// propagation timestep. Neither is touched by any equilibrium (diagonalization) code
+	// path -- both stay nullptr unless a time-dependent run explicitly allocates them.
+	Matrix<T>* ham_static = nullptr;
+	Matrix<T>* ham_hyb = nullptr;
 	uptrd eig, eigvec;
 	std::vector<int> einrange;
 	std::vector<ulli> rank; // rank keeps some rank information for faster hashing
@@ -299,10 +328,12 @@ public:
 		nev = size;
 		rank = std::move(rank_in);
 	};
-	
+
 	Block(Block<T>&& blk) : Sz(blk.Sz), Jz(blk.Jz), K(blk.K), size(blk.size), f_ind(blk.f_ind), nev(blk.nev) {
 		// This is a bit odd, should I copy or move?
 		ham = std::move(blk.ham);
+		ham_static = std::move(blk.ham_static);
+		ham_hyb = std::move(blk.ham_hyb);
 		eig = std::move(blk.eig);
 		eigvec = std::move(blk.eigvec);
 		_ham = std::move(blk._ham);
@@ -330,6 +361,27 @@ public:
 			else ham = new Dense<double>();
 		}
 		ham->malloc(size);
+	};
+	void malloc_ham_static() {
+		// Static (Coulomb+SOC+CF+CV+MF) piece used only for real-time propagation.
+		// Same size-based storage heuristic as malloc_ham, since it's built/mvmult'd
+		// the same way -- just never diagonalized.
+		if (size <= 2e3) ham_static = new Dense<T>();
+		else ham_static = new EZSparse<T>();
+		ham_static->malloc(size);
+	};
+	void malloc_ham_dyn() {
+		// One-body (pump/hybridization) piece, rebuilt every propagation timestep.
+		// Uses the SAME size-based storage choice as ham_static/malloc_ham, so that
+		// H_static + H_hyb(t) is filled/mvmult'd with exactly the same storage-format
+		// semantics the original monolithic equilibrium ham would have used for this
+		// term at this block size -- a Dense/EZSparse("S") *format* mismatch between
+		// ham_static and ham_hyb was found (empirically) to leak a small amount of
+		// population out of an exact eigenstate under zero pump, which should be
+		// perfectly stationary; matching formats resolved it.
+		if (size <= 2e3) ham_hyb = new Dense<T>();
+		else ham_hyb = new EZSparse<T>();
+		ham_hyb->malloc(size);
 	};
 	void diagonalize(size_t nev_in = 20, bool clear_mat = true) {
 		// Options: 1. DGEES 2. DSYEVR (MRRR) 3. DSYEV (Shifted QR) 

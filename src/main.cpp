@@ -6,6 +6,8 @@
 #include <fstream>
 #include "multiplet.hpp"
 #include "photon.hpp"
+#include "tdynamics.hpp"
+#include "tr_photon.hpp"
 
 #ifdef WINDOWS
     #include <direct.h>
@@ -135,18 +137,24 @@ bool read_bool(string line, bool& tgt) {
 	return true;
 }
 
-void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
+void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite, TRParam& trp) {
 	string line;
 	ifstream input(IDIR);
 	try {
 		if (input.is_open()) {
-			bool read_control = false, read_photon = false;
+			bool read_control = false, read_photon = false, read_pump = false;
 			int atind = 0;
+			// Keys the parser did not recognise, reported together at the end. The section
+			// flags below mean a key placed in the wrong &SECTION never reaches its branch,
+			// so it was previously dropped in silence -- TAUCH in &CONTROL, say, would leave
+			// the core-hole lifetime at its default with nothing to say so. Same for a typo.
+			std::vector<std::string> unknown_keys;
 			while (getline(input,line)) {
 				if (line[0] == '#') continue;
 				if (line[0] == '/') {
 					read_control = false;
 					read_photon = false;
+					read_pump = false;
 					continue;
 				}
 				if (read_control) {
@@ -176,7 +184,9 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 							// else if (p == "TPPSIGMA") skip = read_bool(line.substr(s+1,line.size()-1),hparam.tppsigma_on);
 							else if (p == "OCTJT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.octJT,1,p=p);
 							else if (p == "MLCT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.MLdelta,1,p=p);
+							else if (p == "MF") skip = read_num(line.substr(s+1,line.size()-1),&hparam.MF,1,p=p);
 							else if (p == "SIGPI") skip = read_num(line.substr(s+1,line.size()-1),&hparam.sig_pi,1,p=p);
+							else if (p == "TPPPI") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tpp_pi,1,p=p);
 							else if (p == "EFFDEL") skip = read_bool(line.substr(s+1,line.size()-1),hparam.effective_delta);
 							else if (p == "BLOCK") skip = read_bool(line.substr(s+1,line.size()-1),hparam.block_diag);
 							else if (p == "GSDIAG") skip = read_num(line.substr(s+1,line.size()-1),&hparam.gs_diag_option,1,p=p);
@@ -190,6 +200,7 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 								skip = read_num(line.substr(s+1,line.size()-1),&hparam.gs_diag_option,1);
 								hparam.ex_diag_option = hparam.gs_diag_option;
 							}
+							else if (!p.empty()) {unknown_keys.push_back("&CONTROL: " + p); skip = true;}
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -248,7 +259,45 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 								for (int i = 0; i < 3; ++i) pm.incident[i] = incident_temp[i];
 								pm.set_incident_points();
 							}
-							else if (p == "EM") skip = read_num(line.substr(s+1,line.size()-1),&pm.em_energy,1,p=p);
+						else if (p == "EM") skip = read_num(line.substr(s+1,line.size()-1),&pm.em_energy,1,p=p);
+							else if (p == "EMLO") skip = read_num(line.substr(s+1,line.size()-1),&pm.em_lo,1,p=p);
+							else if (!p.empty()) {unknown_keys.push_back("&PHOTON: " + p); skip = true;}
+							p = "";
+						}
+						if (line[s] == '#') skip = true;
+					}
+				}
+				if (read_pump) {
+					string p;
+					bool skip = false;
+					double delay_temp[3]{0};
+					for (int s = 0; s < line.size() && !skip; ++s) {
+						if (line[s] != ' ' && line[s] != '	' && line[s] != '=') p.push_back(line[s]);
+						else {
+							transform(p.begin(),p.end(),p.begin(),::toupper);
+							if (p == "PUMPFREQ") skip = read_num(line.substr(s+1,line.size()-1),&hparam.pump_freq,1,p=p);
+							else if (p == "PUMPAMPX") skip = read_num(line.substr(s+1,line.size()-1),&hparam.pump_amp_x,1,p=p);
+							else if (p == "PUMPAMPY") skip = read_num(line.substr(s+1,line.size()-1),&hparam.pump_amp_y,1,p=p);
+							else if (p == "PUMPAMPZ") skip = read_num(line.substr(s+1,line.size()-1),&hparam.pump_amp_z,1,p=p);
+							else if (p == "PUMPSIGMA") skip = read_num(line.substr(s+1,line.size()-1),&hparam.pump_sigma,1,p=p);
+							else if (p == "PUMPT0") skip = read_num(line.substr(s+1,line.size()-1),&hparam.pump_t0,1,p=p);
+							else if (p == "TIMEDEP") skip = read_bool(line.substr(s+1,line.size()-1),hparam.time_dep);
+							else if (p == "TDDT") skip = read_num(line.substr(s+1,line.size()-1),&hparam.td_dt,1,p=p);
+							else if (p == "TDM") skip = read_num(line.substr(s+1,line.size()-1),&hparam.td_m,1,p=p);
+							else if (p == "TDOCCSCAN") skip = read_bool(line.substr(s+1,line.size()-1),hparam.td_occ_scan);
+							else if (p == "TDTMIN") skip = read_num(line.substr(s+1,line.size()-1),&hparam.td_tmin,1,p=p);
+							else if (p == "TDTMAX") skip = read_num(line.substr(s+1,line.size()-1),&hparam.td_tmax,1,p=p);
+							else if (p == "TAUCH") skip = read_num(line.substr(s+1,line.size()-1),&hparam.tau_ch,1,p=p);
+							else if (p == "TRXAS") skip = read_bool(line.substr(s+1,line.size()-1),trp.trXAS);
+							else if (p == "TRRIXS") skip = read_bool(line.substr(s+1,line.size()-1),trp.trRIXS);
+							else if (p == "TRRIXS2") skip = read_bool(line.substr(s+1,line.size()-1),trp.trRIXS2);
+							else if (p == "TRPROBESIGMA") skip = read_num(line.substr(s+1,line.size()-1),&trp.probe_sigma,1,p=p);
+							else if (p == "TRDTPROBE") skip = read_num(line.substr(s+1,line.size()-1),&trp.dt_probe,1,p=p);
+							else if (p == "TRDELAY") {
+								skip = read_num(line.substr(s+1,line.size()-1),delay_temp,3,p=p);
+								for (int i = 0; i < 3; ++i) trp.delay[i] = delay_temp[i];
+							}
+							else if (!p.empty()) {unknown_keys.push_back("&PUMP: " + p); skip = true;}
 							p = "";
 						}
 						if (line[s] == '#') skip = true;
@@ -257,11 +306,34 @@ void read_input(string IDIR, PM& pm, HParam& hparam, bool& overwrite) {
 				if (line == "&CONTROL") {
 					read_control = true;
 					read_photon = false;
+					read_pump = false;
 				}
 				else if (line == "&PHOTON") {
 					read_photon = true;
 					read_control = false;
+					read_pump = false;
 				}
+				else if (line == "&PUMP") {
+					read_pump = true;
+					read_control = false;
+					read_photon = false;
+				}
+				else if (line == "&CELL") {
+					// &CELL is parsed separately, in Hilbert's own pass over this file. Clearing the
+					// flags here means its keys are not fed to the previous section's chain, which
+					// happens whenever an input omits the '/' closing the section before it.
+					read_control = false;
+					read_photon = false;
+					read_pump = false;
+				}
+			}
+			if (!unknown_keys.empty()) {
+				std::cerr << "WARNING: " << unknown_keys.size() << " unrecognised input key(s); "
+						<< "these were IGNORED and their defaults used:" << std::endl;
+				for (auto& k : unknown_keys) std::cerr << "           " << k << std::endl;
+				std::cerr << "         A key only takes effect inside its own section: pump, probe and\n"
+						<< "         propagator keys in &PUMP, spectrum keys in &PHOTON, Hamiltonian\n"
+						<< "         keys in &CONTROL. Check spelling and placement." << std::endl;
 			}
 		} else throw invalid_argument("Cannot open " + IDIR + " file");
 	} catch (const exception &ex) {
@@ -497,11 +569,12 @@ int main(int argc, char** argv){
 
 	auto start = chrono::high_resolution_clock::now();
 	PM pm;
-	HParam hparam; 
+	HParam hparam;
+	TRParam trp;
 	bool overwrite = false;
 	string IDIR = "./INPUT";
 	if (argc == 2) IDIR = string(argv[1]);
-	read_input(IDIR,pm,hparam,overwrite);
+	read_input(IDIR,pm,hparam,overwrite,trp);
 	if (pm.edge == "K") {
 		if (hparam.FG[2] != 0 || hparam.FG[3] != 0) 
 			throw invalid_argument("invalid FG input");
@@ -535,12 +608,18 @@ int main(int argc, char** argv){
 	cout << endl << "CF: ";
 	for (int i = 0; i < 5; ++i) cout << hparam.CF[i] << ", ";
 	cout << endl;
+	cout << "Molecular/exchange field (MF): " << hparam.MF << " eV" << endl;
 
 	if (hparam.HYB) {
 		cout << "Hybridization turned on: "; 
 		cout << "tpd = " << hparam.tpd; 
 		cout << ", tpp = " << hparam.tpp; 
-		if (GS.coord == "oct") cout << ", z distortion = " << hparam.octJT << endl; 
+		if (GS.coord == "oct") cout << ", z distortion = " << hparam.octJT << endl;
+		if (GS.coord == "oct" && std::abs(hparam.octJT - 1.0) > 1e-12)
+			std::cerr << "WARNING: OCTJT = " << hparam.octJT << " is parsed and printed but NOT "
+						<< "APPLIED -- Octahedral::get_tmat pins its distance factor to 1, so the "
+						<< "tpd/tpp distance modulation is inert and this run is identical to "
+						<< "OCTJT = 1." << std::endl;
 		if (GS.coord != "ion") {
 			cout << ", sigma pi bond ratio = " << hparam.sig_pi; 
 			// if (hparam.tppsigma_on) cout << ", tppsigma on (only tppzpi!!!)" << endl; 
@@ -634,7 +713,117 @@ int main(int argc, char** argv){
 	auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
 	cout << "Number of Holes: " << GS.num_vh << endl;
 	cout << "Run time = " << duration.count() << " ms\n" << endl;
+	// process_hilbert_space swaps hparam.SC/hparam.SO[1] to excited-state (core-hole)
+	// values in place while building EX, and never restores them (nothing previously
+	// needed GS's ground-state parameters again afterward). Snapshot them here so any
+	// later ground-state-only Hamiltonian rebuild (e.g. for real-time propagation) uses
+	// the correct, unmutated ground-state parameters.
+	vector<double*> SC_gs = hparam.SC;
+	double SO1_gs = hparam.SO[1];
 	process_hilbert_space(GS,EX,hparam,pm);
+
+	if (hparam.time_dep) {
+		// hparam currently holds the core-hole (EX) values left behind by
+		// process_hilbert_space; snapshot that as hparam_ex, then restore ground-state
+		// values (as hparam already did for the GS-only harnesses) to get hparam_gs.
+		// trXAS/trRIXS need both: GS.hblks[*].ham_static must be built from ground-state
+		// Coulomb/SOC, EX.hblks[*].ham_static from core-hole values.
+		HParam hparam_ex = hparam;
+		hparam.SC = SC_gs;
+		hparam.SO[1] = SO1_gs;
+		HParam& hparam_gs = hparam;
+
+		// Reference output: the pump's A_x/A_y/A_z(t) profile, over whatever time range is
+		// actually being simulated by the selected mode below (the trXAS/trRIXS probe window
+		// if either is active, else the TDTMIN/TDTMAX occupation-scan/validation window).
+		double prof_t_lo = hparam.td_tmin, prof_t_hi = hparam.td_tmax;
+		if (trp.trRIXS || trp.trXAS) {
+			trp.set_delay_points();
+			if (!trp.delay_points.empty()) {
+				prof_t_lo = *std::min_element(trp.delay_points.begin(),trp.delay_points.end())
+								- trp.n_sigma_probe*trp.probe_sigma;
+				prof_t_hi = *std::max_element(trp.delay_points.begin(),trp.delay_points.end())
+								+ trp.n_sigma_probe*trp.probe_sigma;
+			}
+		}
+		write_pump_profile(hparam_gs, prof_t_lo, prof_t_hi, hparam.td_dt);
+
+		if (trp.trRIXS2) {
+			// Validation-only dispatch for the two-time-correlator Mode B: for each ground state,
+			// every matching core-hole block is accumulated COHERENTLY inside trRIXS_2time (see
+			// its own comment) into one combined amplitude before any |.|^2 is taken -- summing
+			// per-block *intensities* here instead (an earlier version's one-call-per-exblk,
+			// one-file-per-channel design) silently discarded real interference between core-hole
+			// blocks and was the actual root cause of this session's Mode B vs. reference mismatch.
+			trp.set_delay_points();
+			double gs_en = GS.hblks[0].eig[0];
+			for (auto &gsb : GS.hblks) for (size_t i = 0; i < gsb.nev; ++i) if (gsb.eig[i] <= gs_en) gs_en = gsb.eig[i];
+			std::vector<bindex> gsi;
+			for (size_t i = 0; i < GS.hblks.size(); ++i)
+				for (size_t j = 0; j < GS.hblks[i].nev; ++j)
+					if (std::abs(GS.hblks[i].eig[j]-gs_en) < TOL) gsi.push_back({i,j});
+			vecd loss_grid2(pm.nedos,0);
+			for (int i = 0; i < pm.nedos; ++i) loss_grid2[i] = pm.em_lo + (pm.em_energy-pm.em_lo)/pm.nedos*i;
+			int chan = 0;
+			for (auto& g : gsi) {
+				std::vector<size_t> ex_blk_inds;
+				for (auto& exblk : EX.hblks) {
+					size_t exblk_ind = &exblk - &EX.hblks[0];
+					if (!GS.SO_on && !EX.SO_on && GS.hblks[g.first].get_sz() != exblk.get_sz()) continue;
+					ex_blk_inds.push_back(exblk_ind);
+				}
+				if (ex_blk_inds.empty()) continue;
+				// Simulated (t1,t2) range and t2 truncation.
+				//
+				// sim_window_mult sets how far [t_lo,t_hi] extends beyond the extreme requested
+				// delays, as sim_window_mult*max(probe_sigma,tau_ch). It defaults to
+				// trp.n_sigma_probe (4), consistent with trXAS() and trRIXS_snapshot(), so that
+				// every requested delay sits >=4 probe-sigma inside the window and its Gaussian
+				// is not truncated. trRIXS_2time warns if any delay ends up under 3 sigma.
+				//
+				// This default USED TO BE 0.75, chosen only to match the toy Fortran reference's
+				// own bounded (nb=nt=1) window. That silently under-converged every production
+				// run: on the PRX Fig. 7 grid it put 13 of 15 delays under 3 sigma from an edge,
+				// including both delays used for the figure (0.75 sigma each), costing ~12% of
+				// their intensity. Set TRRIXS2_WINDOW_MULT=0.75 to reproduce those runs.
+				//
+				// t2_max_window bounds how far t2 runs past t1. The core-hole propagator carries
+				// exp(-|t2-t1|/tau_ch), so truncating at 8*tau_ch discards a relative 3e-4 while
+				// turning the (t1,t2) cost from O(n_is^2) into O(n_is * tau_ch/dt) -- the
+				// difference between an affordable production run and an unaffordable one. Set
+				// TRRIXS2_T2_WINDOW=-1 for the un-truncated sum (needed only to match the
+				// reference's own un-truncated (t1,t2) sum exactly).
+				trRIXS_2time(GS,EX,hparam_gs,hparam_ex,pm,g.first,g.second,ex_blk_inds,
+								pm.inc_e_points, loss_grid2, trp.delay_points, trp.probe_sigma,
+								hparam.tau_ch, hparam.td_dt, hparam.td_m,
+								std::getenv("TRRIXS2_WINDOW_MULT")
+									? std::atof(std::getenv("TRRIXS2_WINDOW_MULT"))
+									: (double)trp.n_sigma_probe,
+								std::getenv("TRRIXS2_T2_WINDOW")
+									? std::atof(std::getenv("TRRIXS2_T2_WINDOW"))
+									: 8.0*hparam.tau_ch,
+								"trRIXS2_chan"+std::to_string(chan),
+								// Diagnostic-only: TRRIXS2_COHERENT_FINAL reproduces the paper-1
+								// reference Fortran's coherent sum over final valence states, which
+								// is NOT the Eq. (11) cross section (see trRIXS_2time's own comment).
+								// Set it only to diff against that reference; leave it unset for physics.
+								std::getenv("TRRIXS2_COHERENT_FINAL") != nullptr);
+				chan++;
+			}
+			std::cout << std::endl
+				<< "=== trRIXS2 wrote " << chan << " channel(s) ===" << std::endl
+				<< "Each trRIXS2_chan<n>_* set is ONE degenerate ground state, not the cross" << std::endl
+				<< "section. The observable is their SUM over the " << gsi.size() << " degenerate" << std::endl
+				<< "ground state(s). Use util/sum_trrixs2_channels.py, or sum them yourself --" << std::endl
+				<< "reading chan0 alone silently drops the rest." << std::endl;
+		}
+		else if (trp.trRIXS) trRIXS(GS,EX,hparam_gs,hparam_ex,pm,trp);
+		else if (trp.trXAS) trXAS(GS,EX,hparam_gs,hparam_ex,pm,trp);
+		else if (hparam.td_occ_scan) scan_td_occupation(GS,hparam_gs,hparam.td_tmin,hparam.td_tmax);
+		else validate_propagator(GS,hparam_gs);
+		return 0;
+	}
+
 	// Calculate Cross Sections
 	vector<double> pvin = pm.pvin, pvout = pm.pvout;
 

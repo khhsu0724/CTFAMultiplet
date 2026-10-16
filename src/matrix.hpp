@@ -1,6 +1,7 @@
 #ifndef MATRIX
 #define MATRIX
 #include "helper.hpp"
+#include <stdexcept>
 #if defined __has_include && __has_include ("mkl.h") 
 #include "mkl.h" // Can we auto-detect if mkl is installed
 #include "mkl_lapacke.h"
@@ -240,6 +241,48 @@ private:
 		a += b;
 		return;
 	}           
+};
+
+// Propagation-only view combining a static Hamiltonian piece with a time-dependent one
+// (e.g. the pump-modulated hybridization). Never filled/diagonalized directly -- only
+// used for mat-vec inside real-time propagation (Lanczos/short-iterative-Lanczos).
+// Both pieces must already be malloc'd to the same block size; ownership stays with
+// whoever allocated them (typically a Block<T>), CombinedHam only holds raw pointers.
+template<typename T>
+class CombinedHam : public Matrix<T> {
+public:
+	CombinedHam(Matrix<T>* h_static, Matrix<T>* h_dyn) : h_static(h_static), h_dyn(h_dyn) {
+		this->mat_type = "COMBINED";
+		this->size = h_static->get_mat_dim();
+		if (h_dyn->get_mat_dim() != this->size)
+			throw std::invalid_argument("CombinedHam: static/dynamic matrix size mismatch");
+	};
+	void mvmult_cmplx(const vecc& vec_in, vecc& vec_out) {
+		vecc tmp(this->size,0);
+		h_static->mvmult_cmplx(vec_in, vec_out);
+		h_dyn->mvmult_cmplx(vec_in, tmp);
+		#pragma omp parallel for
+		for (int i = 0; i < this->size; ++i) vec_out[i] += tmp[i];
+		return;
+	};
+	void mvmult(T* vec_in, T* vec_out, int n) {
+		std::vector<T> tmp(n,0);
+		h_static->mvmult(vec_in, vec_out, n);
+		h_dyn->mvmult(vec_in, tmp.data(), n);
+		#pragma omp parallel for
+		for (int i = 0; i < n; ++i) vec_out[i] += tmp[i];
+		return;
+	};
+	vecc precond(const vecc& vec_in, dcomp shift) {return vecc(vec_in);}; // identity, not used by propagation
+	void fill_mat(int,int,T) {throw std::logic_error("CombinedHam: fill_mat unsupported, propagation-only view");};
+	void malloc(int) {throw std::logic_error("CombinedHam: malloc unsupported, propagation-only view");};
+	T* get_dense() {throw std::logic_error("CombinedHam: get_dense unsupported, propagation-only view");};
+	void clear_mat() {throw std::logic_error("CombinedHam: clear_mat unsupported, propagation-only view");};
+	void is_symmetric() {throw std::logic_error("CombinedHam: is_symmetric unsupported, propagation-only view");};
+	int get_mat_size() {return h_static->get_mat_size();};
+private:
+	Matrix<T>* h_static; // non-owning
+	Matrix<T>* h_dyn;    // non-owning
 };
 
 // A wrapper class for boost Sparse Matrix

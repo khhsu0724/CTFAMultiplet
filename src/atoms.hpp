@@ -47,7 +47,25 @@ struct HParam {
 	double nedos = 0; // PHASE OUT
 	double HFscale = 1.0;
 	double MLdelta = 0, octJT = 1, sig_pi = 0.5;
+	double MF = 0; // Molecular/exchange field on valence d spin (mean-field superexchange, eV)
+	// Time-dependent pump (Peierls shift of hybridization) and real-time propagator params.
+	// All times are in natural units (hbar=1), i.e. eV^-1 (1 eV^-1 = 0.658 fs).
+	double pump_freq = 0, pump_amp_x = 0, pump_amp_y = 0, pump_amp_z = 0;
+	double pump_sigma = 0, pump_t0 = 0;
+	bool time_dep = false;
+	double td_dt = 0.02; // Lanczos propagator time step
+	int td_m = 12;        // Krylov subspace dimension per propagator step
+	bool td_occ_scan = false; // if true, run scan_td_occupation instead of validate_propagator
+	double td_tmin = -5, td_tmax = 15; // time window for the occupation scan (eV^-1)
+	// Core-hole dwell-time lifetime for trXAS/trRIXS (Phase 3-4), eV^-1. This is a PHYSICAL
+	// core-hole lifetime (3d-TM L-edge / ligand K-edge: ~0.1-1 fs, i.e. ~0.15-1.5 eV^-1),
+	// deliberately INDEPENDENT of pm.eps_ab/eps_loss (those are numerical broadenings, not
+	// literal lifetimes). Do NOT set this to 1/EPSAB -- that reintroduces a real-time sweep
+	// of thousands of steps per probe sample (~9.2/eps_ab), which is what this independent
+	// parameter exists to avoid. Used as Gamma_ch = 1/tau_ch in tr_photon.hpp.
+	double tau_ch = 0.5;
 	double tpd = 0, tpp = 0, tpdz_ratio = 0.25;
+	double tpp_pi = 0; // ligand-ligand pi-bonding (SquarePlanar); see calc_HYB O-O coupling notes
 	bool tppsigma_on = false;
 	double SO[3]{0}, CF[5]{0};
 	double SC2[5]{0}, SC1[3]{0}, FG[4]{0}, SC2EX[5]{0};

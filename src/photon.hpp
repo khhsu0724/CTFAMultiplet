@@ -18,6 +18,7 @@ struct PM {
 	int spec_solver = 1; // 1 = exact, 2 = Classic K-H, 3 = both, 4 Lanczos/BiCGS
 	int precond = 0; // 0 = no preconditioner, 1 = supply initial guess from last incident e
 	double em_energy = 15;
+	double em_lo = -2; // lower bound of the RIXS loss-energy axis (was hardcoded -2 previously)
 	double gamma = 0.3;
 	double eps_ab = 0.1, eps_loss = 0.1;
 	double abmax = -1;
@@ -76,6 +77,31 @@ struct PM {
 	        inc_e_points.push_back(start + i * step);
 	    }
 	    return;
+	}
+};
+
+// Parameters specific to time-resolved (pump-probe) XAS/RIXS (Phase 3-4), analogous to PM.
+// All times are natural units (eV^-1), matching HParam's pump/propagator fields.
+struct TRParam {
+	bool trXAS = false, trRIXS = false;
+	bool trRIXS2 = false; // Mode B: genuine two-time correlator (validation-only for now)
+	double probe_sigma = 1.0;    // Gaussian probe envelope width (eV^-1)
+	vecd delay = vecd({0,0,0});  // [start, end, num] delay-time scan, mirrors PM::incident
+	vecd delay_points;
+	double dt_probe = -1;        // <=0 => use hparam.td_dt
+	int n_sigma_probe = 4;       // probe-window truncation multiplier
+	void set_delay_points() {
+		if (delay.size() != 3) {
+			std::cout << "TRDELAY needs 3 values: start, end, num" << std::endl;
+			exit(1);
+		}
+		double start = delay.at(0), end = delay.at(1);
+		int num = (int)delay.at(2);
+		if (num <= 0) return;
+		if (num == 1) { delay_points.push_back(start); return; }
+		double step = (end-start)/(1.0*(num-1));
+		for (int i = 0; i < num; ++i) delay_points.push_back(start + i*step);
+		return;
 	}
 };
 
